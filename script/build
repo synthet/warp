@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+#
+# Build Synth Warp and resume from target/ after an interrupt or out-of-memory crash.
+# On Windows this dispatches to script/windows/build.ps1.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+cd "${REPO_ROOT}"
+
+OS_TYPE="$(uname -s 2>/dev/null || echo unknown)"
+
+usage() {
+  cat <<EOF
+Usage: ./script/build [options]
+
+Build Synth Warp (default: warp-oss with --features gui). Re-running this
+script continues from target/ instead of starting over. Transient failures
+(page-file exhaustion, rustc crash) are retried with fewer jobs.
+
+Options:
+  -h, --help              Show this help.
+  --clean                 cargo clean before building (do not resume).
+  --release               Build with --release.
+  --jobs N                Cargo parallelism (default: 2 on Windows, 4 elsewhere).
+  --retries N             Extra attempts after a retryable failure (default: 8).
+  --retry-wait N          Pause between retries in seconds (default: 15).
+  --bin NAME              Cargo binary (default: warp-oss).
+  --features LIST         Cargo features (default: gui).
+  --package NAME          Cargo package (default: warp).
+
+Windows:
+  ./script/build
+  ./script/windows/build.ps1
+
+Log and resume state: target/synth-build.log  target/synth-build-resume.json
+EOF
+}
+
+CLEAN=0
+RELEASE=0
+JOBS=""
+RETRIES=8
+RETRY_WAIT=15
+BIN="warp-oss"
+FEATURES="gui"
+PACKAGE="warp"
+
+while (($#)); do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --clean)
+      CLEAN=1
+      shift
+      ;;
+    --release)
+      RELEASE=1
+      shift
+      ;;
+    --jobs)
+      JOBS="${2:?--jobs requires a value}"
+      shift 2
+      ;;
+    --retries)
+      RETRIES="${2:?--retries requires a value}"
+      shift 2
+      ;;
+    --retry-wait)
+      RETRY_WAIT="${2:?--retry-wait requires a value}"
+      shift 2
+      ;;
+    --bin)
+      BIN="${2:?--bin requires a value}"
+      shift 2
+      ;;
+    --features)
+      FEATURES="${2:?--features requires a value}"
+      shift 2
+      ;;
+    --package)
+      PACKAGE="${2:?--package requires a value}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "${OS_TYPE}" =~ ^(MINGW|MSYS|CYGWIN) ]] || [[ -n "${WINDIR:-}" ]]; then
+  PS_ARGS=()
+  if [[ "${CLEAN}" -eq 1 ]]; then PS_ARGS+=(-Clean); fi
+  if [[ "${RELEASE}" -eq 1 ]]; then PS_ARGS+=(-Release); fi
+  if [[ -n "${JOBS}" ]]; then PS_ARGS+=(-Jobs "${JOBS}"); fi
+  PS_ARGS+=(-Retries "${RETRIES}" -RetryWaitSeconds "${RETRY_WAIT}" -Bin "${BIN}" -Features "${FEATURES}" -Package "${PACKAGE}")
+  PS_FILE="${REPO_ROOT}/script/windows/build.ps1"
+  if command -v pwsh >/dev/null 2>&1; then
+    exec pwsh -NoProfile -ExecutionPolicy Bypass -File "${PS_FILE}" "${PS_ARGS[@]}"
+  fi
+  exec powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${PS_FILE}" "${PS_ARGS[@]}"
+fi
+
+TARGET_DIR="${REPO_ROOT}/target"
+STATE_PATH="${TARGET_DIR}/synth-build-resume.json"
+LOG_PATH="${TARGET_DIR}/synth-build.log"
+mkdir -p "${TARGET_DIR}"
+
+if [[ -z "${JOBS}" ]]; then
+  if command -v nproc >/dev/null 2>&1; then
+    JOBS="$(nproc)"
+  else
+    JOBS=4
+  fi
+  if [[ "${JOBS}" -gt 4 ]]; then JOBS=4; fi
+  if [[ "${JOBS}" -lt 1 ]]; then JOBS=1; fi
+fi
+
+export CARGO_BUILD_JOBS="${JOBS}"
+export CARGO_INCREMENTAL=1
+
+is_retryable() {
+  grep -Eiq 'os error 1455|paging file|memory allocation of|STATUS_STACK_BUFFER_OVERRUN|0xc0000409|internal compiler error|fatal runtime error|failed to mmap|signal: 9|[[:space:]]Killed[[:space:]]|STATUS_NO_MEMORY' "$1"
+}
+
+write_state() {
+  local attempt="$1" jobs="$2" exit_code="$3" reason="$4"
+  cat > "${STATE_PATH}" <<EOF
+{"bin":"${BIN}","features":"${FEATURES}","release":${RELEASE},"jobs":${jobs},"attempt":${attempt},"last_exit":${exit_code},"last_error":"${reason}","log":"${LOG_PATH}","resume":"./script/build --jobs ${jobs} --bin ${BIN} --features ${FEATURES}"}
+EOF
+}
+
+if [[ "${CLEAN}" -eq 1 ]]; then
+  echo "Cleaning target/ (--clean); this will not resume previous artifacts."
+  cargo clean
+  rm -f "${STATE_PATH}" "${LOG_PATH}"
+elif [[ -f "${STATE_PATH}" ]]; then
+  echo "Resuming previous build from ${STATE_PATH}"
+  echo "Incremental artifacts in target/ will be reused."
+else
+  echo "Starting build. Re-run ./script/build to resume if it is interrupted."
+fi
+
+echo "cargo=$(cargo --version)"
+echo "rustc=$(rustc --version)"
+echo "jobs=${JOBS} log=${LOG_PATH}"
+{
+  echo
+  echo "==== $(date -Iseconds 2>/dev/null || date) bin=${BIN} features=${FEATURES} jobs=${JOBS} release=${RELEASE} ===="
+} >> "${LOG_PATH}"
+
+max_attempts=$((RETRIES + 1))
+exit_code=1
+attempt=1
+while [[ "${attempt}" -le "${max_attempts}" ]]; do
+  echo "Attempt ${attempt} / ${max_attempts} (jobs=${JOBS})"
+  write_state "${attempt}" "${JOBS}" 0 running
+  cargo_args=(build -p "${PACKAGE}" --bin "${BIN}" --features "${FEATURES}" -j "${JOBS}")
+  if [[ "${RELEASE}" -eq 1 ]]; then
+    cargo_args+=(--release)
+  fi
+  echo "cargo ${cargo_args[*]}"
+  set +e
+  cargo "${cargo_args[@]}" 2>&1 | tee -a "${LOG_PATH}"
+  exit_code="${PIPESTATUS[0]}"
+  set -e
+  if [[ "${exit_code}" -eq 0 ]]; then
+    write_state "${attempt}" "${JOBS}" 0 ok
+    profile_dir=debug
+    if [[ "${RELEASE}" -eq 1 ]]; then profile_dir=release; fi
+    echo "Build succeeded: ${TARGET_DIR}/${profile_dir}/${BIN}"
+    exit 0
+  fi
+  tail_file="$(mktemp)"
+  tail -n 80 "${LOG_PATH}" > "${tail_file}"
+  retryable=0
+  if is_retryable "${tail_file}"; then retryable=1; fi
+  rm -f "${tail_file}"
+  if [[ "${retryable}" -eq 0 ]] || [[ "${attempt}" -ge "${max_attempts}" ]]; then
+    reason=compile-error
+    if [[ "${retryable}" -eq 1 ]]; then reason=retryable-exhausted; fi
+    write_state "${attempt}" "${JOBS}" "${exit_code}" "${reason}"
+    echo "Build failed with exit ${exit_code}. Resume with: ./script/build"
+    exit "${exit_code}"
+  fi
+  next_jobs="${JOBS}"
+  if [[ "${JOBS}" -gt 1 ]]; then
+    next_jobs=$((JOBS - 1))
+  fi
+  echo "Retryable failure (OOM/rustc crash). Waiting ${RETRY_WAIT}s then retrying with jobs=${next_jobs}"
+  JOBS="${next_jobs}"
+  export CARGO_BUILD_JOBS="${JOBS}"
+  write_state "${attempt}" "${JOBS}" "${exit_code}" oom-or-crash
+  sleep "${RETRY_WAIT}"
+  attempt=$((attempt + 1))
+done
+
+exit "${exit_code}"

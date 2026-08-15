@@ -20,9 +20,12 @@ Warp’s server, Drive backend, and hosted agent inference are **not** in this r
 
 ```bash
 ./script/bootstrap   # platform-specific setup
+./script/build       # resumable compile (re-run after OOM or interrupt)
 ./script/run         # build and run Synth Warp
 ./script/presubmit   # fmt, clippy, and tests
 ```
+
+On Windows, `.\script\windows\build.ps1` (or `.\script\build.cmd`) sets up MSVC and retries with fewer jobs after a crash. Incremental artifacts in `target\` are reused unless you pass `-Clean` / `--clean`.
 
 See [AGENTS.md](AGENTS.md) for the engineering guide and [docs/](docs/README.md) for design notes, including the [Zed × Warp hybrid](docs/zed-warp/README.md).
 
