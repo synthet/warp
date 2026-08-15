@@ -44,8 +44,8 @@ impl ChannelState {
             config: ChannelConfig {
                 app_id,
                 logfile_name: "".into(),
-                server_config: WarpServerConfig::production(),
-                oz_config: OzConfig::production(),
+                server_config: WarpServerConfig::disabled(),
+                oz_config: OzConfig::disabled(),
                 telemetry_config: None,
                 autoupdate_config: None,
                 crash_reporting_config: None,
@@ -62,6 +62,7 @@ impl ChannelState {
     }
 
     pub fn new(channel: Channel, mut config: ChannelConfig) -> Self {
+        config = config.without_remote_telemetry();
         if let Some(app_id) = app_id_from_bundle() {
             config.app_id = app_id;
         }
@@ -121,6 +122,17 @@ impl ChannelState {
             return false;
         };
         url.host_str() == Some("staging.warp.dev")
+    }
+
+    /// Whether this process may contact Warp-hosted backends (`app.warp.dev`,
+    /// Drive/RTC, Oz, Warp Firebase). False for OSS/Integration, and for
+    /// Local/Dev unless `server_root_url` is a non-production origin.
+    pub fn warp_cloud_enabled() -> bool {
+        let state = CHANNEL_STATE.lock();
+        warp_cloud_enabled_for(
+            state.channel,
+            state.config.server_config.server_root_url.as_ref(),
+        )
     }
 
     /// Returns the canonical identifier for the application.
@@ -194,6 +206,15 @@ impl ChannelState {
     /// should be hidden since the toggle has no effect.
     pub fn is_telemetry_available() -> bool {
         CHANNEL_STATE.lock().config.telemetry_config.is_some()
+    }
+
+    /// Whether this process may POST usage telemetry or crash reports to a
+    /// remote collector (Rudderstack, Sentry, or similar).
+    ///
+    /// Synth Warp is local-first: this is always `false`. In-process event
+    /// recording and optional local file logs remain available.
+    pub fn telemetry_remote_export_enabled() -> bool {
+        false
     }
 
     /// Returns whether this build has a crash reporting config and can therefore
@@ -401,6 +422,32 @@ impl ChannelState {
     }
 }
 
+/// Whether Warp-hosted backends should be contacted for this channel and
+/// configured server root. See [`ChannelState::warp_cloud_enabled`].
+pub fn warp_cloud_enabled_for(channel: Channel, server_root_url: &str) -> bool {
+    match channel {
+        Channel::Oss | Channel::Integration => false,
+        Channel::Stable | Channel::Preview => true,
+        Channel::Local | Channel::Dev => !is_hosted_warp_production_url(server_root_url),
+    }
+}
+
+fn is_hosted_warp_production_url(url: &str) -> bool {
+    Url::parse(url)
+        .ok()
+        .and_then(|parsed| parsed.host_str().map(is_hosted_warp_cloud_host))
+        .unwrap_or(false)
+}
+
+/// Hosts that belong to Warp's cloud (app, RTC, Oz, Drive) or Warp Firebase auth.
+pub fn is_hosted_warp_cloud_host(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    host == "warp.dev"
+        || host.ends_with(".warp.dev")
+        || host == "identitytoolkit.googleapis.com"
+        || host == "securetoken.googleapis.com"
+}
+
 /// Derives an HTTP(S) origin URL from a WebSocket URL by rewriting the scheme
 /// (`wss`→`https`, `ws`→`http`) and stripping the path, query, and fragment.
 /// Returns [`None`] when the input cannot be parsed as a URL or uses a scheme
@@ -424,6 +471,16 @@ fn derive_http_origin_from_ws_url(ws_url: &str) -> Option<String> {
 #[cfg(all(test, not(feature = "test-util")))]
 #[path = "state_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod remote_export_tests {
+    use super::ChannelState;
+
+    #[test]
+    fn telemetry_remote_export_is_disabled() {
+        assert!(!ChannelState::telemetry_remote_export_enabled());
+    }
+}
 
 fn app_id_from_bundle() -> Option<AppId> {
     // On macOS, attempt to determine the app ID from the containing bundle,

@@ -484,10 +484,10 @@ fn test_tools_panel_preferences_activate_after_signup_and_ai_enablement() {
             });
             workspace.handle_left_panel_event(&LeftPanelEvent::SignInRequested, ctx);
             assert!(
-                workspace
+                !workspace
                     .current_workspace_state
                     .is_require_login_modal_open,
-                "locked-panel Sign in should open the existing auth modal"
+                "locked-panel Sign in must not open a Warp account login modal"
             );
             // Keep the remainder of this state-transition test focused on the
             // tool panel rather than modal rendering.

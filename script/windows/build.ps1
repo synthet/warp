@@ -190,15 +190,21 @@ function Get-FreeRamGb {
 
 function Get-DefaultJobs {
     $freeGb = Get-FreeRamGb
-    $jobs = [int][math]::Floor($freeGb / 4)
+    $jobs = [int][math]::Floor($freeGb / 6)
     if ($jobs -lt 1) { $jobs = 1 }
-    if ($jobs -gt 4) { $jobs = 4 }
+    if ($jobs -gt 2) { $jobs = 2 }
     return $jobs
 }
 
 function Test-RetryableFailure {
-    param([string]$Text)
-    return $Text -match 'os error 1455|paging file|Файл подкачки|memory allocation of|STATUS_STACK_BUFFER_OVERRUN|0xc0000409|internal compiler error|fatal runtime error|failed to mmap|signal: 9|\bKilled\b|STATUS_NO_MEMORY'
+    param(
+        [string]$Text,
+        [int]$ExitCode
+    )
+    if ($ExitCode -lt 0) { return $true }
+    # NTSTATUS: STACK_BUFFER_OVERRUN, NO_MEMORY, STACK_OVERFLOW
+    if ($ExitCode -in @(3221226505, 3221225495, 3221225725)) { return $true }
+    return $Text -match 'os error 1455|paging file|Файл подкачки|memory allocation of|STATUS_STACK_BUFFER_OVERRUN|0xc0000409|internal compiler error|fatal runtime error|failed to mmap|signal: 9|\bKilled\b|STATUS_NO_MEMORY|file lock on package cache|Blocking waiting for file lock'
 }
 
 function Save-BuildState {
@@ -250,19 +256,21 @@ function Invoke-CargoBuild {
         $cargoArgs += '--release'
     }
     Write-Host "cargo $($cargoArgs -join ' ')"
-    $writer = [System.IO.StreamWriter]::new($LogPath, $true)
-    $writer.AutoFlush = $true
+    Add-Content -Path $LogPath -Value "cargo $($cargoArgs -join ' ')"
+    $oldEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     try {
-        & cargo @cargoArgs 2>&1 | ForEach-Object {
-            $line = "$_"
-            [Console]::WriteLine($line)
-            $writer.WriteLine($line)
-        }
+        # Invoke cargo directly. Start-Process -NoNewWindow -Wait can hang after
+        # cargo exits when attached to this console; piping 2>&1 turns cargo
+        # stderr into NativeCommandError in PowerShell 7+.
+        $cargoExe = (Get-Command cargo -Type Application).Source
+        & $cargoExe @cargoArgs
+        $code = $LASTEXITCODE
     } finally {
-        $writer.Dispose()
+        $ErrorActionPreference = $oldEap
     }
-    $code = $LASTEXITCODE
-    if ($null -eq $code) { return 1 }
+    if ($null -eq $code) { $code = 1 }
+    Add-Content -Path $LogPath -Value "cargo exit $code"
     return $code
 }
 
@@ -320,7 +328,7 @@ for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
     }
 
     $tail = Get-Content -Path $LogPath -Tail 80 -ErrorAction SilentlyContinue | Out-String
-    $retryable = Test-RetryableFailure -Text $tail
+    $retryable = Test-RetryableFailure -Text $tail -ExitCode $exitCode
     if (-not $retryable -or $attempt -ge $maxAttempts) {
         Save-BuildState -Attempt $attempt -JobCount $Jobs -ExitCode $exitCode -Reason $(if ($retryable) { 'retryable-exhausted' } else { 'compile-error' })
         Write-Output "Build failed with exit $exitCode. Resume with: .\script\windows\build.ps1"

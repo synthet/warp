@@ -51,6 +51,10 @@ impl ChangelogModel {
                 // There is already a request pending, so no-op while we wait for the response
             }
             ChangelogState::None => {
+                if !ChannelState::warp_cloud_enabled() {
+                    ctx.emit(Event::ChangelogRequestFailed { request_type });
+                    return;
+                }
                 self.changelog = ChangelogState::Pending;
                 let server_api = self.server_api.clone();
                 let _ = ctx.spawn(

@@ -32,7 +32,7 @@ Warp’s server, Drive backend, and Oz orchestration are **not** in the Warp rep
 
 `TabConfigPaneType::Cloud` exists in the schema; do not require it for Zed layouts. Prefer `terminal` and `agent` (CLI) panes.
 
-Synth Warp: app id `io.github.synthet.Warp`, URL scheme **`warposs`**, default-run binary `warp-oss`.
+Synth Warp: app id `io.github.synthet.Warp`, other binaries `io.github.synthet.Warp*` (Local, Tui, …). URL scheme **`warposs`**, default-run binary `warp-oss`. Do not use `synth.dev` / `dev.synth.*`. Warp-side parse: `(Warp) crates/warp_core/src/app_id.rs` (`splitn(3, '.')`).
 
 Synth Zed: keep upstream GPL; deep links `synthzed://…`. Do not assume a license change.
 

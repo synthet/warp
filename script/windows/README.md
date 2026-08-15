@@ -1,4 +1,41 @@
-# Inno Setup installer script
+# Windows packaging and local deploy
+
+## Local deploy onto `C:\Program Files\Warp`
+
+Use this to overlay a Synth Warp (OSS) build onto the existing official install
+without running the Inno Setup wizard. Start Menu shortcuts and `unins000.*` stay
+in place. Re-run after each build.
+
+```powershell
+.\script\windows\deploy.ps1              # build release OSS, overlay, restart
+.\script\windows\deploy.ps1 -SkipBuild   # copy last build only
+.\script\windows\deploy.ps1 -Debug       # faster non-release overlay
+```
+
+`deploy.cmd` in this folder is a double-clickable wrapper for the same script.
+UAC elevation happens only for the copy step, so a rebuild is not repeated as
+Administrator.
+
+Before the **first** overlay:
+
+- Quit Warp.
+- Optional: copy `C:\Program Files\Warp` and `%APPDATA%\warp\Warp` somewhere safe.
+  Deploy does not delete AppData; the official uninstaller still would.
+- If Warp was installed with winget, pin it so `winget upgrade` cannot restore
+  official binaries: `winget pin add --name Warp` (confirm the package id with
+  `winget list Warp` first).
+
+Do **not** uninstall official Warp as part of this loop. That would wipe AppData
+and remove the shortcuts the overlay relies on.
+
+The overlaid binary is still the OSS channel (`warposs://`, no Warp.dev
+auto-update). Settings live under `io.github.synthet.Warp`, not
+`%APPDATA%\warp\Warp`. Explorer “Open Warp here” commands that still use
+`Warp://` are rewritten to `warposs://` on deploy. If `cargo about` is not
+installed, deploy still copies `resources\bundled` and skips license/schema
+generation.
+
+Shipping installers (WarpOss / `warp-oss.exe`) continue to use Inno Setup below.
 
 ## What is `windows-installer.iss`?
 

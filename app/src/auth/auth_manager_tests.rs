@@ -7,7 +7,7 @@ use warpui::{App, SingletonEntity};
 
 use super::{AuthManager, AuthManagerEvent, request_device_code_with_timeout};
 use crate::ServerApiProvider;
-use crate::auth::auth_view_modal::AuthRedirectPayload;
+use crate::auth::auth_view_modal::{AuthRedirectPayload, AuthViewVariant};
 use crate::auth::credentials::{Credentials, LoginToken, RefreshToken};
 use crate::auth::user::{FirebaseAuthTokens, TEST_USER_UID, User};
 use crate::auth::{AuthStateProvider, UserUid};
@@ -349,5 +349,44 @@ fn test_persist_skips_when_api_key_authenticated() {
         AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {
             auth_manager.persist(ctx);
         });
+    });
+}
+
+#[test]
+fn local_only_signup_and_login_gated_features_emit_no_auth_events() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let emitted = Arc::new(AtomicBool::new(false));
+        let emitted_for_closure = emitted.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&AuthManager::handle(ctx), move |_, event, _| {
+                if matches!(
+                    event,
+                    AuthManagerEvent::AttemptedLoginGatedFeature { .. }
+                        | AuthManagerEvent::MintCustomTokenFailed(_)
+                ) {
+                    emitted_for_closure.store(true, Ordering::Relaxed);
+                }
+            });
+        });
+
+        AuthManager::handle(&app).update(&mut app, |auth_manager, ctx| {
+            auth_manager.initiate_anonymous_user_linking(
+                crate::server::telemetry::AnonymousUserSignupEntrypoint::SignUpButton,
+                ctx,
+            );
+            auth_manager.attempt_login_gated_feature(
+                "Upgrade Plan",
+                AuthViewVariant::RequireLoginCloseable,
+                ctx,
+            );
+            auth_manager.anonymous_user_hit_drive_object_limit(ctx);
+        });
+
+        assert!(
+            !emitted.load(Ordering::Relaxed),
+            "Synth Warp must not emit Warp account login/signup events"
+        );
     });
 }

@@ -473,8 +473,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::WarpifyFooter,
         #[cfg(feature = "solo_user_byok")]
         FeatureFlag::SoloUserByok,
-        #[cfg(feature = "billing_and_usage_page_v2")]
-        false,
         #[cfg(feature = "gpt_configurable_context_window")]
         FeatureFlag::GPTConfigurableContextWindow,
         #[cfg(feature = "skip_firebase_anonymous_user")]

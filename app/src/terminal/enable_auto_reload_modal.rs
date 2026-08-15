@@ -161,32 +161,34 @@ impl EnableAutoReloadModalBody {
                 };
                 if discount_percent > 0 {
                     MenuItemFields::new_with_custom_label(
-                        Arc::new(enclose!((primary_text) move |is_selected, is_hovered, appearance, _| {
-                            let text_color = appearance.theme().main_text_color(
-                                if is_selected || is_hovered {
-                                    appearance.theme().accent()
-                                } else {
-                                    appearance.theme().surface_1()
-                                }
-                            );
-                            let main_text = Text::new_inline(
-                                primary_text.clone(),
-                                appearance.ui_font_family(),
-                                appearance.ui_font_size(),
-                            )
-                            .with_color(text_color.into())
-                            .finish();
+                        Arc::new(
+                            enclose!((primary_text) move |is_selected, is_hovered, appearance, _| {
+                                let text_color = appearance.theme().main_text_color(
+                                    if is_selected || is_hovered {
+                                        appearance.theme().accent()
+                                    } else {
+                                        appearance.theme().surface_1()
+                                    }
+                                );
+                                let main_text = Text::new_inline(
+                                    primary_text.clone(),
+                                    appearance.ui_font_family(),
+                                    appearance.ui_font_size(),
+                                )
+                                .with_color(text_color.into())
+                                .finish();
 
-                            let discount_badge = Empty::new().finish();
+                                let discount_badge = Empty::new().finish();
 
-                            Flex::row()
-                                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                                .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
-                                .with_main_axis_size(MainAxisSize::Max)
-                                .with_child(main_text)
-                                .with_child(discount_badge)
-                                .finish()
-                        })),
+                                Flex::row()
+                                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                                    .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
+                                    .with_main_axis_size(MainAxisSize::Max)
+                                    .with_child(main_text)
+                                    .with_child(discount_badge)
+                                    .finish()
+                            }),
+                        ),
                         Some(primary_text),
                     )
                     .with_on_select_action(DropdownAction::select_action_and_close(

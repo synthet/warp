@@ -20,8 +20,6 @@ use warpui::windowing::WindowManager;
 use warpui::{AppContext, SingletonEntity};
 
 use crate::ai::persisted_workspace::PersistedWorkspace;
-use crate::auth;
-use crate::auth::AuthStateProvider;
 use crate::default_terminal::DefaultTerminal;
 use crate::features::{FeatureFlag, runtime_flags_menu_items};
 use crate::root_view::OpenLaunchConfigArg;
@@ -73,7 +71,6 @@ pub fn menu_bar(ctx: &mut AppContext) -> MenuBar {
         make_new_ai_menu(ctx),
         make_new_drive_menu(ctx),
         make_new_window_menu(),
-        make_new_help_menu(),
     ])
 }
 
@@ -229,21 +226,6 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
         None,
     )));
     menu_items.push(MenuItem::Separator);
-    menu_items.push(MenuItem::Custom(CustomMenuItem::new(
-        "Log out",
-        auth::maybe_log_out,
-        move |_, ctx| {
-            let is_anonymous = AuthStateProvider::handle(ctx)
-                .as_ref(ctx)
-                .get()
-                .is_anonymous_or_logged_out();
-            MenuItemPropertyChanges {
-                disabled: Some(is_anonymous),
-                ..Default::default()
-            }
-        },
-        None,
-    )));
     menu_items.push(MenuItem::Standard(StandardAction::Quit));
     Menu::new("Warp", menu_items)
 }
@@ -911,6 +893,7 @@ fn link_menu_item(title: &'static str, link: Cow<'static, str>) -> MenuItem {
     ))
 }
 
+#[allow(dead_code)]
 fn feedback_menu_item() -> MenuItem {
     MenuItem::Custom(CustomMenuItem::new(
         "Send Feedback...",
@@ -925,6 +908,7 @@ fn feedback_menu_item() -> MenuItem {
     ))
 }
 
+#[allow(dead_code)]
 fn make_new_help_menu() -> Menu {
     Menu::new(
         "Help",

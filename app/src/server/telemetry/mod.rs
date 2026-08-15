@@ -101,7 +101,9 @@ impl TelemetryApi {
             self.persist_events_to_telemetry_log_file(events.clone())?;
         }
 
-        if ChannelState::is_release_bundle() || FeatureFlag::WithSandboxTelemetry.is_enabled() {
+        if ChannelState::telemetry_remote_export_enabled()
+            && (ChannelState::is_release_bundle() || FeatureFlag::WithSandboxTelemetry.is_enabled())
+        {
             self.send_batch_messages_to_rudder(
                 events
                     .into_iter()
@@ -122,6 +124,12 @@ impl TelemetryApi {
         path: &Path,
         settings_snapshot: PrivacySettingsSnapshot,
     ) -> Result<()> {
+        if !ChannelState::telemetry_remote_export_enabled() {
+            log::debug!(
+                "Skipping persisted Rudderstack flush because remote telemetry export is disabled."
+            );
+            return Ok(());
+        }
         if path.exists() {
             let file = File::open(path)?;
             let events: Vec<RudderBatchMessage> = serde_json::from_reader(file)?;
@@ -252,8 +260,9 @@ impl TelemetryApi {
                 self.persist_events_to_telemetry_log_file(vec![event.clone()])?;
             }
 
-            if !(ChannelState::is_release_bundle()
-                || FeatureFlag::WithSandboxTelemetry.is_enabled())
+            if !(ChannelState::telemetry_remote_export_enabled()
+                && (ChannelState::is_release_bundle()
+                    || FeatureFlag::WithSandboxTelemetry.is_enabled()))
             {
                 return Result::Ok(());
             }
@@ -306,6 +315,10 @@ impl TelemetryApi {
         messages: Vec<RudderBatchMessageWithMetadata>,
         settings_snapshot: PrivacySettingsSnapshot,
     ) -> Result<()> {
+        if !ChannelState::telemetry_remote_export_enabled() {
+            log::debug!("Dropping RudderStack telemetry batch because remote export is disabled.");
+            return Ok(());
+        }
         if messages.is_empty() {
             log::debug!("Dropping empty RudderStack telemetry batch");
             return Ok(());
@@ -383,6 +396,13 @@ impl TelemetryApi {
         mut msg: RudderMessage,
         rudder_stack_destination: RudderStackDestination,
     ) -> Result<()> {
+        if !ChannelState::telemetry_remote_export_enabled() {
+            log::debug!(
+                "Skipping RudderStack HTTP request because remote telemetry export is disabled."
+            );
+            return Ok(());
+        }
+
         msg.attach_context();
 
         let path = match msg {

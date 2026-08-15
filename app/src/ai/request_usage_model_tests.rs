@@ -86,8 +86,7 @@ fn add_request_usage_model_with_client(
     app.add_singleton_model(|ctx| AIRequestUsageModel::new_for_test(ai_client, ctx))
 }
 
-fn set_addon_credits_pricing_info(app: &mut App) {
-}
+fn set_addon_credits_pricing_info(app: &mut App) {}
 
 fn standard_purchase_policy() -> PurchaseAddOnCreditsPolicy {
     PurchaseAddOnCreditsPolicy {

@@ -6,8 +6,6 @@ use std::time::Duration;
 use anyhow::{Result, anyhow};
 use futures::future::Either;
 use settings::Setting as _;
-#[cfg(target_family = "wasm")]
-use url::Url;
 use uuid::Uuid;
 use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
@@ -45,13 +43,8 @@ use crate::settings::cloud_preferences_syncer::CloudPreferencesSyncer;
 use crate::settings::initializer::SettingsInitializer;
 use crate::terminal::general_settings::GeneralSettings;
 use crate::terminal::shared_session::manager::Manager as SharedSessionManager;
-#[cfg(target_family = "wasm")]
-use crate::uri::browser_url_handler::{parse_current_url, update_browser_url};
 use crate::workspaces::team_tester::TeamTesterStatus;
-use crate::{
-    GlobalResourceHandlesProvider, TelemetryEvent, persistence, send_telemetry_from_ctx,
-    send_telemetry_sync_from_ctx,
-};
+use crate::{GlobalResourceHandlesProvider, TelemetryEvent, persistence, send_telemetry_from_ctx};
 
 #[derive(Debug)]
 pub enum AuthManagerEvent {
@@ -718,73 +711,23 @@ impl AuthManager {
 
     pub fn attempt_login_gated_feature(
         &self,
-        feature: LoginGatedFeature,
-        auth_view_variant: AuthViewVariant,
-        ctx: &mut ModelContext<Self>,
+        _feature: LoginGatedFeature,
+        _auth_view_variant: AuthViewVariant,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        if self.auth_state.is_anonymous_or_logged_out() {
-            send_telemetry_from_ctx!(
-                TelemetryEvent::AnonymousUserAttemptLoginGatedFeature { feature },
-                ctx
-            );
-            ctx.emit(AuthManagerEvent::AttemptedLoginGatedFeature { auth_view_variant });
-        };
+        // Synth Warp is local-first: never open the Warp account login modal.
     }
 
-    pub fn anonymous_user_hit_drive_object_limit(&self, ctx: &mut ModelContext<Self>) {
-        if self.auth_state.is_anonymous_or_logged_out() {
-            send_telemetry_from_ctx!(TelemetryEvent::AnonymousUserHitCloudObjectLimit, ctx);
-            ctx.emit(AuthManagerEvent::AttemptedLoginGatedFeature {
-                auth_view_variant: AuthViewVariant::HitDriveObjectLimitCloseable,
-            });
-        };
+    pub fn anonymous_user_hit_drive_object_limit(&self, _ctx: &mut ModelContext<Self>) {
+        // Synth Warp is local-first: never prompt to create a Warp account.
     }
 
     pub fn initiate_anonymous_user_linking(
         &self,
-        entrypoint: AnonymousUserSignupEntrypoint,
-        ctx: &mut ModelContext<Self>,
+        _entrypoint: AnonymousUserSignupEntrypoint,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let auth_client = self.auth_client.clone();
-        let _ = ctx.spawn(
-            async move { auth_client.fetch_new_custom_token().await },
-            move |me, response, ctx| {
-                let custom_token = me.auth_client.on_custom_token_fetched(response);
-
-                match custom_token {
-                    Ok(custom_token) => {
-                        // Send synchronously since this is an important event in the sign up funnel and we
-                        // don't want to lose events if the user quits before the event queue is flushed.
-                        send_telemetry_sync_from_ctx!(
-                            TelemetryEvent::InitiateAnonymousUserSignup { entrypoint },
-                            ctx
-                        );
-                        let login_options_url = me.login_options_url(&custom_token);
-                        if cfg!(target_family = "wasm") {
-                            #[cfg(target_family = "wasm")]
-                            if let Some(current_url) = parse_current_url() {
-                                update_browser_url(
-                                    Url::parse(&format!(
-                                        "{}?redirect_to={}",
-                                        login_options_url,
-                                        current_url.path()
-                                    ))
-                                    .ok(),
-                                    true,
-                                );
-                            } else {
-                                update_browser_url(Url::parse(&login_options_url).ok(), true);
-                            }
-                        } else {
-                            ctx.open_url(&login_options_url);
-                        }
-                    }
-                    Err(e) => {
-                        ctx.emit(AuthManagerEvent::MintCustomTokenFailed(e));
-                    }
-                }
-            },
-        );
+        // Synth Warp is local-first: never mint a token or open a sign-up URL.
     }
 
     // Opens a page in the web app and logs the user in using a customToken if they are an anonymous user.

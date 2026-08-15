@@ -9,7 +9,10 @@ use warp_core::features;
 
 fn main() -> Result<()> {
     ChannelState::set(
-        ChannelState::new(Channel::Dev, warp_channel_config::load_config!("dev"))
+        ChannelState::new(
+            Channel::Dev,
+            warp_channel_config::load_config!("dev").without_remote_telemetry(),
+        )
             .with_additional_features(features::DEBUG_FLAGS)
             .with_additional_features(features::DOGFOOD_FLAGS)
             .with_additional_features(features::PREVIEW_FLAGS),

@@ -13,7 +13,6 @@ use warpui::elements::{
 };
 use warpui::fonts::Weight;
 use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{
     AppContext, Entity, FocusContext, ModelHandle, SingletonEntity, TypedActionView, View,
@@ -76,6 +75,7 @@ struct MouseStateHandles {
     conversation_list_view_button: MouseStateHandle,
     global_search_button: MouseStateHandle,
     warp_drive_button: MouseStateHandle,
+    #[allow(dead_code)]
     sign_in_button: MouseStateHandle,
 }
 
@@ -255,12 +255,12 @@ impl LeftPanelView {
     ) -> Box<dyn Element> {
         let (title, description) = match (view, availability) {
             (ToolPanelView::WarpDrive, ToolPanelAvailability::RequiresAccount) => (
-                "Sign in to access Warp Drive",
-                "Create an account to save and share workflows, notebooks, prompts, and more.",
+                "Warp Drive is not available",
+                "This local-only build does not include Warp Drive cloud sync.",
             ),
             (ToolPanelView::ConversationListView, ToolPanelAvailability::RequiresAccount) => (
-                "Sign in to access Agent conversations",
-                "Create an account and enable AI to access your conversation history.",
+                "Agent conversations are local",
+                "Enable AI in Settings to access conversation history on this machine.",
             ),
             (ToolPanelView::ConversationListView, ToolPanelAvailability::RequiresAi) => (
                 "Turn on AI to access Agent conversations",
@@ -308,26 +308,11 @@ impl LeftPanelView {
             })
             .build()
             .finish();
-        let mut content = Flex::column()
+        let content = Flex::column()
             .with_main_axis_size(MainAxisSize::Min)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(title)
             .with_child(Container::new(description).with_margin_top(8.).finish());
-        if availability == ToolPanelAvailability::RequiresAccount {
-            let sign_in = appearance
-                .ui_builder()
-                .button(
-                    ButtonVariant::Accent,
-                    self.mouse_state_handles.sign_in_button.clone(),
-                )
-                .with_text_label("Sign in".to_string())
-                .build()
-                .on_click(|ctx, _, _| {
-                    ctx.dispatch_typed_action(LeftPanelAction::SignIn);
-                })
-                .finish();
-            content = content.with_child(Container::new(sign_in).with_margin_top(16.).finish());
-        }
         let content = ConstrainedBox::new(content.finish())
             .with_max_width(280.)
             .finish();
@@ -1186,7 +1171,7 @@ impl LeftPanelView {
                 }
             }
             LeftPanelAction::SignIn => {
-                ctx.emit(LeftPanelEvent::SignInRequested);
+                // Synth Warp is local-first: never request Warp account sign-in.
             }
         }
     }

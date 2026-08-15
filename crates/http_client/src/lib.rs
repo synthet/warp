@@ -19,7 +19,7 @@ use reqwest::IntoUrl;
 use reqwest_eventsource::RequestBuilderExt;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use warp_core::channel::{Channel, ChannelState};
+use warp_core::channel::{Channel, ChannelState, is_hosted_warp_cloud_host};
 use warp_core::execution_mode;
 use warp_core::operating_system_info::OperatingSystemInfo;
 use warp_errors::report_error;
@@ -374,6 +374,14 @@ impl Client {
             prevent_sleep_reason,
         } = request;
 
+        if should_block_hosted_warp_request(request.url()) {
+            log::debug!(
+                "Blocked Warp cloud request to {} (local-first channel)",
+                request.url()
+            );
+            return Err(blocked_warp_cloud_error(&self.wrapped));
+        }
+
         if let Some(before_response_send_fn) = &self.before_request_sent {
             before_response_send_fn(&request, &serialized_payload);
         }
@@ -408,6 +416,19 @@ fn is_warp_server_origin(url: &reqwest::Url) -> bool {
     .iter()
     .filter_map(|candidate| reqwest::Url::parse(candidate.as_ref()).ok())
     .any(|candidate| candidate.origin() == url.origin())
+}
+
+fn should_block_hosted_warp_request(url: &reqwest::Url) -> bool {
+    !ChannelState::warp_cloud_enabled() && url.host_str().is_some_and(is_hosted_warp_cloud_host)
+}
+
+/// `reqwest::Error` has no public constructor; reuse a builder failure so callers
+/// still see a `RequestError` without sending packets.
+fn blocked_warp_cloud_error(client: &reqwest::Client) -> reqwest::Error {
+    client
+        .get("http://")
+        .build()
+        .expect_err("empty host is an invalid request URL")
 }
 
 /// Returns the current OTEL span context formatted as a W3C `traceparent` value
@@ -838,6 +859,50 @@ mod origin_tests {
     fn third_party_origin_does_not_match() {
         let url = reqwest::Url::parse("https://evil.example.com/graphql/v2").unwrap();
         assert!(!is_warp_server_origin(&url));
+    }
+
+    #[test]
+    fn blocks_hosted_warp_hosts_when_cloud_is_disabled() {
+        let warp = reqwest::Url::parse("https://app.warp.dev/graphql/v2").unwrap();
+        assert!(should_block_hosted_warp_request(&warp));
+
+        let firebase =
+            reqwest::Url::parse("https://identitytoolkit.googleapis.com/v1/accounts").unwrap();
+        assert!(should_block_hosted_warp_request(&firebase));
+    }
+
+    #[test]
+    fn does_not_block_byok_hosts_when_cloud_is_disabled() {
+        let openai = reqwest::Url::parse("https://api.openai.com/v1/chat/completions").unwrap();
+        assert!(!should_block_hosted_warp_request(&openai));
+
+        let local = reqwest::Url::parse("http://127.0.0.1:11434/api/chat").unwrap();
+        assert!(!should_block_hosted_warp_request(&local));
+    }
+
+    #[test]
+    fn blocked_warp_request_does_not_invoke_before_request_hook() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let mut client = Client::new();
+        let hook_called = Arc::new(AtomicBool::new(false));
+        let hook_called_clone = hook_called.clone();
+        client.set_before_request_fn(Box::new(move |_, _| {
+            hook_called_clone.store(true, Ordering::SeqCst);
+        }));
+
+        let request = client
+            .get("https://app.warp.dev/graphql/v2")
+            .build()
+            .expect("request should build");
+        let result = futures::executor::block_on(client.execute(request));
+
+        assert!(result.is_err());
+        assert!(
+            !hook_called.load(Ordering::SeqCst),
+            "network-log hook must not run for blocked Warp cloud requests"
+        );
     }
 }
 

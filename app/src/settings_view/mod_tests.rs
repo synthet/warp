@@ -93,6 +93,15 @@ fn cloud_platform_subpages_are_identified() {
 }
 
 #[test]
+fn warp_cloud_account_sections_are_hidden_in_local_only_build() {
+    assert!(SettingsSection::Teams.is_hidden_in_local_only_build());
+    assert!(SettingsSection::CloudEnvironments.is_hidden_in_local_only_build());
+    assert!(SettingsSection::OzCloudAPIKeys.is_hidden_in_local_only_build());
+    assert!(!SettingsSection::Account.is_hidden_in_local_only_build());
+    assert!(!SettingsSection::Appearance.is_hidden_in_local_only_build());
+}
+
+#[test]
 fn is_subpage_covers_all_umbrella_types() {
     // All subpages under any umbrella should return true.
     for section in SettingsSection::ai_subpages() {
@@ -702,11 +711,7 @@ fn realistic_nav_items() -> Vec<SettingsNavItem> {
             "Code",
             SettingsSection::code_subpages().to_vec(),
         )),
-        SettingsNavItem::Umbrella(SettingsUmbrella::new(
-            "Cloud platform",
-            SettingsSection::cloud_platform_subpages().to_vec(),
-        )),
-        SettingsNavItem::Page(SettingsSection::Teams),
+        SettingsNavItem::Page(SettingsSection::Appearance),
     ]
 }
 
@@ -725,9 +730,8 @@ fn collapsed_umbrella_is_a_single_nav_stop() {
     // All umbrellas default to collapsed.
     let stops = build_nav_stops(&nav_items, |_| true);
 
-    // Expect: Account, <Agents umbrella>, <Code umbrella>,
-    // <Cloud platform umbrella>, Teams.
-    assert_eq!(stops.len(), 5);
+    // Expect: Account, <Agents umbrella>, <Code umbrella>, Appearance.
+    assert_eq!(stops.len(), 4);
     assert!(matches!(
         stops[0],
         NavStop::Section(SettingsSection::Account)
@@ -750,13 +754,8 @@ fn collapsed_umbrella_is_a_single_nav_stop() {
     ));
     assert!(matches!(
         stops[3],
-        NavStop::CollapsedUmbrella {
-            nav_index: 3,
-            first_subpage: SettingsSection::CloudEnvironments,
-            last_subpage: SettingsSection::OzCloudAPIKeys,
-        }
+        NavStop::Section(SettingsSection::Appearance)
     ));
-    assert!(matches!(stops[4], NavStop::Section(SettingsSection::Teams)));
 }
 
 #[test]
@@ -768,7 +767,7 @@ fn expanded_umbrella_produces_section_stop_per_subpage() {
     let stops = build_nav_stops(&nav_items, |_| true);
 
     // Expect: Account, WarpAgent, AgentProfiles, AgentMCPServers, Knowledge,
-    // ThirdPartyCLIAgents, <Code umbrella>, <Cloud platform umbrella>, Teams.
+    // ThirdPartyCLIAgents, <Code umbrella>, Appearance.
     let sections: Vec<_> = stops
         .iter()
         .map(|s| match s {
@@ -786,8 +785,7 @@ fn expanded_umbrella_produces_section_stop_per_subpage() {
             "Knowledge",
             "ThirdPartyCLIAgents",
             "Umbrella@2",
-            "Umbrella@3",
-            "Teams",
+            "Appearance",
         ]
     );
 }
@@ -843,16 +841,11 @@ fn umbrella_with_no_visible_subpages_is_skipped_entirely() {
             .all(|s| !matches!(s, NavStop::CollapsedUmbrella { nav_index: 1, .. })),
         "Agents umbrella should not appear when none of its subpages are visible"
     );
-    // The still-visible Code / Cloud platform umbrellas remain as stops.
+    // The still-visible Code umbrella remains as a stop.
     assert!(
         stops
             .iter()
             .any(|s| matches!(s, NavStop::CollapsedUmbrella { nav_index: 2, .. }))
-    );
-    assert!(
-        stops
-            .iter()
-            .any(|s| matches!(s, NavStop::CollapsedUmbrella { nav_index: 3, .. }))
     );
 }
 
@@ -860,13 +853,13 @@ fn umbrella_with_no_visible_subpages_is_skipped_entirely() {
 fn filtered_out_top_level_page_is_skipped() {
     let nav_items = realistic_nav_items();
 
-    let stops = build_nav_stops(&nav_items, |section| section != SettingsSection::Teams);
+    let stops = build_nav_stops(&nav_items, |section| section != SettingsSection::Appearance);
 
     assert!(
         !stops
             .iter()
-            .any(|s| matches!(s, NavStop::Section(SettingsSection::Teams))),
-        "Teams should be filtered out entirely"
+            .any(|s| matches!(s, NavStop::Section(SettingsSection::Appearance))),
+        "Appearance should be filtered out entirely"
     );
     // But other pages remain.
     assert!(
@@ -1040,7 +1033,7 @@ fn arrow_down_from_expanded_last_subpage_leaves_umbrella() {
 #[test]
 fn arrow_down_across_adjacent_collapsed_umbrellas() {
     let nav_items = realistic_nav_items();
-    // Both Code and Cloud platform umbrellas are collapsed.
+    // Both Agents and Code umbrellas are collapsed.
     let stops = build_nav_stops(&nav_items, |_| true);
 
     // From Agents (via WarpAgent when collapsed), Down should land on the
@@ -1053,15 +1046,14 @@ fn arrow_down_across_adjacent_collapsed_umbrellas() {
     );
     assert_eq!(next_after_agents, SettingsSection::CodeIndexing);
 
-    // From the Code umbrella stop, pressing Down again should land
-    // on the Cloud platform umbrella's first subpage.
+    // From the Code umbrella stop, pressing Down again should land on Appearance.
     let next_after_code = simulate_cycle(
         &nav_items,
         &stops,
         SettingsSection::CodeIndexing,
         CycleDirection::Down,
     );
-    assert_eq!(next_after_code, SettingsSection::CloudEnvironments);
+    assert_eq!(next_after_code, SettingsSection::Appearance);
 }
 
 #[test]

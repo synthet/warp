@@ -712,7 +712,6 @@ impl TeamsPageView {
             me.update_approved_domains_state(ctx);
         });
 
-
         let appearance = Appearance::as_ref(ctx);
         let font_size = appearance.ui_font_size();
         let create_team_editor = Self::editor(
@@ -1862,7 +1861,8 @@ impl SettingsPageMeta for TeamsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        true
+        // Synth Warp is local-first: Teams requires a Warp cloud account.
+        false
     }
 
     fn on_tab_pressed(&mut self, ctx: &mut ViewContext<Self>) {
@@ -1896,10 +1896,7 @@ struct TeamsWidget {
 impl TeamsWidget {
     /// Gets the per-seat costs (monthly and yearly) for the current team plan.
     /// Returns None if pricing info is unavailable or the plan doesn't support per-seat pricing.
-    fn get_per_seat_costs(
-        &self,
-        _team_metadata: &Team,
-    ) -> Option<(f64, f64)> {
+    fn get_per_seat_costs(&self, _team_metadata: &Team) -> Option<(f64, f64)> {
         None
     }
 
@@ -1966,9 +1963,7 @@ impl TeamsWidget {
         }
     }
 
-    fn has_higher_seat_cap_plan_available(
-        _policy: &WorkspaceSizePolicy,
-    ) -> bool {
+    fn has_higher_seat_cap_plan_available(_policy: &WorkspaceSizePolicy) -> bool {
         false
     }
 
@@ -2005,10 +2000,8 @@ impl TeamsWidget {
         };
         let title_element = self.render_subsection_header(title.to_owned(), appearance);
 
-        let cta = Self::grow_team_warning_cta(
-            warning,
-            has_admin_permissions,
-            &team.billing_metadata);
+        let cta =
+            Self::grow_team_warning_cta(warning, has_admin_permissions, &team.billing_metadata);
 
         let body_prefix = match warning {
             GrowTeamWarning::SeatCapReached => "You've reached your plan's member limit.",
@@ -2295,11 +2288,9 @@ impl TeamsWidget {
         ));
 
         // 6) Optional outgrow CTA
-        if let Some(cta) = self.render_outgrow_upgrade_cta(
-            team_metadata,
-            has_admin_permissions,
-            appearance,
-        ) {
+        if let Some(cta) =
+            self.render_outgrow_upgrade_cta(team_metadata, has_admin_permissions, appearance)
+        {
             main_content.add_child(
                 Container::new(cta)
                     .with_padding_top(CONTENT_SEPARATION_PADDING)
@@ -2609,11 +2600,8 @@ impl TeamsWidget {
         );
 
         if team_metadata.billing_metadata.is_on_stripe_paid_plan() {
-            let pricing_alert = self.render_team_member_cost_info(
-                team_metadata,
-                appearance,
-                has_admin_permissions,
-            );
+            let pricing_alert =
+                self.render_team_member_cost_info(team_metadata, appearance, has_admin_permissions);
             invitation_section.add_child(
                 Container::new(pricing_alert)
                     .with_padding_bottom(24.)

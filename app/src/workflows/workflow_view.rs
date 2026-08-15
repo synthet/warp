@@ -2629,10 +2629,7 @@ impl WorkflowView {
                             environment_variables: None,
                         };
 
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::AutoGenerateMetadataSuccess,
-                            ctx
-                        );
+                        send_telemetry_from_ctx!(TelemetryEvent::AutoGenerateMetadataSuccess, ctx);
 
                         pane.populate_missing_field_with_suggestion(workflow, ctx);
                         ctx.notify();
@@ -2646,10 +2643,7 @@ impl WorkflowView {
                                 ctx,
                             );
                         } else {
-                            pane.display_error_toast(
-                                message.clone(),
-                                ctx,
-                            );
+                            pane.display_error_toast(message.clone(), ctx);
                         }
 
                         send_telemetry_from_ctx!(
@@ -2667,7 +2661,7 @@ impl WorkflowView {
                 AIRequestUsageModel::handle(ctx).update(ctx, |request_usage_model, ctx| {
                     request_usage_model.refresh_request_usage_async(ctx);
                 });
-            }
+            },
         );
 
         self.ai_metadata_assist_state = AiAssistState::RequestInFlight;

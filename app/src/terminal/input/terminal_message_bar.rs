@@ -5,7 +5,7 @@ use pathfinder_color::ColorU;
 use warp_core::ui::theme::WarpTheme;
 use warpui::elements::{Container, Element};
 use warpui::keymap::Keystroke;
-use warpui::{AppContext, Entity, ModelHandle, View, ViewContext};
+use warpui::{AppContext, Entity, ModelHandle, SingletonEntity, View, ViewContext};
 
 use super::buffer_model::InputBufferModel;
 use super::message_bar::common::render_terminal_message;

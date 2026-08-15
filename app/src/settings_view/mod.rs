@@ -376,6 +376,11 @@ impl SettingsSection {
     pub fn cloud_platform_subpages() -> &'static [Self] {
         &[Self::CloudEnvironments, Self::OzCloudAPIKeys]
     }
+
+    /// Warp-cloud account surfaces omitted from Synth Warp's local-only Settings.
+    pub fn is_hidden_in_local_only_build(&self) -> bool {
+        matches!(self, Self::Teams) || self.is_cloud_platform_subpage()
+    }
 }
 
 impl FromStr for SettingsSection {
@@ -1317,14 +1322,6 @@ impl SettingsView {
                     SettingsSection::EditorAndCodeReview,
                 ],
             )),
-            SettingsNavItem::Umbrella(SettingsUmbrella::new(
-                "Cloud platform",
-                vec![
-                    SettingsSection::CloudEnvironments,
-                    SettingsSection::OzCloudAPIKeys,
-                ],
-            )),
-            SettingsNavItem::Page(SettingsSection::Teams),
             SettingsNavItem::Page(SettingsSection::Appearance),
             SettingsNavItem::Page(SettingsSection::Features),
             SettingsNavItem::Page(SettingsSection::Keybindings),
@@ -1354,6 +1351,7 @@ impl SettingsView {
             Some(SettingsSection::Scripting) if !FeatureFlag::WarpControlCli.is_enabled() => {
                 SettingsSection::Account
             }
+            Some(section) if section.is_hidden_in_local_only_build() => SettingsSection::Account,
             Some(section) if section.is_subpage() => section,
             other => other.unwrap_or_default(),
         };
@@ -1957,6 +1955,7 @@ impl SettingsView {
         let section = match section {
             SettingsSection::AI => SettingsSection::WarpAgent,
             SettingsSection::Code => SettingsSection::CodeIndexing,
+            section if section.is_hidden_in_local_only_build() => SettingsSection::Account,
             other => other,
         };
 

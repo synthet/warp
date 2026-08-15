@@ -186,6 +186,11 @@ pub(crate) fn init(ctx: &mut AppContext) -> bool {
         return false;
     }
 
+    if !ChannelState::is_crash_reporting_available() {
+        log::info!("Crash reporting is unavailable in this build; not initializing sentry.");
+        return false;
+    }
+
     let window_manager = WindowManager::handle(ctx);
     ctx.subscribe_to_model(&window_manager, |_, event, _| match event {
         StateEvent::ValueChanged { current, previous } => {
@@ -294,6 +299,11 @@ fn get_environment() -> Cow<'static, str> {
 /// This must be called from the main thread to capture panics/crashes across the entire
 /// application.
 fn init_sentry(user_id: Option<UserUid>, email: Option<String>, ctx: &mut AppContext) {
+    if !ChannelState::is_crash_reporting_available() || ChannelState::sentry_url().is_empty() {
+        log::info!("Crash reporting is unavailable in this build; not initializing sentry.");
+        return;
+    }
+
     let key = release_version();
 
     let environment = Some(get_environment());

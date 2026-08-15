@@ -109,9 +109,7 @@ use crate::workspace::{ActiveSession, OneTimeModalModel, ToastStack, WorkspaceRe
 use crate::workspaces::team_tester::TeamTesterStatus;
 use crate::workspaces::update_manager::TeamUpdateManager;
 use crate::workspaces::user_workspaces::UserWorkspaces;
-use crate::{
-    AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider,
-};
+use crate::{AgentNotificationsModel, GlobalResourceHandles, GlobalResourceHandlesProvider};
 
 #[test]
 fn renders_git_checkout_prompt_chip_command_as_single_shell_argument() {

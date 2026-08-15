@@ -1,4 +1,6 @@
 use super::derive_http_origin_from_ws_url;
+use super::{is_hosted_warp_cloud_host, warp_cloud_enabled_for};
+use crate::channel::Channel;
 
 #[test]
 fn wss_becomes_https_and_strips_path() {
@@ -16,4 +18,75 @@ fn ws_becomes_http_and_preserves_port() {
 fn unparseable_input_returns_none() {
     assert!(derive_http_origin_from_ws_url("not a url").is_none());
     assert!(derive_http_origin_from_ws_url("https://app.warp.dev").is_none());
+}
+
+#[test]
+fn hosted_warp_cloud_hosts_include_app_rtc_oz_and_firebase() {
+    assert!(is_hosted_warp_cloud_host("app.warp.dev"));
+    assert!(is_hosted_warp_cloud_host("rtc.app.warp.dev"));
+    assert!(is_hosted_warp_cloud_host("sessions.app.warp.dev"));
+    assert!(is_hosted_warp_cloud_host("oz.warp.dev"));
+    assert!(is_hosted_warp_cloud_host("identitytoolkit.googleapis.com"));
+    assert!(is_hosted_warp_cloud_host("securetoken.googleapis.com"));
+    assert!(is_hosted_warp_cloud_host("APP.WARP.DEV"));
+}
+
+#[test]
+fn hosted_warp_cloud_hosts_exclude_byok_and_localhost() {
+    assert!(!is_hosted_warp_cloud_host("api.openai.com"));
+    assert!(!is_hosted_warp_cloud_host("api.anthropic.com"));
+    assert!(!is_hosted_warp_cloud_host(
+        "generativelanguage.googleapis.com"
+    ));
+    assert!(!is_hosted_warp_cloud_host("localhost"));
+    assert!(!is_hosted_warp_cloud_host("127.0.0.1"));
+    assert!(!is_hosted_warp_cloud_host("192.0.2.0"));
+}
+
+#[test]
+fn warp_cloud_is_always_off_for_oss_and_integration() {
+    assert!(!warp_cloud_enabled_for(
+        Channel::Oss,
+        "https://app.warp.dev"
+    ));
+    assert!(!warp_cloud_enabled_for(
+        Channel::Oss,
+        "http://localhost:8080"
+    ));
+    assert!(!warp_cloud_enabled_for(
+        Channel::Integration,
+        "https://app.warp.dev"
+    ));
+}
+
+#[test]
+fn warp_cloud_stays_on_for_stable_and_preview() {
+    assert!(warp_cloud_enabled_for(
+        Channel::Stable,
+        "https://app.warp.dev"
+    ));
+    assert!(warp_cloud_enabled_for(
+        Channel::Preview,
+        "https://app.warp.dev"
+    ));
+}
+
+#[test]
+fn warp_cloud_for_local_and_dev_follows_server_root() {
+    assert!(!warp_cloud_enabled_for(
+        Channel::Local,
+        "https://app.warp.dev"
+    ));
+    assert!(warp_cloud_enabled_for(
+        Channel::Local,
+        "http://localhost:8080"
+    ));
+    assert!(!warp_cloud_enabled_for(
+        Channel::Dev,
+        "https://app.warp.dev"
+    ));
+    assert!(warp_cloud_enabled_for(
+        Channel::Dev,
+        "http://127.0.0.1:8080"
+    ));
 }

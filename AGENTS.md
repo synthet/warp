@@ -46,7 +46,7 @@ See [`.agent/SAFETY.md`](.agent/SAFETY.md) and [`docs/ai-workflow/README.md`](do
 
 | Date | Symptom | Root cause | Fix / guard |
 |------|---------|------------|-------------|
-| _(none yet)_ | | | |
+| 2026-08-15 | Windows `warp-oss` compile: `NativeCommandError` / hung waiter / `false` in `enabled_features()` | Piping cargo `2>&1`; `Start-Process -NoNewWindow -Wait` after link; leftover `false` in a `FeatureFlag` array | [guides/build-and-run.md](docs/guides/build-and-run.md); [architecture/synth-fork.md](docs/architecture/synth-fork.md) |
 
 ## Backlog
 

@@ -12,7 +12,7 @@ use warpui::{AppContext, SingletonEntity as _, ViewHandle};
 
 use super::common::{
     add_command_xray_overlay, add_input_suggestions_overlays, add_voltron_overlay,
-    add_workflow_info_overlay,     wrap_input_with_terminal_padding_and_focus_handler,
+    add_workflow_info_overlay, wrap_input_with_terminal_padding_and_focus_handler,
 };
 use super::{Input, InputAction, InputDropTargetData};
 use crate::BlocklistAIHistoryModel;

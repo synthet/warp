@@ -5,7 +5,7 @@ use warp_core::features;
 fn main() -> Result<()> {
     let config = warp_channel_config::load_config!("local");
 
-    let mut state = ChannelState::new(Channel::Local, config)
+    let mut state = ChannelState::new(Channel::Local, config.without_remote_telemetry())
         .with_additional_features(features::DEBUG_FLAGS)
         .with_additional_features(features::DOGFOOD_FLAGS)
         .with_additional_features(features::PREVIEW_FLAGS)

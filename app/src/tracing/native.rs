@@ -208,18 +208,17 @@ pub(super) fn start_auth_refresh(client: Arc<dyn ManagedSecretsClient>, ctx: &mu
 /// Converts the configured OTLP base URL into the HTTP/protobuf traces endpoint.
 ///
 /// The configuration is treated as a base URL rather than a complete signal-specific URL, so any
-/// query or fragment is discarded before appending `v1/traces`. Authenticated export requires
-/// HTTPS unless the configured host is guaranteed to resolve to the local machine.
+/// query or fragment is discarded before appending `v1/traces`. Export is restricted to loopback
+/// hosts so cloud-agent traces cannot leave this machine.
 fn traces_endpoint(base_endpoint: &str) -> anyhow::Result<String> {
     let mut endpoint = Url::parse(base_endpoint).context("Invalid cloud-agent OTLP endpoint")?;
+    if !endpoint_host_is_loopback(&endpoint) {
+        return Err(anyhow!(
+            "Cloud-agent OTLP endpoint must target a loopback host"
+        ));
+    }
     match endpoint.scheme() {
-        "https" => {}
-        "http" if endpoint_host_is_loopback(&endpoint) => {}
-        "http" => {
-            return Err(anyhow!(
-                "Cloud-agent OTLP endpoint must use HTTPS unless its host is loopback"
-            ));
-        }
+        "https" | "http" => {}
         _ => return Err(anyhow!("Cloud-agent OTLP endpoint must use HTTP or HTTPS")),
     }
 
@@ -540,3 +539,7 @@ fn filter_cloud_agent_span(mut span: SpanData) -> Option<SpanData> {
     }
     Some(span)
 }
+
+#[cfg(test)]
+#[path = "native_tests.rs"]
+mod tests;

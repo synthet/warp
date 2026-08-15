@@ -265,40 +265,18 @@ impl MainSettingsPageView {
             Self::handle_autoupdate_state_change,
         );
 
-        ctx.subscribe_to_model(&CloudPreferencesSettings::handle(ctx), |_, _, _, ctx| {
-            ctx.notify();
-        });
-
         let auth_manager_handle = AuthManager::handle(ctx);
         ctx.subscribe_to_model(&auth_manager_handle, |_, _, _, ctx| {
             ctx.notify();
         });
 
-        let mut widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
-            Box::new(AccountWidget::default()),
-            Box::new(DividerWidget {}),
-        ];
-
-        widgets.push(Box::new(SettingsSyncWidget::default()));
-
-        widgets.push(Box::new(EarnRewardsWidget::default()));
-
-        #[cfg(not(target_family = "wasm"))]
-        if IapManager::as_ref(ctx).is_enabled() {
-            widgets.push(Box::new(IapCredentialsWidget::default()));
-            let iap_manager_handle = IapManager::handle(ctx);
-            ctx.subscribe_to_model(&iap_manager_handle, |_, _, e, ctx| {
-                if matches!(e, IapManagerEvent::StateChanged) {
-                    ctx.notify();
-                }
-            })
-        }
+        // Synth Warp is local-first: omit settings sync, referrals, IAP, and logout.
+        let mut widgets: Vec<Box<dyn SettingsWidget<View = Self>>> =
+            vec![Box::new(AccountWidget::default())];
 
         if ChannelState::app_version().is_some() {
             widgets.push(Box::new(VersionInfoWidget::default()));
         }
-
-        widgets.push(Box::new(LogoutWidget::default()));
 
         let page = PageType::new_uncategorized(widgets, Some("Account"));
 
@@ -319,46 +297,18 @@ impl MainSettingsPageView {
 }
 
 #[derive(Default)]
-struct AccountWidgetStateHandles {
-    anonymous_user_sign_up_button: MouseStateHandle,
-}
-
-#[derive(Default)]
-struct AccountWidget {
-    ui_state_handles: AccountWidgetStateHandles,
-}
+struct AccountWidget {}
 
 impl AccountWidget {
-    fn render_anonymous_account_info(
-        &self,
-        auth_state: &AuthState,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
-        let button_styles = UiComponentStyles {
-            font_size: Some(14.),
-            font_weight: Some(Weight::Semibold),
-            border_radius: Some(CornerRadius::with_all(Radius::Pixels(4.))),
-            padding: Some(Coords {
-                top: 12.,
-                bottom: 12.,
-                left: 40.,
-                right: 40.,
-            }),
-            ..Default::default()
-        };
-
+    fn render_anonymous_account_info(&self, appearance: &Appearance) -> Box<dyn Element> {
         let user_info = appearance
             .ui_builder()
-            .button(
-                ButtonVariant::Accent,
-                self.ui_state_handles.anonymous_user_sign_up_button.clone(),
-            )
-            .with_style(button_styles)
-            .with_text_label("Sign up".to_owned())
-            .build()
-            .on_click(move |ctx, _, _| {
-                ctx.dispatch_typed_action(MainPageAction::SignupAnonymousUser);
+            .paragraph("This build runs locally without a Warp account.")
+            .with_style(UiComponentStyles {
+                font_size: Some(REGULAR_TEXT_FONT_SIZE),
+                ..Default::default()
             })
+            .build()
             .finish();
 
         let mut plan_info = Flex::column()
@@ -495,7 +445,7 @@ impl SettingsWidget for AccountWidget {
     type View = MainSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "account sign up"
+        "account local"
     }
 
     fn render(
@@ -505,7 +455,7 @@ impl SettingsWidget for AccountWidget {
         app: &AppContext,
     ) -> Box<dyn Element> {
         let account_info = if view.auth_state.is_anonymous_or_logged_out() {
-            self.render_anonymous_account_info(view.auth_state.as_ref(), appearance)
+            self.render_anonymous_account_info(appearance)
         } else {
             let profile_image_source = view.auth_state.user_photo_url().map(|url| {
                 asset_cache::url_source_with_persistence(url, &warp_core::paths::cache_dir())
@@ -525,6 +475,7 @@ impl SettingsWidget for AccountWidget {
     }
 }
 
+#[allow(dead_code)]
 struct DividerWidget {}
 
 impl SettingsWidget for DividerWidget {
@@ -550,6 +501,7 @@ impl SettingsWidget for DividerWidget {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Default)]
 struct SettingsSyncWidget {
     tooltip_state: MouseStateHandle,
@@ -609,6 +561,7 @@ impl SettingsWidget for SettingsSyncWidget {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Default)]
 struct EarnRewardsWidget {
     refer_link_mouse_handle: MouseStateHandle,
@@ -922,6 +875,7 @@ impl SettingsWidget for VersionInfoWidget {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Default)]
 struct LogoutWidget {
     mouse_state: MouseStateHandle,
@@ -948,6 +902,7 @@ impl LogoutWidget {
 
 /// Widget displaying IAP credential state and a refresh button. Only
 /// visible on staging channels where IAP is active.
+#[allow(dead_code)]
 #[cfg(not(target_family = "wasm"))]
 #[derive(Default)]
 struct IapCredentialsWidget {

@@ -27,6 +27,10 @@ Workaround for Level 1: OS `start warposs://…`.
 
 Many Warp plugins write OSC 777 to `/dev/tty` (Unix-centric). Zed [Phase A](../phase-a-status.md) on Windows should parse PTY output and prefer Zed-native plugins.
 
+## Compiling Warp and Zed together
+
+On a 32 GB Windows host, a Warp GUI debug compile and a Zed `cargo` at the same time typically exhaust the page file (`os error 1455`) and contend for the global crates.io package-cache lock. Run one tree at a time. Warp resume compile: `(Warp) script/windows/build.ps1`. Overlay the Warp OSS GUI onto `C:\Program Files\Warp`: `(Warp) script/windows/deploy.ps1` (do not build Warp `CHANNEL=stable`).
+
 ## URL scheme
 
 OSS scheme is `warposs`. Packaging must register that protocol. See [URI and tab configs](../surfaces/uri-and-tab-configs.md).

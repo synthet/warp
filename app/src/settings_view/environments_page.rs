@@ -2025,7 +2025,8 @@ impl SettingsPageMeta for EnvironmentsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        true
+        // Synth Warp is local-first: Cloud Environments require Warp cloud.
+        false
     }
 
     fn update_filter(&mut self, query: &str, ctx: &mut ViewContext<Self>) -> MatchData {

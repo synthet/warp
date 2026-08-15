@@ -183,10 +183,7 @@ fn theme_chooser_items(theme_config: &WarpThemeConfig) -> Vec<ThemeChooserItem> 
 }
 
 impl ThemeChooser {
-    pub fn new(
-        ctx: &mut ViewContext<Self>,
-        tips_completed: ModelHandle<TipsCompleted>,
-    ) -> Self {
+    pub fn new(ctx: &mut ViewContext<Self>, tips_completed: ModelHandle<TipsCompleted>) -> Self {
         let search_editor = {
             ctx.add_typed_action_view(|ctx| {
                 let appearance = Appearance::as_ref(ctx);
@@ -203,7 +200,6 @@ impl ThemeChooser {
         ctx.subscribe_to_view(&search_editor, move |me, _, event, ctx| {
             me.handle_editor_event(event, ctx);
         });
-
 
         let warp_config_handle = WarpConfig::handle(ctx);
         ctx.subscribe_to_model(&warp_config_handle, |me, _, event, ctx| {
@@ -495,8 +491,7 @@ impl ThemeChooser {
     }
 
     fn update_themes(&mut self, ctx: &mut ViewContext<Self>) {
-        *self.themes = theme_chooser_items(WarpConfig::as_ref(ctx).theme_config(),
-        );
+        *self.themes = theme_chooser_items(WarpConfig::as_ref(ctx).theme_config());
     }
 
     fn up(&mut self, ctx: &mut ViewContext<Self>) {

@@ -42,24 +42,30 @@ impl TelemetryCollector {
     }
 
     pub fn initialize_telemetry_collection(&self, ctx: &mut ModelContext<TelemetryCollector>) {
+        let remote_export = ChannelState::telemetry_remote_export_enabled();
+
         // Start a background thread to periodically flush events from the telemetry event queue.
-        if ChannelState::is_release_bundle() || FeatureFlag::WithSandboxTelemetry.is_enabled() {
+        if remote_export
+            && (ChannelState::is_release_bundle() || FeatureFlag::WithSandboxTelemetry.is_enabled())
+        {
             // Flush the events to Rudderstack that were persisted into a file the last time the app was
             // quit.
             self.flush_persisted_events_from_disk(ctx);
         }
 
         // Send Active App Usage signals
-        if FeatureFlag::RecordAppActiveEvents.is_enabled()
+        if remote_export
+            && FeatureFlag::RecordAppActiveEvents.is_enabled()
             && (ChannelState::is_release_bundle() || FeatureFlag::WithSandboxTelemetry.is_enabled())
         {
             self.schedule_send_active_usage_event(ctx);
         }
 
         // Start a background thread to periodically flush events from the telemetry event queue.
-        if ChannelState::is_release_bundle()
-            || FeatureFlag::WithSandboxTelemetry.is_enabled()
-            || FeatureFlag::SendTelemetryToFile.is_enabled()
+        if FeatureFlag::SendTelemetryToFile.is_enabled()
+            || (remote_export
+                && (ChannelState::is_release_bundle()
+                    || FeatureFlag::WithSandboxTelemetry.is_enabled()))
         {
             self.schedule_event_queue_flush(ctx);
         }

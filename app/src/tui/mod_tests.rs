@@ -27,7 +27,7 @@ fn login_model(phase: TuiLoginPhase) -> TuiLoginModel {
 }
 
 #[test]
-fn credential_only_auth_stays_on_signed_out_welcome() {
+fn credential_only_auth_starts_loginless() {
     let auth_state = AuthState::new_logged_out_for_test();
     auth_state.set_credentials(Some(Credentials::ApiKey {
         key: "wk-api-test".to_owned(),
@@ -37,7 +37,7 @@ fn credential_only_auth_stays_on_signed_out_welcome() {
     assert!(!has_validated_identity(&auth_state));
     assert!(matches!(
         initial_login_phase(&auth_state),
-        TuiLoginPhase::SignedOutWelcome
+        TuiLoginPhase::LoggedIn
     ));
 }
 
@@ -53,13 +53,13 @@ fn credentials_with_user_identity_start_logged_in() {
 }
 
 #[test]
-fn missing_credentials_and_identity_start_signed_out() {
+fn missing_credentials_and_identity_start_loginless() {
     let auth_state = AuthState::new_logged_out_for_test();
 
     assert!(!has_validated_identity(&auth_state));
     assert!(matches!(
         initial_login_phase(&auth_state),
-        TuiLoginPhase::SignedOutWelcome
+        TuiLoginPhase::LoggedIn
     ));
 }
 

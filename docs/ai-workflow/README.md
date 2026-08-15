@@ -4,7 +4,7 @@ title: AI Workflow & Asset Map
 description: Where every agent asset lives (rules, commands, skills, agents, memory, workflows) and the SDLC loop they support.
 resource: ai-workflow/README.md
 tags: [docs, agents, workflow]
-timestamp: 2026-07-03T00:00:00Z
+timestamp: 2026-08-15T16:00:00Z
 okf_version: 0.1
 ---
 
@@ -29,6 +29,20 @@ okf_version: 0.1
 
 **Single source of truth:** edit assets under `.claude/` + `.agent/`, then run
 `python scripts/sync_assistant_trees.py` to regenerate the Cursor and Codex mirrors.
+
+Install shared common-skills **globally** (`~/.agents/skills` via `skills-lock.json`).
+`./script/bootstrap --install-common-skills-in-repo` writes into `.agents/skills` and is wiped on
+the next sync — do not use it in this checkout.
+
+## Framework adopt (do not re-bootstrap)
+
+This repo already adopted [synthet-code-framework](https://github.com/synthet/synthet-code-framework)
+with `--adopt`. Do **not** run `python bootstrap.py --force` (or a force overwrite `--target`) against
+this checkout: that replaces README / AGENTS.md and wipes Warp-domain skills.
+
+- Warp launch scripts stay in `script/` (singular). Framework Python helpers are `scripts/` (plural).
+- Do not replace README, licenses, `script/`, or `.github/workflows` from the framework template.
+- Existing-repo updates belong in the framework (`--adopt`, rust stack), then a careful merge here.
 
 ## CLI tooling skills
 

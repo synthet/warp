@@ -652,6 +652,16 @@ fn requires_post_onboarding_login() -> bool {
     // Synth Warp is local-first and never gates the terminal on a Warp account.
     false
 }
+
+/// Whether the local onboarding-completed flag must be written as onboarding finishes.
+///
+/// Account-first onboarding defers this to `complete_account_first`, which only runs once the
+/// post-onboarding login slide reports back. When no login slide follows, that never happens, so
+/// the flag has to be written here or onboarding shows again on the next launch.
+fn should_mark_onboarding_completed_now(account_first: bool, requires_login: bool) -> bool {
+    !account_first || !requires_login
+}
+
 /// Replaces the settings and tutorial snapshots consumed when post-auth
 /// onboarding eventually completes.
 ///
@@ -2659,7 +2669,12 @@ impl RootView {
                 let target = target.clone();
                 let onboarding_view = onboarding_view.clone();
                 let account_first = FeatureFlag::AccountFirstOnboarding.is_enabled();
-                if !account_first {
+                // With old onboarding, we ask user to log in before onboarding, so don't do it after onboarding completes.
+                let requires_login = requires_post_onboarding_login();
+                // Account-first normally defers persisting completion to `complete_account_first`,
+                // which only runs after the login slide. Synth Warp has no login slide, so persist
+                // here instead.
+                if should_mark_onboarding_completed_now(account_first, requires_login) {
                     mark_local_onboarding_completed(ctx);
                     if FeatureFlag::HOAOnboardingFlow.is_enabled() {
                         mark_hoa_onboarding_completed(ctx);
@@ -2667,8 +2682,6 @@ impl RootView {
                 }
 
                 let ai_enabled = selected_settings.is_ai_enabled();
-                // With old onboarding, we ask user to log in before onboarding, so don't do it after onboarding completes.
-                let requires_login = requires_post_onboarding_login();
 
                 if requires_login {
                     refresh_pending_onboarding_choices(
@@ -2738,6 +2751,7 @@ impl RootView {
                     return;
                 }
 
+                let is_logged_in = AuthStateProvider::as_ref(ctx).get().is_logged_in();
                 apply_onboarding_settings(selected_settings, is_logged_in, ctx);
 
                 if is_logged_in {
@@ -3440,9 +3454,7 @@ impl RootView {
         // still returns the user through the Billing & Usage deeplink. Landing
         // it mid-onboarding would interrupt the flow, so onboarding takes it as
         // the purchase succeeding and moves on instead.
-        if *section == SettingsSection::Account
-            && self.notify_onboarding_checkout_succeeded(ctx)
-        {
+        if *section == SettingsSection::Account && self.notify_onboarding_checkout_succeeded(ctx) {
             return true;
         }
 

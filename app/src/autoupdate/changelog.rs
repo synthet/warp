@@ -13,6 +13,10 @@ use crate::channel::{Channel, ChannelState};
 use crate::server::server_api::ServerApi;
 
 pub async fn get_current_changelog(server_api: Arc<ServerApi>) -> Result<Option<Changelog>> {
+    if !ChannelState::warp_cloud_enabled() {
+        return Ok(None);
+    }
+
     let rand: String = {
         let mut rng = thread_rng();
         iter::repeat(())
@@ -86,3 +90,7 @@ fn changelog_url(channel: Channel, version: &str) -> String {
 pub fn should_fetch_changelog_json(channel: Channel) -> bool {
     channel == Channel::Dev
 }
+
+#[cfg(test)]
+#[path = "changelog_tests.rs"]
+mod tests;

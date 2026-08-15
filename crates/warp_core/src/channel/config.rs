@@ -27,6 +27,17 @@ pub struct ChannelConfig {
     pub mcp_static_config: Option<McpStaticConfig>,
 }
 
+impl ChannelConfig {
+    /// Drops Rudderstack and Sentry destinations so this process cannot export
+    /// telemetry or crash reports off-machine, even if a channel-config generator
+    /// embedded Warp keys.
+    pub fn without_remote_telemetry(mut self) -> Self {
+        self.telemetry_config = None;
+        self.crash_reporting_config = None;
+        self
+    }
+}
+
 /// Configuration for GCP Identity-Aware Proxy authentication, present only on staging builds.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct IapConfig {
@@ -53,6 +64,11 @@ pub struct WarpServerConfig {
     pub iap_config: Option<IapConfig>,
 }
 
+/// IANA TEST-NET-1 address plus the TCP discard port. Used when Warp cloud is
+/// disabled so leftover URL interpolation cannot target production.
+const DISABLED_HTTP_ROOT: &str = "http://192.0.2.0:9";
+const DISABLED_RTC_URL: &str = "ws://192.0.2.0:9/graphql/v2";
+
 impl WarpServerConfig {
     pub fn production() -> Self {
         Self {
@@ -60,6 +76,18 @@ impl WarpServerConfig {
             rtc_server_url: "wss://rtc.app.warp.dev/graphql/v2".into(),
             session_sharing_server_url: Some("wss://sessions.app.warp.dev".into()),
             firebase_auth_api_key: "AIzaSyBdy3O3S9hrdayLJxJ7mriBR4qgUaUygAs".into(),
+            iap_config: None,
+        }
+    }
+
+    /// Config that does not point at Warp production. Callers must still skip
+    /// initiating requests; this is a backstop for URL interpolation.
+    pub fn disabled() -> Self {
+        Self {
+            server_root_url: DISABLED_HTTP_ROOT.into(),
+            rtc_server_url: DISABLED_RTC_URL.into(),
+            session_sharing_server_url: None,
+            firebase_auth_api_key: "".into(),
             iap_config: None,
         }
     }
@@ -80,6 +108,13 @@ impl OzConfig {
     pub fn production() -> Self {
         Self {
             oz_root_url: "https://oz.warp.dev".into(),
+            workload_audience_url: None,
+        }
+    }
+
+    pub fn disabled() -> Self {
+        Self {
+            oz_root_url: DISABLED_HTTP_ROOT.into(),
             workload_audience_url: None,
         }
     }
@@ -168,4 +203,33 @@ pub struct McpOAuthLoopbackClientConfig {
     /// secret support for providers that require one.
     #[serde(default)]
     pub client_secret: Option<Cow<'static, str>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::AppId;
+
+    #[test]
+    fn without_remote_telemetry_clears_destinations() {
+        let config = ChannelConfig {
+            app_id: AppId::new("io", "github", "synthet.Warp"),
+            logfile_name: "warp.log".into(),
+            server_config: WarpServerConfig::disabled(),
+            oz_config: OzConfig::disabled(),
+            telemetry_config: Some(TelemetryConfig {
+                telemetry_file_name: "telemetry.json".into(),
+                rudderstack_config: None,
+            }),
+            autoupdate_config: None,
+            crash_reporting_config: Some(CrashReportingConfig {
+                sentry_url: "https://example.invalid/dsn".into(),
+            }),
+            mcp_static_config: None,
+        }
+        .without_remote_telemetry();
+
+        assert!(config.telemetry_config.is_none());
+        assert!(config.crash_reporting_config.is_none());
+    }
 }

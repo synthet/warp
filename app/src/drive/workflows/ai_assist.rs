@@ -106,7 +106,7 @@ impl WorkflowModal {
                                 name: parameter.name,
                                 description: Some(parameter.description),
                                 default_value: Some(parameter.default_value),
-                                arg_type: Default::default()
+                                arg_type: Default::default(),
                             })
                             .collect_vec();
 
@@ -123,10 +123,7 @@ impl WorkflowModal {
                             environment_variables: None,
                         };
 
-                        send_telemetry_from_ctx!(
-                            TelemetryEvent::AutoGenerateMetadataSuccess,
-                            ctx
-                        );
+                        send_telemetry_from_ctx!(TelemetryEvent::AutoGenerateMetadataSuccess, ctx);
 
                         modal.populate_missing_field_with_suggestion(workflow, ctx);
                         ctx.notify();
@@ -157,7 +154,7 @@ impl WorkflowModal {
                 AIRequestUsageModel::handle(ctx).update(ctx, |request_usage_model, ctx| {
                     request_usage_model.refresh_request_usage_async(ctx);
                 });
-            }
+            },
         );
 
         self.ai_metadata_assist_state = AiAssistState::RequestInFlight;

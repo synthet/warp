@@ -241,12 +241,9 @@ fn has_validated_identity(auth_state: &AuthState) -> bool {
     auth_state.is_logged_in() && auth_state.user_id().is_some()
 }
 
-fn initial_login_phase(auth_state: &AuthState) -> TuiLoginPhase {
-    if has_validated_identity(auth_state) {
-        TuiLoginPhase::LoggedIn
-    } else {
-        TuiLoginPhase::SignedOutWelcome
-    }
+fn initial_login_phase(_auth_state: &AuthState) -> TuiLoginPhase {
+    // Synth Warp is local-first: start the TUI without a Warp account login gate.
+    TuiLoginPhase::LoggedIn
 }
 
 fn handle_auth_manager_event(event: &AuthManagerEvent, ctx: &mut AppContext) {
@@ -386,15 +383,8 @@ fn start_tui_device_login_with_entrypoint(
         authorize_device(ctx);
     }
 }
-/// Logs out the current TUI user and sends them to Warp web's logged-out flow.
-pub fn log_out_tui(ctx: &mut AppContext) {
-    auth::log_out(ctx);
-    TuiOnboardingMarkers::handle(ctx).update(ctx, |markers, ctx| {
-        markers.reset_for_account_transition(ctx);
-    });
-    set_logged_out_phase(ctx);
-    authorize_device(ctx);
-}
+/// Synth Warp is local-first: never bounce the TUI into device-authorization logout.
+pub fn log_out_tui(_ctx: &mut AppContext) {}
 
 fn set_logged_out_phase(ctx: &mut AppContext) {
     let event = TuiLoginModel::handle(ctx).update(ctx, |model, ctx| {

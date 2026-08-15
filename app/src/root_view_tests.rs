@@ -15,6 +15,7 @@ use super::{
     HAS_COMPLETED_ONBOARDING_KEY, NewWorkspaceSource, RootView, WorkspaceArgs,
     has_completed_local_onboarding, offer_variant_for_account_class,
     refresh_pending_onboarding_choices, requires_post_onboarding_login,
+    should_mark_onboarding_completed_now,
 };
 use crate::GlobalResourceHandles;
 use crate::appearance::Appearance;
@@ -77,6 +78,20 @@ fn set_local_onboarding_completed(app: &mut App, completed: bool) {
 #[test]
 fn post_onboarding_login_never_required_for_synth_warp() {
     assert!(!requires_post_onboarding_login());
+}
+
+/// Regression test: Synth Warp removed the post-onboarding login slide, so account-first onboarding
+/// no longer reaches `complete_account_first`. Completion must be persisted inline or the wizard
+/// reappears on every launch.
+#[test]
+fn onboarding_completion_is_persisted_when_no_login_slide_follows() {
+    // Synth Warp: account-first on, login slide gone.
+    assert!(should_mark_onboarding_completed_now(true, false));
+    // Upstream account-first: the login slide persists it later.
+    assert!(!should_mark_onboarding_completed_now(true, true));
+    // Non-account-first always persists inline.
+    assert!(should_mark_onboarding_completed_now(false, false));
+    assert!(should_mark_onboarding_completed_now(false, true));
 }
 
 #[test]

@@ -6,7 +6,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use settings::macros::{define_settings_group, maybe_define_setting, register_settings_events};
 use settings::{RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud};
-use warp_core::features::FeatureFlag;
 use warp_errors::{report_error, report_if_error};
 use warp_graphql::mutations::update_user_settings::UpdateUserSettingsInput;
 use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
@@ -15,6 +14,7 @@ use super::cloud_preferences_syncer::CloudPreferencesSyncer;
 use crate::ai::blocklist::telemetry_banner::should_collect_ai_ugc_telemetry;
 use crate::auth::AuthStateProvider;
 use crate::auth::auth_state::AuthState;
+use crate::channel::ChannelState;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::server_api::ServerApiProvider;
@@ -200,10 +200,7 @@ impl PrivacySettingsSnapshot {
     }
 
     pub fn should_disable_telemetry(&self) -> bool {
-        // If a user has opted in to the agent mode analytics experiment, telemetry must be enabled.
-        !self.is_telemetry_enabled
-            && !self.is_telemetry_force_enabled
-            && !FeatureFlag::AgentModeAnalytics.is_enabled()
+        !self.is_telemetry_enabled && !self.is_telemetry_force_enabled
     }
 
     pub fn should_collect_ai_ugc_telemetry(&self) -> bool {
@@ -216,6 +213,17 @@ impl PrivacySettingsSnapshot {
             cloud_conversation_storage_enabled: None,
             // Synth Warp: privacy defaults stay off until the user opts in.
             is_telemetry_enabled: false,
+            is_crash_reporting_enabled: false,
+            is_telemetry_force_enabled: false,
+            should_collect_ai_ugc_telemetry: false,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn mock_opted_in() -> Self {
+        Self {
+            cloud_conversation_storage_enabled: None,
+            is_telemetry_enabled: true,
             is_crash_reporting_enabled: false,
             is_telemetry_force_enabled: false,
             should_collect_ai_ugc_telemetry: false,
@@ -513,7 +521,7 @@ impl PrivacySettings {
                     .set_value(new_value, ctx);
             });
 
-            if self.auth_state.is_logged_in() {
+            if self.auth_state.is_logged_in() && ChannelState::telemetry_remote_export_enabled() {
                 let auth_client = self.auth_client.clone();
                 let _ = ctx.spawn(
                     async move { auth_client.set_is_crash_reporting_enabled(new_value).await },
@@ -547,7 +555,7 @@ impl PrivacySettings {
                 let _ = settings.is_telemetry_enabled.set_value(new_value, ctx);
             });
 
-            if self.auth_state.is_logged_in() {
+            if self.auth_state.is_logged_in() && ChannelState::telemetry_remote_export_enabled() {
                 let auth_client = self.auth_client.clone();
                 let _ = ctx.spawn(
                     async move { auth_client.set_is_telemetry_enabled(new_value).await },
@@ -688,6 +696,9 @@ impl PrivacySettings {
 
     /// Sends request(s) to update server-side user settings with current local values.
     fn update_server_with_local_settings(&self, ctx: &mut ModelContext<Self>) {
+        if !ChannelState::telemetry_remote_export_enabled() {
+            return;
+        }
         if self.auth_state.is_logged_in() {
             let auth_client = self.auth_client.clone();
             let snapshot = self.get_snapshot(ctx);

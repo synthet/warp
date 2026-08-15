@@ -291,7 +291,6 @@ impl AgentMessageBar {
             None
         }
     }
-
 }
 
 impl View for AgentMessageBar {

@@ -13,11 +13,10 @@ use warp_errors::report_error;
 use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
 use warpui::elements::{
     Align, AnchorPair, Border, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Dismiss, Fill, Flex, OffsetPositioning, OffsetType, ParentElement,
-    ParentOffsetBounds, PositionedElementOffsetBounds, PositioningAxis, Radius, Resizable,
-    ResizableStateHandle, SavePosition, ScrollStateHandle, Scrollable, ScrollableElement,
-    Shrinkable, Stack, UniformList, UniformListState, XAxisAnchor, YAxisAnchor,
-    resizable_state_handle,
+    Dismiss, Fill, Flex, OffsetPositioning, OffsetType, ParentElement, ParentOffsetBounds,
+    PositionedElementOffsetBounds, PositioningAxis, Radius, Resizable, ResizableStateHandle,
+    SavePosition, ScrollStateHandle, Scrollable, ScrollableElement, Shrinkable, Stack, UniformList,
+    UniformListState, XAxisAnchor, YAxisAnchor, resizable_state_handle,
 };
 use warpui::presenter::ChildView;
 use warpui::ui_components::components::{UiComponent, UiComponentStyles};
@@ -36,8 +35,8 @@ use super::zero_state::{CommandSearchZeroStateEvent, CommandSearchZeroStateView}
 use crate::ai_assistant::GenerateCommandsFromNaturalLanguageError;
 use crate::ai_assistant::execution_context::WarpAiExecutionContext;
 use crate::appearance::Appearance;
-use crate::auth::auth_state::AuthState;
 use crate::auth::AuthStateProvider;
+use crate::auth::auth_state::AuthState;
 use crate::completer::SessionContext;
 use crate::drive::settings::WarpDriveSettings;
 use crate::search::QueryFilter;

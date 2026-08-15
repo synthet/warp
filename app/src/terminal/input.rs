@@ -1960,7 +1960,7 @@ pub fn init(app: &mut AppContext) {
                 & !id!("ProfileModelSelectorOpen")
                 & !id!("PromptChipMenuOpen")
                 & !id!(QUEUED_PROMPT_INLINE_EDITOR_OPEN_CONTEXT)
-                & !id!("AIContextMenuOpen")
+                & !id!("AIContextMenuOpen"),
         ),
     ]);
 
@@ -3213,7 +3213,7 @@ impl Input {
             None
         };
 
-        let terminal_input_message_bar = ctx.add_typed_action_view(|ctx| {
+        let terminal_input_message_bar = ctx.add_view(|ctx| {
             TerminalInputMessageBar::new(
                 model.clone(),
                 ai_input_model.clone(),
@@ -6731,8 +6731,7 @@ impl Input {
                     entrypoint: AnonymousUserSignupEntrypoint::SignUpAIPrompt,
                 });
             }
-            PromptAlertEvent::OpenAccountSettingsPage => {
-            }
+            PromptAlertEvent::OpenAccountSettingsPage => {}
             PromptAlertEvent::OpenBillingPortal { team_uid } => {
                 UserWorkspaces::handle(ctx).update(ctx, |user_workspaces, ctx| {
                     user_workspaces.generate_stripe_billing_portal_link(*team_uid, ctx);
@@ -15927,8 +15926,7 @@ impl Input {
             PromptSuggestionsEvent::SignupAnonymousUser => ctx.emit(Event::SignupAnonymousUser {
                 entrypoint: AnonymousUserSignupEntrypoint::SignUpAIPrompt,
             }),
-            PromptSuggestionsEvent::OpenAccountSettingsPage => {
-            }
+            PromptSuggestionsEvent::OpenAccountSettingsPage => {}
             PromptSuggestionsEvent::OpenBillingPortal { team_uid } => {
                 UserWorkspaces::handle(ctx).update(ctx, |user_workspaces, ctx| {
                     user_workspaces.generate_stripe_billing_portal_link(*team_uid, ctx);
