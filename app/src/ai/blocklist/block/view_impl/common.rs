@@ -78,8 +78,7 @@ use crate::ai::blocklist::inline_action::requested_action::RenderableAction;
 use crate::ai::blocklist::model::{AIBlockModel, AIBlockModelHelper};
 use crate::ai::blocklist::secret_redaction::{SecretRedactionState, redact_secrets_in_element};
 use crate::ai::blocklist::view_util::{
-    FailedOutputPresentation, OUT_OF_CREDITS_SUBSCRIBE_LABEL, error_color,
-    failed_output_presentation,
+    FailedOutputPresentation, error_color, failed_output_presentation,
 };
 use crate::ai::blocklist::{BlocklistAIActionModel, ShellCommandExecutor, TextLocation};
 use crate::ai::loading::shimmering_warp_loading_text;
@@ -3146,6 +3145,7 @@ pub fn render_failed_output(props: FailedOutputProps, app: &AppContext) -> Box<d
         .finish()
 }
 /// Builds an out-of-credits CTA button, styled like the invalid-API-key error's button.
+#[allow(dead_code)]
 fn out_of_credits_cta_button(
     label: &str,
     state_handle: &MouseStateHandle,
@@ -3221,14 +3221,8 @@ fn render_out_of_credits_error(
     })
     .finish();
 
-    let subscribe_button =
-        out_of_credits_cta_button(OUT_OF_CREDITS_SUBSCRIBE_LABEL, subscribe_button_handle, app)
-            .build()
-            .on_click(|ctx, _, _| {
-                ctx.dispatch_typed_action(WorkspaceAction::ShowUpgrade);
-            })
-            .finish();
-
+    // Synth Warp is commercial-free: show the out-of-credits message without a subscribe CTA.
+    let _ = subscribe_button_handle;
     Flex::column()
         .with_cross_axis_alignment(CrossAxisAlignment::Start)
         .with_spacing(12.)
@@ -3237,17 +3231,6 @@ fn render_out_of_credits_error(
                 .with_child(icon)
                 .with_child(Shrinkable::new(1., text).finish())
                 .finish(),
-        )
-        .with_child(
-            Container::new(
-                Flex::row()
-                    .with_main_axis_size(MainAxisSize::Min)
-                    .with_main_axis_alignment(MainAxisAlignment::Start)
-                    .with_child(subscribe_button)
-                    .finish(),
-            )
-            .with_margin_left(icon_size(app) + icon_right_margin)
-            .finish(),
         )
         .finish()
 }

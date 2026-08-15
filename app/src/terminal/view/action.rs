@@ -378,7 +378,7 @@ pub enum TerminalAction {
         skill_reference: SkillReference,
     },
     OpenAddPromptPane,
-    OpenBillingAndUsagePane,
+    OpenAccountSettingsPane,
     OpenConversationsPalette,
     PickRepoToOpen,
     OpenFilesPalette {
@@ -711,7 +711,7 @@ impl fmt::Debug for TerminalAction {
             OpenRulesPane => write!(f, "OpenRulesPane"),
             OpenEditSkillPane { .. } => write!(f, "OpenEditSkillPane"),
             OpenAddPromptPane => write!(f, "OpenAddPromptPane"),
-            OpenBillingAndUsagePane => write!(f, "OpenBillingAndUsagePane"),
+            OpenAccountSettingsPane => write!(f, "OpenAccountSettingsPane"),
             OpenConversationsPalette => write!(f, "OpenConversationsPalette"),
             PickRepoToOpen => write!(f, "PickRepoToOpen"),
             OpenFilesPalette { .. } => write!(f, "OpenFilesPalette"),

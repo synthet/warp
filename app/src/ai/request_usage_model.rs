@@ -17,7 +17,6 @@ use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::credit_availability::{AICreditAvailability, AICreditDenialReason, AICreditSource};
 use crate::auth::AuthStateProvider;
-use crate::pricing::PricingInfoModel;
 use crate::server::server_api::ai::AIClient;
 use crate::settings::AISettings;
 use crate::workspaces::user_workspaces::UserWorkspaces;
@@ -482,27 +481,20 @@ impl AIRequestUsageModel {
     /// Returns the number of remaining requests the user has based on their latest rate limit info.
     /// If the current time is past the next refresh time, then the number of remaining reqs is the limit.
     fn requests_remaining(&self) -> usize {
-        if self.next_refresh_time() <= Utc::now() || self.is_unlimited() {
-            self.request_limit_info.limit
-        } else {
-            self.request_limit_info
-                .limit
-                .saturating_sub(self.request_limit_info.num_requests_used_since_refresh)
-        }
+        // Synth Warp is commercial-free: treat quotas as unlimited.
+        self.request_limit().max(1)
     }
 
     /// Whether unused base-plan request quota remains.
     pub(crate) fn has_base_plan_requests_remaining(&self) -> bool {
-        self.requests_remaining() > 0
+        true
     }
 
     /// Returns `true` if the user can start an interactive AI request.
     /// Prefers the server decision when present; otherwise uses the pre-fetch fallback.
-    pub fn has_any_ai_remaining(&self, ctx: &AppContext) -> bool {
-        if let Some(availability) = self.server_availability.latest {
-            return Self::server_availability_permits_ai(availability, ctx);
-        }
-        self.has_any_ai_remaining_before_server_decision(ctx)
+    pub fn has_any_ai_remaining(&self, _ctx: &AppContext) -> bool {
+        // Synth Warp is commercial-free: never block local AI use on plan quotas.
+        true
     }
 
     /// Trusts `available`; only `OutOfCredits` may be refined by local BYO credentials.
@@ -554,19 +546,8 @@ impl AIRequestUsageModel {
             .is_some_and(|w| w.billing_metadata.is_enterprise_pay_as_you_go_enabled());
         let is_enterprise_auto_reload_enabled = current_workspace
             .is_some_and(|w| w.billing_metadata.is_enterprise_auto_reload_enabled());
-        let is_self_serve_auto_reload_enabled = current_workspace.is_some_and(|workspace| {
-            workspace
-                .billing_metadata
-                .is_purchase_add_on_credits_policy_enabled()
-                && workspace
-                    .settings
-                    .addon_credits_settings
-                    .auto_reload_enabled
-                && PricingInfoModel::as_ref(ctx)
-                    .addon_credits_options()
-                    .and_then(|options| workspace.get_auto_reload_price_cents(options))
-                    .is_some_and(|price| !workspace.would_addon_purchase_reach_limit(price))
-        });
+        // Synth Warp: never treat add-on credit auto-reload as available AI capacity.
+        let is_self_serve_auto_reload_enabled = false;
 
         // If you have provided your own API key or connected a Grok
         // subscription, it doesn't matter if you are out of warp-provided requests.
@@ -601,13 +582,10 @@ impl AIRequestUsageModel {
     /// the user's tier allows them to index. If the user is allowed unlimited indices, then the
     /// max_indices_allowed is None.
     pub fn codebase_context_limits(&self) -> CodebaseContextUsageLimit {
+        // Synth Warp is commercial-free: do not enforce hosted plan index quotas.
         CodebaseContextUsageLimit {
             max_files_per_repo: self.request_limit_info.max_files_per_repo,
-            max_indices_allowed: if self.request_limit_info.is_unlimited_codebase_indices {
-                None
-            } else {
-                Some(self.request_limit_info.max_codebase_indices)
-            },
+            max_indices_allowed: None,
             embedding_generation_batch_size: self
                 .request_limit_info
                 .embedding_generation_batch_size,
@@ -623,7 +601,7 @@ impl AIRequestUsageModel {
     }
 
     pub fn is_unlimited(&self) -> bool {
-        self.request_limit_info.is_unlimited
+        true
     }
 
     pub fn refresh_duration_to_string(&self) -> String {
@@ -705,84 +683,18 @@ impl AIRequestUsageModel {
     /// Computes the current banner state based on live conditions.
     pub fn compute_buy_addon_credits_banner_display_state(
         &self,
-        ctx: &AppContext,
+        _ctx: &AppContext,
     ) -> BuyCreditsBannerDisplayState {
-        // Early return if user dismissed
-        if self.buy_addon_credits_banner_dismissed {
-            return BuyCreditsBannerDisplayState::Hidden;
-        }
-        let user_workspaces = UserWorkspaces::as_ref(ctx);
-        let current_workspace = user_workspaces.current_workspace();
-        let policy_allows_purchasing = user_workspaces
-            .purchase_policy()
-            .is_some_and(|policy| policy.allows_purchases());
-
-        if !policy_allows_purchasing {
-            return BuyCreditsBannerDisplayState::Hidden;
-        }
-
-        // TODO: we might want to suggest credits purchase if request_remain/bonus credits is below certain threshold
-        // something to consider after launch
-        // Ambient-only credits are usable for cloud agents and should not suppress this banner.
-        let now = Utc::now();
-        let has_non_ambient_bonus_credits = self
-            .bonus_grants
-            .iter()
-            .filter(|grant| grant.grant_type != BonusGrantType::AmbientOnly)
-            .filter(|grant| grant.expiration.is_none_or(|exp| now < exp))
-            .filter(|grant| grant.request_credits_remaining > 0)
-            .any(|grant| match grant.scope {
-                BonusGrantScope::User => true,
-                BonusGrantScope::Team(uid) | BonusGrantScope::Workspace(uid) => {
-                    current_workspace.is_some_and(|workspace| workspace.uid == uid)
-                }
-            });
-
-        if let Some(availability) = self.server_availability.latest {
-            let only_ambient_server_source = availability.available
-                && matches!(
-                    availability.credit_source,
-                    Some(AICreditSource::AmbientBonusGrant)
-                );
-            // Hide when interactive AI is permitted, except ambient-only sources
-            // which do not fund interactive requests.
-            if self.has_any_ai_remaining(ctx) && !only_ambient_server_source {
-                return BuyCreditsBannerDisplayState::Hidden;
-            }
-        } else if self.has_base_plan_requests_remaining() || has_non_ambient_bonus_credits {
-            return BuyCreditsBannerDisplayState::Hidden;
-        }
-
-        let auto_reload_enabled = current_workspace
-            .is_some_and(|w| w.settings.addon_credits_settings.auto_reload_enabled);
-        if !auto_reload_enabled {
-            return BuyCreditsBannerDisplayState::OutOfCredits;
-        }
-
-        let at_monthly_limit =
-            current_workspace.is_some_and(|w| w.is_at_addon_credits_monthly_limit());
-
-        let auto_reload_would_exceed = current_workspace
-            .and_then(|workspace| {
-                let options = PricingInfoModel::as_ref(ctx).addon_credits_options()?;
-                let price = workspace.get_auto_reload_price_cents(options)?;
-                Some(workspace.would_addon_purchase_reach_limit(price))
-            })
-            .unwrap_or(false);
-
-        if at_monthly_limit || auto_reload_would_exceed {
-            BuyCreditsBannerDisplayState::MonthlyLimitReached
-        } else {
-            BuyCreditsBannerDisplayState::Hidden
-        }
+        // Synth Warp is commercial-free: never show buy-credits banners.
+        BuyCreditsBannerDisplayState::Hidden
     }
 
-    pub fn dismiss_buy_credits_banner(&mut self, ctx: &mut ModelContext<Self>) {
+    pub fn dismiss_credits_upsell_banner(&mut self, ctx: &mut ModelContext<Self>) {
         self.buy_addon_credits_banner_dismissed = true;
         ctx.notify();
     }
 
-    pub fn enable_buy_credits_banner(&mut self, ctx: &mut ModelContext<Self>) {
+    pub fn enable_credits_upsell_banner(&mut self, ctx: &mut ModelContext<Self>) {
         self.buy_addon_credits_banner_dismissed = false;
         ctx.notify();
     }
@@ -801,30 +713,25 @@ impl AIRequestUsageModel {
     }
 
     fn is_unlimited_voice_requests(&self) -> bool {
-        self.request_limit_info.is_unlimited_voice
+        true
     }
 
     /// Returns the number of remaining requests the user has based on their latest rate limit info.
     /// If the current time is past the next refresh time, then the number of remaining reqs is the limit.
     fn voice_requests_remaining(&self) -> usize {
-        if self.next_refresh_time() <= Utc::now() || self.is_unlimited_voice_requests() {
-            self.voice_requests_limit()
-        } else {
-            self.voice_requests_limit()
-                .saturating_sub(self.voice_requests())
-        }
+        self.voice_requests_limit().max(1)
     }
 
     /// Returns `true` if the user has at least one voice request before hitting the
     /// limit. Returns `false` otherwise.
     fn has_voice_requests_remaining(&self) -> bool {
-        self.voice_requests_remaining() > 0
+        true
     }
 
     /// Checks request limits to see if the user can make a voice request.
     /// Returns true if the user can make a voice request, false otherwise.
     pub fn can_request_voice(&self) -> bool {
-        self.has_voice_requests_remaining()
+        true
     }
 }
 

@@ -7,7 +7,7 @@ use settings::Setting as _;
 use thousands::Separable;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
-use warp_graphql::billing::{AddonCreditsOption, StripeSubscriptionPlan};
+use warp_graphql::billing::AddonCreditsOption;
 use warpui::elements::{
     Align, Border, CacheOption, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius,
     CrossAxisAlignment, DropShadow, Flex, FormattedTextElement, HighlightedHyperlink, Image,
@@ -22,7 +22,6 @@ use warpui::{
     AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
 };
 
-use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
 use crate::terminal::general_settings::GeneralSettings;
 use crate::ui_components::blended_colors;
 use crate::view_components::{Dropdown, DropdownEvent, DropdownItem, ToastFlavor};
@@ -66,16 +65,6 @@ pub struct BuildPlanMigrationModal {
 
 impl BuildPlanMigrationModal {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
-        ctx.subscribe_to_model(
-            &PricingInfoModel::handle(ctx),
-            |me, _, event, ctx| match event {
-                PricingInfoModelEvent::PricingInfoUpdated => {
-                    me.update_addon_credits_options(ctx);
-                    ctx.notify();
-                }
-            },
-        );
-
         ctx.subscribe_to_model(&UserWorkspaces::handle(ctx), |me, _handle, event, ctx| {
             me.handle_workspaces_event(event, ctx);
         });
@@ -137,10 +126,8 @@ impl BuildPlanMigrationModal {
     }
 
     fn update_addon_credits_options(&mut self, ctx: &mut ViewContext<Self>) {
-        self.addon_credits_options = PricingInfoModel::as_ref(ctx)
-            .addon_credits_options()
-            .map(|opts| opts.to_vec())
-            .unwrap_or_default();
+        // Synth Warp is commercial-free: no hosted addon credit packs.
+        self.addon_credits_options = Vec::new();
         // Sync the selected denomination after options are updated
         self.sync_selected_denomination(ctx);
         // Populate dropdown after syncing selection so it shows the correct item
@@ -497,26 +484,15 @@ impl BuildPlanMigrationModal {
             .map(|workspace| workspace.billing_metadata.customer_type == CustomerType::Business)
             .unwrap_or(false);
 
-        let plan_pricing = PricingInfoModel::as_ref(app).plan_pricing(if is_business {
-            &StripeSubscriptionPlan::BuildBusiness
-        } else {
-            &StripeSubscriptionPlan::Build
-        });
-        let base_credits_limit = plan_pricing.and_then(|p| p.request_limit).unwrap_or(1500);
+        // Synth Warp is commercial-free: use static fallbacks instead of hosted pricing.
+        let base_credits_limit = 1500;
         // (monthly price cents, monthly price cents for annual)
-        let base_plan_prices = plan_pricing
-            .map(|p| {
-                (
-                    p.monthly_plan_price_per_month_usd_cents,
-                    p.yearly_plan_price_per_month_usd_cents,
-                )
-            })
-            .unwrap_or((2000, 1800));
+        let base_plan_prices = (2000, 1800);
 
         let title_text = if is_business {
             "Welcome to the New Business Plan"
         } else {
-            "Welcome to Warp Build"
+            "Welcome to Synth Warp"
         };
 
         let title = Self::create_text(

@@ -804,60 +804,10 @@ impl OneTimeModalModel {
 
     fn check_and_trigger_build_plan_migration_modal(
         &mut self,
-        ctx: &mut ModelContext<Self>,
+        _ctx: &mut ModelContext<Self>,
     ) -> bool {
-        use crate::workspaces::user_workspaces::UserWorkspaces;
-
-        // Check if already dismissed
-        let general_settings = GeneralSettings::as_ref(ctx);
-        if *general_settings
-            .build_plan_migration_modal_dismissed
-            .value()
-        {
-            return false;
-        }
-
-        // Check if user is authenticated
-        let auth_state = crate::auth::AuthStateProvider::as_ref(ctx).get();
-
-        if auth_state.is_anonymous_or_logged_out() {
-            return false;
-        }
-
-        // Check if current workspace has sunsetted_to_build_ts set
-        let user_workspaces = UserWorkspaces::as_ref(ctx);
-        let Some(target_window_id) = self
-            .target_window_id
-            .or_else(|| ctx.windows().active_window())
-        else {
-            return false;
-        };
-        let Some(current_team) = user_workspaces.team_for_window(target_window_id) else {
-            return false;
-        };
-
-        // Check if user is admin of the team
-        let Some(user_email) = auth_state.user_email() else {
-            return false;
-        };
-
-        if !current_team.has_admin_permissions(&user_email) {
-            return false;
-        }
-
-        // Check if service agreement has sunsetted_to_build_ts set
-        let has_sunsetted_to_build = user_workspaces
-            .current_workspace()
-            .and_then(|workspace| workspace.billing_metadata.service_agreements.first())
-            .is_some_and(|agreement| agreement.sunsetted_to_build_ts.is_some());
-
-        if !has_sunsetted_to_build {
-            return false;
-        }
-
-        // All conditions met, show the modal
-        self.target_window_id = Some(target_window_id);
-        self.set_build_plan_migration_modal_open(true, ctx)
+        // Synth Warp is commercial-free: never show the Warp Build migration upsell.
+        false
     }
 }
 

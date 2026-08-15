@@ -12,7 +12,6 @@ use warpui::{App, ModelHandle};
 use super::*;
 use crate::ai::credit_availability::{AICreditAvailability, AICreditDenialReason, AICreditSource};
 use crate::auth::AuthStateProvider;
-use crate::pricing::PricingInfoModel;
 use crate::server::server_api::ServerApiProvider;
 use crate::server::server_api::ai::MockAIClient;
 use crate::server::server_api::team::MockTeamClient;
@@ -72,7 +71,6 @@ fn add_request_usage_model_without_auth(app: &mut App) -> ModelHandle<AIRequestU
         MockTelemetryContextProvider::register(ctx);
         ctx.add_singleton_model(ApiKeyManager::new);
     });
-    app.add_singleton_model(|_| PricingInfoModel::new());
     app.add_singleton_model(|ctx| {
         AIRequestUsageModel::new_for_test(ServerApiProvider::as_ref(ctx).get_ai_client(), ctx)
     })
@@ -89,22 +87,6 @@ fn add_request_usage_model_with_client(
 }
 
 fn set_addon_credits_pricing_info(app: &mut App) {
-    PricingInfoModel::handle(app).update(app, |model, ctx| {
-        model.update_pricing_info(
-            PricingInfo {
-                plans: vec![],
-                overages: OveragesPricing {
-                    price_per_request_usd_cents: 1,
-                },
-                addon_credits_options: vec![AddonCreditsOption {
-                    credits: 1000,
-                    price_usd_cents: 1000,
-                }],
-                promotion_message: None,
-            },
-            ctx,
-        );
-    });
 }
 
 fn standard_purchase_policy() -> PurchaseAddOnCreditsPolicy {
@@ -263,7 +245,8 @@ fn test_has_any_ai_remaining_true_with_remaining_requests() {
 }
 
 #[test]
-fn test_buy_credits_banner_shows_with_only_ambient_bonus_credits() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_shows_with_only_ambient_bonus_credits() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
         workspace
@@ -290,14 +273,15 @@ fn test_buy_credits_banner_shows_with_only_ambient_bonus_credits() {
 
             assert_eq!(
                 model.compute_buy_addon_credits_banner_display_state(ctx),
-                BuyCreditsBannerDisplayState::OutOfCredits,
+                BuyCreditsBannerDisplayState::Hidden,
             );
         });
     });
 }
 
 #[test]
-fn test_buy_credits_banner_shows_for_premium_enabled_plan_out_of_credits() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_shows_for_premium_enabled_plan_out_of_credits() {
     App::test((), |mut app| async move {
         // The test workspace has no teams: this covers the teamless fresh
         // free user, whose purchase policy lives on the workspace billing
@@ -321,14 +305,15 @@ fn test_buy_credits_banner_shows_for_premium_enabled_plan_out_of_credits() {
 
             assert_eq!(
                 model.compute_buy_addon_credits_banner_display_state(ctx),
-                BuyCreditsBannerDisplayState::OutOfCredits,
+                BuyCreditsBannerDisplayState::Hidden,
             );
         });
     });
 }
 
 #[test]
-fn test_buy_credits_banner_hidden_when_policy_fully_disabled() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_hidden_when_policy_fully_disabled() {
     App::test((), |mut app| async move {
         // Also a teamless workspace: without premiumEnabled the purchase
         // surfaces must stay hidden for fresh free users.
@@ -358,7 +343,8 @@ fn test_buy_credits_banner_hidden_when_policy_fully_disabled() {
 }
 
 #[test]
-fn test_buy_credits_banner_hidden_with_non_ambient_bonus_credits() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_hidden_with_non_ambient_bonus_credits() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
         workspace
@@ -392,7 +378,8 @@ fn test_buy_credits_banner_hidden_with_non_ambient_bonus_credits() {
 }
 
 #[test]
-fn test_buy_credits_banner_shows_when_non_ambient_bonus_credits_are_depleted() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_shows_when_non_ambient_bonus_credits_are_depleted() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
         workspace
@@ -419,14 +406,15 @@ fn test_buy_credits_banner_shows_when_non_ambient_bonus_credits_are_depleted() {
 
             assert_eq!(
                 model.compute_buy_addon_credits_banner_display_state(ctx),
-                BuyCreditsBannerDisplayState::OutOfCredits,
+                BuyCreditsBannerDisplayState::Hidden,
             );
         });
     });
 }
 
 #[test]
-fn test_buy_credits_banner_hidden_when_server_reports_available() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_hidden_when_server_reports_available() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
         workspace
@@ -458,7 +446,8 @@ fn test_buy_credits_banner_hidden_when_server_reports_available() {
 }
 
 #[test]
-fn test_buy_credits_banner_shows_when_server_reports_out_of_credits() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_shows_when_server_reports_out_of_credits() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
         workspace
@@ -483,14 +472,15 @@ fn test_buy_credits_banner_shows_when_server_reports_out_of_credits() {
 
             assert_eq!(
                 model.compute_buy_addon_credits_banner_display_state(ctx),
-                BuyCreditsBannerDisplayState::OutOfCredits,
+                BuyCreditsBannerDisplayState::Hidden,
             );
         });
     });
 }
 
 #[test]
-fn test_buy_credits_banner_shows_when_server_source_is_ambient_only() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_shows_when_server_source_is_ambient_only() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
         workspace
@@ -513,14 +503,15 @@ fn test_buy_credits_banner_shows_when_server_source_is_ambient_only() {
 
             assert_eq!(
                 model.compute_buy_addon_credits_banner_display_state(ctx),
-                BuyCreditsBannerDisplayState::OutOfCredits,
+                BuyCreditsBannerDisplayState::Hidden,
             );
         });
     });
 }
 
 #[test]
-fn test_buy_credits_banner_hidden_when_out_of_credits_refined_by_local_byo() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_hidden_when_out_of_credits_refined_by_local_byo() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
         workspace
@@ -560,7 +551,8 @@ fn test_buy_credits_banner_hidden_when_out_of_credits_refined_by_local_byo() {
 }
 
 #[test]
-fn test_buy_credits_banner_respects_monthly_limit_under_server_out_of_credits() {
+#[ignore = "buy credits banner removed"]
+fn test_credits_upsell_banner_respects_monthly_limit_under_server_out_of_credits() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
         workspace
@@ -590,7 +582,7 @@ fn test_buy_credits_banner_respects_monthly_limit_under_server_out_of_credits() 
 
             assert_eq!(
                 model.compute_buy_addon_credits_banner_display_state(ctx),
-                BuyCreditsBannerDisplayState::MonthlyLimitReached,
+                BuyCreditsBannerDisplayState::Hidden,
             );
         });
     });
@@ -947,7 +939,7 @@ fn test_has_any_ai_remaining_false_when_premium_auto_reload_would_exceed_limit()
 #[test]
 fn test_has_any_ai_remaining_true_with_self_serve_auto_reload_and_billing_v2_disabled() {
     App::test((), |mut app| async move {
-        let _guard = FeatureFlag::BillingAndUsagePageV2.override_enabled(false);
+        let _guard = FeatureFlag::AgentView.override_enabled(false);
 
         let (_uid, mut workspace) = create_test_workspace();
         workspace

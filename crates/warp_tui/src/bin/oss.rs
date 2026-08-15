@@ -14,7 +14,7 @@ fn main() -> Result<()> {
     let mut state = ChannelState::new(
         Channel::Oss,
         ChannelConfig {
-            app_id: AppId::new("dev", "warp", "WarpTui"),
+            app_id: AppId::new("io", "github", "synthet.Warp-Tui"),
             logfile_name: "warp-tui.log".into(),
             server_config: WarpServerConfig::production(),
             oz_config: OzConfig::production(),

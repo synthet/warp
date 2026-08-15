@@ -182,7 +182,8 @@ impl AuthViewBody {
             ctx.notify();
         });
 
-        let allow_loginless = !FeatureFlag::ForceLogin.is_enabled();
+        // Synth Warp is local-first: always allow continuing without an account.
+        let allow_loginless = true;
 
         let network_status = NetworkStatus::handle(ctx);
         ctx.subscribe_to_model(&network_status, |_, _, _, ctx| {
@@ -637,10 +638,10 @@ impl AuthViewBody {
         };
 
         let text = match self.variant {
-            AuthViewVariant::Initial => "Welcome to Warp!",
+            AuthViewVariant::Initial => "Welcome to Synth Warp!",
             AuthViewVariant::RequireLoginCloseable
             | AuthViewVariant::HitDriveObjectLimitCloseable
-            | AuthViewVariant::ShareRequirementCloseable => "Sign up for Warp",
+            | AuthViewVariant::ShareRequirementCloseable => "Sign up for Synth Warp",
         };
 
         ui_builder
@@ -992,7 +993,7 @@ impl View for AuthViewBody {
 
     fn accessibility_contents(&self, _: &AppContext) -> Option<AccessibilityContent> {
         Some(AccessibilityContent::new(
-            "Welcome to Warp!",
+            "Welcome to Synth Warp!",
             "Press enter to open your browser to Sign Up or Sign In.",
             WarpA11yRole::HelpRole,
         ))

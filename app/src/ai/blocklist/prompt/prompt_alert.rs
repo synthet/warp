@@ -30,12 +30,9 @@ const DELINQUENT_DUE_TO_PAYMENT_ISSUE_PRIMARY_TEXT: &str = "Restricted due to pa
 const OUT_OF_REQUESTS_PRIMARY_TEXT: &str = "Out of credits";
 
 const ANONYMOUS_USER_REQUEST_LIMIT_ACTION_TEXT: &str = "Sign up for more AI credits";
-const DELINQUENT_DUE_TO_PAYMENT_ISSUE_ACTION_TEXT: &str = "Manage billing";
+const DELINQUENT_DUE_TO_PAYMENT_ISSUE_ACTION_TEXT: &str = "Check account status";
 const OVERAGES_TOGGLEABLE_BUT_NOT_ENABLED_ACTION_TEXT: &str = "Enable premium overages";
 const MONTHLY_OVERAGES_SPEND_LIMIT_REACHED_ACTION_TEXT: &str = "Increase monthly spend limit";
-const UPGRADE_TEXT: &str = "Upgrade";
-const COMPARE_PLANS_TEXT: &str = "Compare plans";
-const CONTACT_SUPPORT_TEXT: &str = "Contact support";
 const NON_ADMIN_CONTACT_ADMIN_TEXT: &str = ", contact a team admin";
 const NON_ADMIN_ASK_ADMIN_TO_ENABLE_OVERAGES_TEXT: &str = ", ask a team admin to enable overages";
 const NON_ADMIN_ASK_ADMIN_TO_INCREASE_OVERAGES_TEXT: &str =
@@ -51,7 +48,7 @@ pub enum PromptAlertAction {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptAlertEvent {
     SignupAnonymousUser,
-    OpenBillingAndUsagePage,
+    OpenAccountSettingsPage,
     OpenBillingPortal { team_uid: ServerId },
 }
 
@@ -346,45 +343,11 @@ impl PromptAlertView {
                 }
             }
             PromptAlertState::RequestLimitReached => {
-                text_fragments.push(FormattedTextFragment::plain_text("  "));
-                if let Some(team) = current_team {
-                    if team.billing_metadata.can_upgrade_to_higher_tier_plan() {
-                        let upgrade_url = UserWorkspaces::upgrade_link_for_team(team.uid);
-                        let upgrade_text = if !has_admin_permissions {
-                            COMPARE_PLANS_TEXT
-                        } else if team.billing_metadata.can_upgrade_to_build_plan() {
-                            "Upgrade to Build"
-                        } else {
-                            UPGRADE_TEXT
-                        };
-
-                        text_fragments
-                            .push(FormattedTextFragment::hyperlink(upgrade_text, upgrade_url));
-                    } else {
-                        text_fragments.push(FormattedTextFragment::hyperlink(
-                            CONTACT_SUPPORT_TEXT,
-                            "mailto:support@warp.dev".to_owned(),
-                        ));
-                    }
-                } else {
-                    let user_id = auth_state.user_id().unwrap_or_default();
-                    let upgrade_url = UserWorkspaces::upgrade_link(user_id);
-                    let label =
-                        if let Some(workspace) = UserWorkspaces::as_ref(app).current_workspace() {
-                            if workspace.billing_metadata.can_upgrade_to_build_plan() {
-                                "Upgrade to Build"
-                            } else {
-                                UPGRADE_TEXT
-                            }
-                        } else {
-                            UPGRADE_TEXT
-                        };
-                    text_fragments.push(FormattedTextFragment::hyperlink(label, upgrade_url));
-                }
+                // Synth Warp is commercial-free: prefer local BYO keys over hosted upgrade CTAs.
                 if UserWorkspaces::as_ref(app).is_byo_api_key_enabled(app) {
-                    text_fragments.push(FormattedTextFragment::plain_text(" or "));
+                    text_fragments.push(FormattedTextFragment::plain_text("  "));
                     text_fragments.push(FormattedTextFragment::hyperlink_action(
-                        "use your own API keys",
+                        "Use your own API keys",
                         WorkspaceAction::ShowSettingsPageWithSearch {
                             search_query: "api".to_string(),
                             section: Some(SettingsSection::WarpAgent),
@@ -424,39 +387,8 @@ impl View for PromptAlertView {
         let mut text_fragments = vec![];
 
         self.primary_text(&state, &mut text_fragments);
-
-        let auth_state = AuthStateProvider::as_ref(app).get();
-        let workspaces = UserWorkspaces::as_ref(app);
-        let current_team = workspaces.team_for_view_handle(&self.view_handle, app);
-        // A teamless user can be considered the admin of their non-existent team.
-        let has_admin_permissions = current_team.is_none_or(|team| {
-            auth_state
-                .user_email()
-                .is_some_and(|email| team.has_admin_permissions(&email))
-        });
-
-        let can_purchase_addon_credits = workspaces
-            .purchase_policy_for_team(current_team)
-            .is_some_and(|policy| policy.allows_purchases());
-
-        let suggest_buy_credits = can_purchase_addon_credits
-            && has_admin_permissions
-            && matches!(
-                state,
-                PromptAlertState::RequestLimitReached
-                    | PromptAlertState::OveragesToggleableButNotEnabled
-                    | PromptAlertState::MonthlyOveragesSpendLimitReached
-            );
-
-        if suggest_buy_credits {
-            text_fragments.push(FormattedTextFragment::plain_text("  "));
-            text_fragments.push(FormattedTextFragment::hyperlink_action(
-                "Add credits",
-                WorkspaceAction::ShowSettingsPage(SettingsSection::BillingAndUsage),
-            ));
-        } else {
-            self.action_hyperlink(&state, &mut text_fragments, app);
-        }
+        // Synth Warp is commercial-free: never suggest buying hosted credits.
+        self.action_hyperlink(&state, &mut text_fragments, app);
 
         let formatted_text_element = FormattedTextElement::new(
             FormattedText::new([FormattedTextLine::Line(text_fragments)]),
@@ -523,7 +455,7 @@ impl TypedActionView for PromptAlertView {
                 ctx.emit(PromptAlertEvent::SignupAnonymousUser);
             }
             PromptAlertAction::OpenSettingsClicked => {
-                ctx.emit(PromptAlertEvent::OpenBillingAndUsagePage);
+                ctx.emit(PromptAlertEvent::OpenAccountSettingsPage);
             }
             PromptAlertAction::ManageBillingClicked { team_uid } => {
                 ctx.emit(PromptAlertEvent::OpenBillingPortal {

@@ -70,3 +70,24 @@ __pycache__/
 # Project notes
 .note/
 .claude/scheduled_tasks.lock
+
+# --- synthet-code-framework agent paths ---
+secrets.json
+.env
+.env.*
+!.env.example
+.cursor/mcp.json
+.agent/scratch/*
+!.agent/scratch/.gitkeep
+.agent-memory/raw-sessions/*
+!.agent-memory/raw-sessions/.gitkeep
+.agent-memory/dreams/*
+!.agent-memory/dreams/.gitkeep
+.agent-runs/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+dist/
+graphify-out/
+Thumbs.db

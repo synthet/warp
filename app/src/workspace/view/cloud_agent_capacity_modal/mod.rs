@@ -2,11 +2,9 @@ use asset_macro::bundled_or_fetched_asset;
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
-use thousands::Separable;
 use warp_core::channel::ChannelState;
 use warp_core::ui::appearance::Appearance;
 use warp_core::ui::theme::Fill;
-use warp_graphql::billing::StripeSubscriptionPlan;
 use warpui::elements::{
     Align, CacheOption, ChildAnchor, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     DropShadow, Expanded, Flex, FormattedTextElement, HighlightedHyperlink, Image,
@@ -21,7 +19,6 @@ use warpui::ui_components::components::{UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, Entity, SingletonEntity, TypedActionView, View, ViewContext};
 
 use crate::auth::AuthStateProvider;
-use crate::pricing::PricingInfoModel;
 use crate::ui_components::blended_colors;
 use crate::ui_components::icons::Icon;
 use crate::workspaces::user_workspaces::UserWorkspaces;
@@ -33,9 +30,10 @@ const MODAL_HEIGHT: f32 = 532.;
 const COMPACT_MODAL_HEIGHT: f32 = 360.;
 const HEADER_HEIGHT: f32 = 92.;
 const BUTTON_DIAMETER: f32 = 20.;
-const BILLING_AND_USAGE_PATH: &str = "settings/billing_and_usage";
+const BILLING_AND_USAGE_PATH: &str = "settings/account";
 
 fn billing_and_usage_url() -> String {
+    // Synth Warp: no billing page; keep URI shape for any remaining callers.
     format!(
         "{}://{}",
         ChannelState::url_scheme(),
@@ -114,19 +112,9 @@ impl CloudAgentCapacityModal {
     }
 
     fn cta_url(&self, ctx: &ViewContext<Self>) -> Option<String> {
-        let customer_type = UserWorkspaces::handle(ctx)
-            .as_ref(ctx)
-            .current_workspace()
-            .map(|workspace| workspace.billing_metadata.customer_type)
-            .unwrap_or(CustomerType::Free);
-        if !Self::should_show_cta(customer_type, self.variant) {
-            return None;
-        }
-        if Self::can_upgrade(customer_type, self.variant) {
-            Self::get_upgrade_url(ctx)
-        } else {
-            Some(billing_and_usage_url())
-        }
+        // Synth Warp: no upgrade/billing CTAs for cloud agent capacity.
+        let _ = (self, ctx);
+        None
     }
 
     fn render_content(&self, customer_type: CustomerType, app: &AppContext) -> Box<dyn Element> {
@@ -175,33 +163,15 @@ impl CloudAgentCapacityModal {
             .with_child(Container::new(subtitle).with_margin_bottom(16.).finish());
 
         if can_upgrade {
-            let (target_plan, agent_multiplier, extra_benefits) = match customer_type {
-                CustomerType::Build | CustomerType::BuildMax => {
-                    (StripeSubscriptionPlan::BuildBusiness, "2x", vec!["SSO"])
-                }
+            let (agent_multiplier, extra_benefits) = match customer_type {
+                CustomerType::Build | CustomerType::BuildMax => ("2x", vec!["SSO"]),
                 // Free tier or a legacy plan.
-                _ => (StripeSubscriptionPlan::Build, "5x", vec![]),
+                _ => ("5x", vec![]),
             };
 
-            let plan_pricing = PricingInfoModel::handle(app)
-                .as_ref(app)
-                .plan_pricing(&target_plan);
-
-            // Pricing text based on plan type and actual pricing
+            // Synth Warp is commercial-free: omit hosted plan pricing copy.
             let pricing_text = if customer_type == CustomerType::Free {
-                if let Some(pricing) = plan_pricing {
-                    let price = pricing.yearly_plan_price_per_month_usd_cents / 100;
-                    format!(
-                        "Paid plans start at ${price}/month and include everything in your free trial plus:"
-                    )
-                } else {
-                    "Paid plans include everything in your free trial plus:".to_string()
-                }
-            } else if let Some(pricing) = plan_pricing {
-                let price = pricing.yearly_plan_price_per_month_usd_cents / 100;
-                format!(
-                    "The Business plan starts at ${price}/month and includes everything on your current plan plus:"
-                )
+                "Paid plans include everything in your free trial plus:".to_string()
             } else {
                 "The Business plan includes everything on your current plan plus:".to_string()
             };
@@ -218,13 +188,7 @@ impl CloudAgentCapacityModal {
             )
             .finish();
 
-            // Credits text from plan pricing
-            let credits_text = if let Some(limit) = plan_pricing.and_then(|plan| plan.request_limit)
-            {
-                format!("{} AI credits per month", limit.separate_with_commas())
-            } else {
-                "Extended AI credits per month".to_string()
-            };
+            let credits_text = "Extended AI credits per month".to_string();
 
             // Benefits list based on plan type
             let mut benefits = vec![

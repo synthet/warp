@@ -26,7 +26,6 @@ use crate::auth::{AuthStateProvider, UserUid};
 use crate::channel::ChannelState;
 use crate::cloud_object::model::persistence::CloudModel;
 use crate::cloud_object::{CloudObjectEventEntrypoint, ObjectType, Owner, Space};
-use crate::pricing::PricingInfoModel;
 use crate::server::experiments::{ServerExperiment, ServerExperiments, ServerExperimentsEvent};
 use crate::server::ids::ServerId;
 use crate::server::server_api::team::TeamClient;
@@ -544,13 +543,8 @@ impl UserWorkspaces {
             .or_else(|| self.current_workspace_billing_metadata())
     }
 
-    pub fn is_custom_llm_enabled_for_team(&self, team: Option<&Team>) -> bool {
-        team.map(Team::is_custom_llm_enabled)
-            .or_else(|| {
-                self.current_workspace()
-                    .map(Workspace::is_custom_llm_enabled)
-            })
-            .unwrap_or(false)
+    pub fn is_custom_llm_enabled_for_team(&self, _team: Option<&Team>) -> bool {
+        true
     }
 
     /// The add-on credits purchase policy for the current viewer context: the
@@ -709,65 +703,25 @@ impl UserWorkspaces {
     /// Note that the value may be incorrect if called before the team's billing metadata has been fetched.
     /// For solo users (no workspace), this is controlled by the `SoloUserByok` feature flag.
     /// Anonymous or logged-out users are not allowed to use BYO API keys.
-    pub fn is_byo_api_key_enabled(&self, app: &AppContext) -> bool {
-        if AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
-        {
-            return false;
-        }
-        self.current_workspace()
-            .map(|workspace| workspace.is_byo_api_key_enabled())
-            .unwrap_or(FeatureFlag::SoloUserByok.is_enabled())
+    pub fn is_byo_api_key_enabled(&self, _app: &AppContext) -> bool {
+        true
     }
 
     /// Whether the current workspace's managed BYOK/BYOE policy allows members
-    /// to use their own provider API keys. Users with no workspace, or
-    /// workspaces without the managed BYOK/BYOE policy, have no team-level
-    /// restriction, so this returns true and the normal BYO entitlement applies.
+    /// to use their own provider API keys. Synth Warp is local-first: always allow.
     pub fn are_member_byo_keys_allowed(&self) -> bool {
-        self.current_workspace().is_none_or(|workspace| {
-            !workspace.billing_metadata.is_managed_byok_byoe_enabled()
-                || workspace
-                    .settings
-                    .team_byo
-                    .as_ref()
-                    .is_some_and(|team_byo| {
-                        team_byo.first_party_enabled && team_byo.allow_user_keys
-                    })
-        })
+        true
     }
     /// Whether custom inference endpoints are enabled for the current user.
-    /// Anonymous or logged-out users are not allowed to use custom inference.
-    /// Controlled by the BYO_ENDPOINT billing policy.
-    pub fn is_custom_inference_enabled(&self, app: &AppContext) -> bool {
-        if AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
-        {
-            return false;
-        }
-
-        self.current_workspace()
-            .map(|workspace| workspace.billing_metadata.is_byo_endpoint_enabled())
-            .unwrap_or(true)
+    /// Synth Warp is local-first: always allow.
+    pub fn is_custom_inference_enabled(&self, _app: &AppContext) -> bool {
+        true
     }
 
     /// Whether the current workspace's managed BYOK/BYOE policy allows members
-    /// to use their own custom endpoints. Users with no workspace, or
-    /// workspaces without the managed BYOK/BYOE policy, have no team-level
-    /// restriction, so this returns true and the normal BYO entitlement applies.
+    /// to use their own custom endpoints. Synth Warp is local-first: always allow.
     pub fn are_member_byo_endpoints_allowed(&self) -> bool {
-        self.current_workspace().is_none_or(|workspace| {
-            !workspace.billing_metadata.is_managed_byok_byoe_enabled()
-                || workspace
-                    .settings
-                    .team_byo
-                    .as_ref()
-                    .is_some_and(|team_byo| {
-                        team_byo.endpoints_enabled && team_byo.allow_user_endpoints
-                    })
-        })
+        true
     }
 
     pub fn aws_bedrock_host_settings(&self) -> Option<&super::workspace::LlmHostSettings> {
@@ -1119,9 +1073,6 @@ impl UserWorkspaces {
         match result {
             Ok(response) => {
                 if let Some(pricing_info) = response.pricing_info {
-                    PricingInfoModel::handle(ctx).update(ctx, |model, ctx| {
-                        model.update_pricing_info(pricing_info, ctx);
-                    });
                 }
 
                 if let Some(availability) = response.metadata.ai_credit_availability {
@@ -1550,40 +1501,18 @@ impl UserWorkspaces {
 
     pub fn generate_stripe_billing_portal_link(
         &mut self,
-        team_uid: ServerId,
-        ctx: &mut ModelContext<Self>,
+        _team_uid: ServerId,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let workspace_client = self.workspace_client.clone();
-        let _ = ctx.spawn(
-            async move {
-                workspace_client
-                    .generate_stripe_billing_portal_link(team_uid)
-                    .await
-            },
-            Self::on_generate_stripe_billing_portal_link,
-        );
     }
 
     pub fn update_usage_based_pricing_settings(
         &mut self,
-        team_uid: ServerId,
-        usage_based_pricing_enabled: bool,
-        max_monthly_spend_cents: Option<u32>,
-        ctx: &mut ModelContext<Self>,
+        _team_uid: ServerId,
+        _usage_based_pricing_enabled: bool,
+        _max_monthly_spend_cents: Option<u32>,
+        _ctx: &mut ModelContext<Self>,
     ) {
-        let workspace_client = self.workspace_client.clone();
-        let _ = ctx.spawn(
-            async move {
-                workspace_client
-                    .update_usage_based_pricing_settings(
-                        team_uid,
-                        usage_based_pricing_enabled,
-                        max_monthly_spend_cents,
-                    )
-                    .await
-            },
-            Self::on_update_workspace_metadata,
-        );
     }
 
     fn on_update_workspace_metadata(

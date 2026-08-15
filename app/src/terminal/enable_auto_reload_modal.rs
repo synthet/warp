@@ -17,10 +17,8 @@ use warpui::{AppContext, Element, Entity, SingletonEntity as _, View, ViewContex
 use crate::features::FeatureFlag;
 use crate::menu::MenuItemFields;
 use crate::modal::{MODAL_PADDING, MODAL_WIDTH, Modal, ModalEvent};
-use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
 use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::{AutoReloadModalAction, TelemetryEvent};
-use crate::settings_view::create_discount_badge;
 use crate::ui_components::blended_colors;
 use crate::view_components::{Dropdown, DropdownAction, ToastFlavor};
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
@@ -64,23 +62,10 @@ fn send_auto_reload_dismissed_telemetry<V: View>(ctx: &mut ViewContext<V>) {
 impl EnableAutoReloadModalBody {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
         ctx.subscribe_to_model(
-            &PricingInfoModel::handle(ctx),
-            |me, _, event, ctx| match event {
-                PricingInfoModelEvent::PricingInfoUpdated => {
-                    me.update_addon_credits_options(ctx);
-                    ctx.notify();
-                }
-            },
-        );
-
-        ctx.subscribe_to_model(
             &UserWorkspaces::handle(ctx),
             |me, _handle, event, ctx| {
                 match event {
                     UserWorkspacesEvent::TeamsChanged => {
-                        // Pricing labels depend on the current team's purchase
-                        // policy (premium surcharge), so rebuild them when
-                        // teams change.
                         me.update_addon_credits_options(ctx);
                         ctx.notify();
                     }
@@ -146,10 +131,7 @@ impl EnableAutoReloadModalBody {
     }
 
     fn update_addon_credits_options(&mut self, ctx: &mut ViewContext<Self>) {
-        self.addon_credits_options = PricingInfoModel::as_ref(ctx)
-            .addon_credits_options()
-            .map(|opts| opts.to_vec())
-            .unwrap_or_default();
+        self.addon_credits_options = Vec::new();
 
         let workspaces = UserWorkspaces::as_ref(ctx);
         let premium_bps = workspaces
@@ -195,7 +177,7 @@ impl EnableAutoReloadModalBody {
                             .with_color(text_color.into())
                             .finish();
 
-                            let discount_badge = create_discount_badge(discount_percent, appearance);
+                            let discount_badge = Empty::new().finish();
 
                             Flex::row()
                                 .with_cross_axis_alignment(CrossAxisAlignment::Center)

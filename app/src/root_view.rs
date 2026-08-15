@@ -43,7 +43,6 @@ use crate::ai::blocklist::SerializedBlockListItem;
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::ai::onboarding::{
     build_onboarding_models, current_onboarding_auth_state, onboarding_credit_packs,
-    onboarding_pricing_promotion_message,
 };
 use crate::ai::request_usage_model::AIRequestUsageModelEvent;
 use crate::app_state::{AppState, PaneUuid, WindowSnapshot};
@@ -75,7 +74,6 @@ use crate::linear::LinearIssueWork;
 use crate::notebooks::manager::NotebookSource;
 use crate::pane_group::{NewTerminalOptions, PanesLayout};
 use crate::persistence::ModelEvent;
-use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
 use crate::server::cloud_objects::update_manager::UpdateManager;
 use crate::server::experiments::ServerExperiments;
 use crate::server::ids::{ServerId, SyncId};
@@ -116,7 +114,7 @@ use crate::{
     send_telemetry_from_app_ctx, send_telemetry_from_ctx,
 };
 
-const WINDOW_TITLE: &str = "Warp";
+const WINDOW_TITLE: &str = "Synth Warp";
 
 lazy_static! {
     static ref FALLBACK_WINDOW_SIZE: Vector2F = vec2f(800.0, 600.0);
@@ -650,15 +648,9 @@ fn open_launch_config(arg: &OpenLaunchConfigArg, ctx: &mut AppContext) {
     );
 }
 
-fn requires_post_onboarding_login(
-    is_logged_in: bool,
-    ai_enabled: bool,
-    warp_drive_enabled: bool,
-) -> bool {
-    !is_logged_in
-        && (FeatureFlag::AccountFirstOnboarding.is_enabled()
-            || ((ai_enabled || warp_drive_enabled)
-                && FeatureFlag::OpenWarpNewSettingsModes.is_enabled()))
+fn requires_post_onboarding_login() -> bool {
+    // Synth Warp is local-first and never gates the terminal on a Warp account.
+    false
 }
 /// Replaces the settings and tutorial snapshots consumed when post-auth
 /// onboarding eventually completes.
@@ -818,7 +810,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                         AddWindowOptions {
                             window_style: WindowStyle::Pin,
                             window_bounds: WindowBounds::ExactPosition(frame_args.window_bounds),
-                            title: Some("Warp".to_owned()),
+                            title: Some(WINDOW_TITLE.to_owned()),
                             fullscreen_state: window.fullscreen_state,
                             background_blur_radius_pixels,
                             background_blur_texture,
@@ -861,7 +853,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                         ctx.add_window(
                             AddWindowOptions {
                                 window_bounds: WindowBounds::new(window.bounds),
-                                title: Some("Warp".to_owned()),
+                                title: Some(WINDOW_TITLE.to_owned()),
                                 fullscreen_state: window.fullscreen_state,
                                 background_blur_radius_pixels,
                                 background_blur_texture,
@@ -913,7 +905,7 @@ fn open_from_restored(arg: &OpenFromRestoredArg, ctx: &mut AppContext) {
                 ctx.add_window(
                     AddWindowOptions {
                         window_bounds: WindowBounds::new(window.bounds),
-                        title: Some("Warp".to_owned()),
+                        title: Some(WINDOW_TITLE.to_owned()),
                         fullscreen_state: window.fullscreen_state,
                         background_blur_radius_pixels,
                         background_blur_texture,
@@ -1313,7 +1305,7 @@ fn default_window_options(window_settings: &WindowSettings, ctx: &AppContext) ->
     AddWindowOptions {
         window_style,
         window_bounds: next_bounds,
-        title: Some("Warp".to_owned()),
+        title: Some(WINDOW_TITLE.to_owned()),
         background_blur_radius_pixels: Some(*window_settings.background_blur_radius),
         background_blur_texture: *window_settings.background_blur_texture,
         on_gpu_driver_selected: on_gpu_driver_selected_callback(),
@@ -1498,7 +1490,7 @@ fn toggle_quake_mode_window(global_resource_handles: &GlobalResourceHandles, ctx
                 AddWindowOptions {
                     window_style: WindowStyle::Pin,
                     window_bounds: WindowBounds::ExactPosition(config.window_bounds),
-                    title: Some("Warp".to_owned()),
+                    title: Some(WINDOW_TITLE.to_owned()),
                     background_blur_radius_pixels: Some(*window_settings.background_blur_radius),
                     background_blur_texture: *window_settings.background_blur_texture,
                     // Ignore the quake window for positioning the next window
@@ -1939,10 +1931,7 @@ impl RootView {
                     let should_show_pre_login_onboarding = pre_login_onboarding_enabled
                         && FeatureFlag::AgentOnboarding.is_enabled()
                         && !has_completed_local_onboarding;
-                    if FeatureFlag::ForceLogin.is_enabled() {
-                        // ForceLogin is true for Preview
-                        AuthOnboardingState::Auth(workspace_args.into())
-                    } else if should_show_pre_login_onboarding {
+                    if should_show_pre_login_onboarding {
                         let workspace_args_box: Box<WorkspaceArgs> = workspace_args.into();
                         let onboarding_view = Self::create_agent_onboarding_view(ctx);
                         onboarding_view.update(ctx, |view, ctx| {
@@ -1952,12 +1941,9 @@ impl RootView {
                             onboarding_view,
                             target: AuthOnboardingTarget::Workspace(workspace_args_box),
                         }
-                    } else if FeatureFlag::SkipFirebaseAnonymousUser.is_enabled() {
-                        // When SkipFirebaseAnonymousUser is enabled, skip the login screen
-                        // entirely and go directly into the workspace.
-                        AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
                     } else {
-                        AuthOnboardingState::Auth(workspace_args.into())
+                        // Synth Warp is local-first: open the terminal without forced login.
+                        AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
                     }
                 }
             }
@@ -2209,23 +2195,8 @@ impl RootView {
                 ctx,
             );
             view.set_credit_pack_options(onboarding_credit_packs(ctx), ctx);
-            view.set_pricing_promotion_message(onboarding_pricing_promotion_message(ctx), ctx);
             view
         });
-        // Keep the offer slide's credit packs and promotion in sync with server pricing.
-        let onboarding_view_for_pricing = onboarding_view.clone();
-        ctx.subscribe_to_model(
-            &PricingInfoModel::handle(ctx),
-            move |_, _pricing, event, ctx| {
-                let PricingInfoModelEvent::PricingInfoUpdated = event;
-                let options = onboarding_credit_packs(ctx);
-                let promotion_message = onboarding_pricing_promotion_message(ctx);
-                onboarding_view_for_pricing.update(ctx, |onboarding_view, ctx| {
-                    onboarding_view.set_credit_pack_options(options, ctx);
-                    onboarding_view.set_pricing_promotion_message(promotion_message, ctx);
-                });
-            },
-        );
 
         let onboarding_view_clone = onboarding_view.clone();
         ctx.subscribe_to_model(
@@ -2695,14 +2666,9 @@ impl RootView {
                     }
                 }
 
-                let is_logged_in = AuthStateProvider::as_ref(ctx).get().is_logged_in();
-                // Account-first always presents account creation to logged-out users.
-                // The fallback flow only requires login for account-backed settings.
                 let ai_enabled = selected_settings.is_ai_enabled();
-                let warp_drive_enabled = selected_settings.is_warp_drive_enabled();
                 // With old onboarding, we ask user to log in before onboarding, so don't do it after onboarding completes.
-                let requires_login =
-                    requires_post_onboarding_login(is_logged_in, ai_enabled, warp_drive_enabled);
+                let requires_login = requires_post_onboarding_login();
 
                 if requires_login {
                     refresh_pending_onboarding_choices(
@@ -3474,7 +3440,7 @@ impl RootView {
         // still returns the user through the Billing & Usage deeplink. Landing
         // it mid-onboarding would interrupt the flow, so onboarding takes it as
         // the purchase succeeding and moves on instead.
-        if *section == SettingsSection::BillingAndUsage
+        if *section == SettingsSection::Account
             && self.notify_onboarding_checkout_succeeded(ctx)
         {
             return true;

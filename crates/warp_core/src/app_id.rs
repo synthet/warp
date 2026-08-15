@@ -25,14 +25,20 @@ impl AppId {
         }
     }
 
-    /// Parses an three-component app identifier string (e.g.: com.example.App)
-    /// into an [`AppId`].
+    /// Parses an app identifier string into an [`AppId`].
+    ///
+    /// The first two dotted segments are the qualifier and organization; the
+    /// remainder is the application name and may itself contain dots (e.g.
+    /// `io.github.synthet.Warp` → application name `synthet.Warp`).
     pub fn parse(app_id: &str) -> anyhow::Result<Self> {
         let &[qualifier, organization, application_name] =
-            app_id.splitn(4, '.').collect_vec().as_slice()
+            app_id.splitn(3, '.').collect_vec().as_slice()
         else {
             anyhow::bail!("App ID does not contain three components, separated by periods.");
         };
+        if application_name.is_empty() {
+            anyhow::bail!("App ID application name must not be empty.");
+        }
         Ok(Self {
             qualifier: Cow::Owned(qualifier.to_owned()),
             organization: Cow::Owned(organization.to_owned()),

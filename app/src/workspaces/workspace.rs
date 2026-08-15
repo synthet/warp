@@ -127,7 +127,7 @@ impl Workspace {
     }
 
     pub fn is_custom_llm_enabled(&self) -> bool {
-        self.settings.llm_settings.enabled
+        true
     }
 
     pub fn are_overages_toggleable(&self) -> bool {
@@ -161,7 +161,7 @@ impl Workspace {
     }
 
     pub fn is_byo_api_key_enabled(&self) -> bool {
-        self.billing_metadata.is_byo_api_key_enabled()
+        true
     }
 
     /// Returns true if the workspace has reached or exceeded its monthly addon credits spend limit.
@@ -780,21 +780,15 @@ impl BillingMetadata {
     }
 
     pub fn is_byo_api_key_enabled(&self) -> bool {
-        self.tier
-            .byo_api_key_policy
-            .is_some_and(|policy| policy.enabled)
+        true
     }
 
     pub fn is_byo_endpoint_enabled(&self) -> bool {
-        self.tier
-            .byo_endpoint_policy
-            .is_some_and(|policy| policy.enabled)
+        true
     }
 
     pub fn is_managed_byok_byoe_enabled(&self) -> bool {
-        self.tier
-            .managed_byok_byoe_policy
-            .is_some_and(|policy| policy.enabled)
+        false
     }
 
     pub fn has_overages_used(&self) -> bool {

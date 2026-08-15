@@ -331,7 +331,7 @@ fn should_open_unavailable_modal(state: &PromptAlertState, app: &AppContext) -> 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptSuggestionsEvent {
     SignupAnonymousUser,
-    OpenBillingAndUsagePage,
+    OpenAccountSettingsPage,
     OpenBillingPortal { team_uid: ServerId },
 }
 
@@ -371,8 +371,8 @@ impl PromptSuggestionsView {
             PromptAlertEvent::SignupAnonymousUser => {
                 ctx.emit(PromptSuggestionsEvent::SignupAnonymousUser);
             }
-            PromptAlertEvent::OpenBillingAndUsagePage => {
-                ctx.emit(PromptSuggestionsEvent::OpenBillingAndUsagePage);
+            PromptAlertEvent::OpenAccountSettingsPage => {
+                ctx.emit(PromptSuggestionsEvent::OpenAccountSettingsPage);
             }
             PromptAlertEvent::OpenBillingPortal { team_uid } => {
                 ctx.emit(PromptSuggestionsEvent::OpenBillingPortal {
@@ -482,8 +482,8 @@ impl TypedActionView for PromptSuggestionsView {
             PromptSuggestionsEvent::SignupAnonymousUser => {
                 ctx.emit(PromptSuggestionsEvent::SignupAnonymousUser);
             }
-            PromptSuggestionsEvent::OpenBillingAndUsagePage => {
-                ctx.emit(PromptSuggestionsEvent::OpenBillingAndUsagePage);
+            PromptSuggestionsEvent::OpenAccountSettingsPage => {
+                ctx.emit(PromptSuggestionsEvent::OpenAccountSettingsPage);
             }
             PromptSuggestionsEvent::OpenBillingPortal { team_uid } => {
                 ctx.emit(PromptSuggestionsEvent::OpenBillingPortal {

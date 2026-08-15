@@ -987,7 +987,7 @@ impl Input {
                 self.open_rewind_menu(ctx);
             }
             SlashCommandKind::Usage => {
-                ctx.dispatch_typed_action(&TerminalAction::OpenBillingAndUsagePane);
+                ctx.dispatch_typed_action(&TerminalAction::OpenAccountSettingsPane);
             }
             SlashCommandKind::RemoteControl => {
                 if !FeatureFlag::CreatingSharedSessions.is_enabled()

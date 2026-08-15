@@ -1,5 +1,62 @@
 # AGENTS.md
 
+<!-- BEGIN SYNTHET-CODE-FRAMEWORK -->
+## Authoring & skill source of truth
+
+- **Canonical** assets are authored under `.claude/` (+ `.agent/`).
+- The **`.cursor/`** tree and Codex-native **`.agents/skills/`** + **`.codex/agents/`**
+  trees are **generated** by `python scripts/sync_assistant_trees.py` — do not hand-edit
+  generated files.
+- When you change a skill/command/agent, run the sync and commit all generated mirrors in the
+  **same change**.
+- Install shared common-skills **globally** (`~/.agents/skills` via `skills-lock.json`).
+  `./script/bootstrap --install-common-skills-in-repo` writes into `.agents/skills` and is
+  wiped on the next sync.
+
+## Commands
+
+```bash
+./script/run
+./script/run-tui
+cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
+./script/format
+cargo clippy --workspace --all-targets --all-features --tests -- -D warnings
+```
+
+See [`.agent/SAFETY.md`](.agent/SAFETY.md) and [`docs/ai-workflow/README.md`](docs/ai-workflow/README.md).
+
+## MCP servers
+
+- Project servers: [`.mcp.json`](.mcp.json) (Claude Code). Copy
+  [`.cursor/mcp.example.json`](.cursor/mcp.example.json) → `.cursor/mcp.json` (gitignored) for Cursor.
+- This repo already registers a `github` MCP server. Optional fff / Graphify examples live under
+  `_examples` in `.mcp.json` and `.cursor/mcp.example.json`.
+- User-level `~/.cursor/mcp.json` holds cross-repo tools.
+
+## Test vocabulary
+
+| You say | Canonical name | Where | How to run |
+|---------|----------------|-------|------------|
+| unit | crate unit tests | `*_tests.rs` / `mod_test.rs` | `cargo nextest run -p <crate>` |
+| nextest | workspace nextest | workspace | `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2` |
+| GUI integration | WarpUI integration tests | `crates/integration` | see `gui-integration-test` skill |
+| TUI | render-to-lines unit tests | `crates/warp_tui` | see `tui-testing` skill |
+
+## RCA / Failure Log
+
+| Date | Symptom | Root cause | Fix / guard |
+|------|---------|------------|-------------|
+| _(none yet)_ | | | |
+
+## Backlog
+
+Work is claimed from existing **GitHub issues** and `specs/` / `.agents/specs/` / `agents/specs/`.
+Do not invent a parallel queue in `.agent/backlog/items.md`. Provider docs remain under
+[`.agent/backlog/`](.agent/backlog/README.md) for optional `/task-claim` use.
+
+<!-- END SYNTHET-CODE-FRAMEWORK -->
+
+
 This file provides guidance when working with code in this repository.
 
 ## Development Commands
@@ -41,7 +98,7 @@ Environment variables:
 - `./script/bootstrap` - Platform-specific setup plus common agent skill installation from `skills-lock.json`; prompts for project/global when an install or update is needed unless a target flag or environment override is provided.
 - `./script/bootstrap --skip-common-skills` - Platform setup without installing or updating common agent skills.
 - `./script/bootstrap --install-common-skills` - Explicitly install common agent skills from `skills-lock.json`; this is the default behavior.
-- `./script/bootstrap --install-common-skills-in-repo` - Platform setup plus common agent skill installation in this checkout's `.agents/skills`.
+- `./script/bootstrap --install-common-skills-in-repo` - Platform setup plus common agent skill installation in this checkout's `.agents/skills`. **Do not use after synthet-code-framework adopt:** `.agents/skills` is a generated mirror of `.claude/skills/` and an in-repo common-skills install is wiped on the next `python scripts/sync_assistant_trees.py`.
 - `./script/bootstrap --install-common-skills-globally` - Platform setup plus common agent skill installation in `~/.agents/skills`.
 - `../common-skills/scripts/install_common_skills --repo-root "$PWD" --project --if-needed` - Install or refresh shared agent skills in this checkout's `.agents/skills`.
 - `../common-skills/scripts/install_common_skills --repo-root "$PWD" --global --if-needed` - Install or refresh shared agent skills in `~/.agents/skills`.

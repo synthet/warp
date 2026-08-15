@@ -365,7 +365,12 @@ pub fn open_file_path_with_line_and_col(
 
 fn is_warp_bundle(bundle_id: &str) -> bool {
     AppId::parse(bundle_id)
-        .map(|id| id.qualifier() == "dev" && id.organization() == "warp")
+        .map(|id| {
+            (id.qualifier() == "dev" && id.organization() == "warp")
+                || (id.qualifier() == "io"
+                    && id.organization() == "github"
+                    && id.application_name().starts_with("synthet.Warp"))
+        })
         .unwrap_or(false)
 }
 

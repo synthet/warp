@@ -7,11 +7,9 @@ use thousands::Separable;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
     Align, Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-    Container, CrossAxisAlignment, Expanded, Flex, Highlight, MouseStateHandle, ParentElement,
+    Container, CrossAxisAlignment, Expanded, Flex, MouseStateHandle, ParentElement,
     PartialClickableElement, ScrollbarWidth, Text,
 };
-use warpui::fonts::Properties;
-use warpui::platform::Cursor;
 use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::switch::SwitchStateHandle;
 use warpui::{
@@ -28,9 +26,7 @@ use crate::ai::execution_profiles::{
     AIExecutionProfile, AIExecutionProfileAppExt as _, ActionPermission, ExecutionProfileId,
     RunAgentsPermission, WriteToPtyPermission,
 };
-use crate::ai::llms::{
-    DisableReason, LLMContextWindow, LLMId, LLMInfo, LLMPreferences, LLMPreferencesEvent,
-};
+use crate::ai::llms::{LLMContextWindow, LLMId, LLMInfo, LLMPreferences, LLMPreferencesEvent};
 use crate::ai::paths::host_native_absolute_path;
 use crate::editor::{
     EditorView, Event as EditorEvent, InteractionState, SingleLineEditorOptions, TextOptions,
@@ -45,16 +41,16 @@ use crate::view_components::dropdown::DropdownAction;
 use crate::view_components::{
     Dropdown, DropdownItem, FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent,
 };
-use crate::workspace::WorkspaceAction;
 use crate::workspaces::user_workspaces::UserWorkspacesEvent;
 use crate::{Appearance, TemplatableMCPServerManager, UserWorkspaces};
 
 const MODEL_MENU_WIDTH: f32 = 250.;
 
-/// Renders a footer banner for model dropdowns informing free-plan users that
-/// frontier models require an upgrade, with a clickable "Upgrade" link.
+/// Renders a footer banner for model dropdowns. Synth Warp is commercial-free,
+/// so this is informational only with no upgrade CTA.
+#[allow(dead_code)]
 fn render_upgrade_footer(
-    upgrade_mouse_state: MouseStateHandle,
+    _upgrade_mouse_state: MouseStateHandle,
     app: &AppContext,
 ) -> Box<dyn Element> {
     let appearance = Appearance::as_ref(app);
@@ -71,29 +67,13 @@ fn render_upgrade_footer(
     .with_height(16.)
     .finish();
 
-    let label = "Frontier models are unavailable on free plans. Upgrade";
-    let upgrade_start = label.len() - "Upgrade".len();
+    let label = "Some models may require a local API key or custom endpoint.";
     let info_text = Text::new(
         label,
         appearance.ui_font_family(),
         appearance.ui_font_size(),
     )
     .with_color(text_color.into())
-    .with_single_highlight(
-        Highlight::new()
-            .with_properties(Properties::default())
-            .with_foreground_color(internal_colors::accent_fg(theme).into()),
-        (upgrade_start..label.len()).collect(),
-    )
-    .with_hoverable_char_range(
-        upgrade_start..label.len(),
-        upgrade_mouse_state,
-        Some(Cursor::PointingHand),
-        |_is_hovered, _ctx, _app| {},
-    )
-    .with_clickable_char_range(upgrade_start..label.len(), move |_modifiers, ctx, _app| {
-        ctx.dispatch_typed_action(WorkspaceAction::ShowUpgrade);
-    })
     .finish();
 
     let inner = Container::new(
@@ -1163,7 +1143,7 @@ impl ExecutionProfileEditorView {
         get_choices: G,
         create_action: A,
         get_default_id: D,
-        upgrade_mouse_state: &MouseStateHandle,
+        _upgrade_mouse_state: &MouseStateHandle,
         ctx: &mut ViewContext<Self>,
     ) where
         G: for<'a> FnOnce(&'a LLMPreferences, &AppContext) -> Vec<&'a LLMInfo>,
@@ -1183,10 +1163,6 @@ impl ExecutionProfileEditorView {
             let llm_prefs = llm_prefs.as_ref(ctx);
             let choices = get_choices(llm_prefs, ctx);
 
-            let has_upgrade_gated_models = choices
-                .iter()
-                .any(|llm| matches!(llm.disable_reason, Some(DisableReason::RequiresUpgrade)));
-
             let items = available_model_menu_items(
                 choices,
                 |llm| DropdownAction::select_action_and_close(create_action(llm.id.clone())),
@@ -1198,15 +1174,8 @@ impl ExecutionProfileEditorView {
             );
             dropdown.set_rich_items(items, ctx);
 
-            if has_upgrade_gated_models {
-                let mouse_state = upgrade_mouse_state.clone();
-                dropdown.set_footer(
-                    move |app| render_upgrade_footer(mouse_state.clone(), app),
-                    ctx,
-                );
-            } else {
-                dropdown.clear_footer(ctx);
-            }
+            // Synth Warp is commercial-free: never show hosted upgrade footers.
+            dropdown.clear_footer(ctx);
 
             let llm_prefs = LLMPreferences::handle(ctx);
             let llm_prefs = llm_prefs.as_ref(ctx);

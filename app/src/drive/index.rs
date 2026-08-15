@@ -4202,7 +4202,7 @@ impl DriveIndex {
     fn render_shared_object_limit_hit_banner(
         &self,
         appearance: &Appearance,
-        team_uid: ServerId,
+        _team_uid: ServerId,
         object_type: ObjectType,
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
@@ -4211,7 +4211,7 @@ impl DriveIndex {
         let highlight =
             Highlight::new().with_properties(Properties::default().weight(Weight::Bold));
 
-        let banner_line_1 = format!("You've run out of {object_type}s on your plan.");
+        let banner_line_1 = format!("You've run out of {object_type}s.");
         let body = Container::new(
             appearance
                 .ui_builder()
@@ -4230,33 +4230,6 @@ impl DriveIndex {
         )
         .with_margin_bottom(16.)
         .finish();
-
-        let button = appearance
-            .ui_builder()
-            .button(
-                ButtonVariant::Accent,
-                self.mouse_state_handles
-                    .shared_object_limit_hit_banner_button_mouse_state
-                    .clone(),
-            )
-            .with_centered_text_label("Compare plans".into())
-            .with_style(UiComponentStyles {
-                font_size: Some(14.),
-                font_weight: Some(Weight::Light),
-                padding: Some(Coords {
-                    top: 8.,
-                    bottom: 8.,
-                    left: 12.,
-                    right: 12.,
-                }),
-                ..Default::default()
-            })
-            .build()
-            .with_cursor(Cursor::PointingHand)
-            .on_click(move |ctx, _, _| {
-                ctx.dispatch_typed_action(DriveIndexAction::ViewPlans { team_uid })
-            })
-            .finish();
 
         let banner_kind = match object_type {
             ObjectType::Notebook => SharedObjectLimitBannerKind::Notebook,
@@ -4299,13 +4272,12 @@ impl DriveIndex {
             .with_child(close_button)
             .finish();
 
-        // Keep the existing message + CTA centered while the header stretches
+        // Keep the existing message centered while the header stretches
         // full width so the close affordance sits in the top-right corner.
         let content = Flex::column()
             .with_main_axis_alignment(MainAxisAlignment::Center)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(body)
-            .with_child(button)
             .finish();
 
         Container::new(
@@ -4329,7 +4301,7 @@ impl DriveIndex {
     fn render_payment_issue_banner(
         &self,
         appearance: &Appearance,
-        team_uid: ServerId,
+        _team_uid: ServerId,
         has_admin_permissions: bool,
         is_on_stripe_paid_plan: bool,
     ) -> Box<dyn Element> {
@@ -4375,37 +4347,6 @@ impl DriveIndex {
             )
             .finish(),
         );
-
-        // Only show a manage billing button if they are an admin and on a paid stripe plan
-        if has_admin_permissions && is_on_stripe_paid_plan {
-            let button = appearance
-                .ui_builder()
-                .button(
-                    ButtonVariant::Accent,
-                    self.mouse_state_handles
-                        .payment_issue_banner_button_mouse_state
-                        .clone(),
-                )
-                .with_centered_text_label("Manage billing".into())
-                .with_style(UiComponentStyles {
-                    font_size: Some(14.),
-                    font_weight: Some(Weight::Light),
-                    padding: Some(Coords {
-                        top: 8.,
-                        bottom: 8.,
-                        left: 12.,
-                        right: 12.,
-                    }),
-                    ..Default::default()
-                })
-                .build()
-                .with_cursor(Cursor::PointingHand)
-                .on_click(move |ctx, _, _| {
-                    ctx.dispatch_typed_action(DriveIndexAction::ManageBilling { team_uid })
-                })
-                .finish();
-            body.add_child(Container::new(button).with_margin_top(16.).finish());
-        }
 
         Container::new(
             Container::new(body.finish())

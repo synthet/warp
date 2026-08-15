@@ -2967,7 +2967,7 @@ impl BlocklistAIController {
                                 },
                             );
                             AIRequestUsageModel::handle(ctx).update(ctx, |model, ctx| {
-                                model.enable_buy_credits_banner(ctx);
+                                
                             });
                         }
 

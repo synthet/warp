@@ -51,7 +51,7 @@ impl SettingsWidget for AboutPageWidget {
     type View = AboutPageView;
 
     fn search_terms(&self) -> &str {
-        "about warp version"
+        "about synth warp version"
     }
 
     fn render(
@@ -71,11 +71,17 @@ impl SettingsWidget for AboutPageWidget {
 
         let version = ChannelState::app_version().unwrap_or("v#.##.###");
 
+        let product_name = ui_builder
+            .span("Synth Warp")
+            .build()
+            .with_margin_top(16.)
+            .finish();
+
         let version_text = ui_builder
             .span(version.to_string())
             .with_soft_wrap()
             .build()
-            .with_margin_top(16.)
+            .with_margin_top(8.)
             .finish();
 
         let copy_version_icon = appearance
@@ -92,7 +98,7 @@ impl SettingsWidget for AboutPageWidget {
             .with_children([
                 version_text,
                 Container::new(copy_version_icon)
-                    .with_margin_top(16.)
+                    .with_margin_top(8.)
                     .with_padding_left(6.)
                     .finish(),
             ]);
@@ -112,10 +118,11 @@ impl SettingsWidget for AboutPageWidget {
                     .with_max_width(350.)
                     .finish(),
                 )
+                .with_child(product_name)
                 .with_child(version_row.finish())
                 .with_child(
                     ui_builder
-                        .span("Copyright 2026 Warp")
+                        .span("Copyright 2026 Synth Warp")
                         .build()
                         .with_margin_top(16.)
                         .finish(),

@@ -761,7 +761,7 @@ fn test_settings_section_for_simple_subpage() {
     );
     assert_eq!(
         settings_section_for_simple_subpage("billing_and_usage"),
-        Some(SettingsSection::BillingAndUsage),
+        Some(SettingsSection::Account),
     );
     assert_eq!(
         settings_section_for_simple_subpage("platform"),
