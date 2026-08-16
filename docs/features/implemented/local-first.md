@@ -17,8 +17,9 @@ Shipped in this fork:
 - Local terminal use without signing in
 - No Stripe billing, plan upgrades, credit packs, or referral UI
 - No Warp Drive cloud sync
-- No hosted Warp-credit AI; use external CLI agents (Claude Code, Codex, Gemini CLI, and others) or BYOK where the client supports them
-- Telemetry and crash reports are not exported remotely (`telemetry_remote_export_enabled` is always false; OSS ships no telemetry/Sentry config). Optional local log files via `SendTelemetryToFile` write under the log directory. Privacy toggles default off.
+- No hosted Warp-credit AI; use external CLI agents (Claude Code, Codex, Gemini CLI, and others). The built-in agent's AI settings are no longer gated on a Warp login, but its BYOK keys are relayed by `server_root_url`, so it only works against a self-hosted backend named by `SYNTH_WARP_SERVER_ROOT_URL` — see [architecture/synth-fork.md](../../architecture/synth-fork.md#byok-and-the-built-in-agent)
+- No Warp-hosted cloud agents (Oz); those session types stay hidden (`ChannelState::oz_enabled()` is always false)
+- Known remote telemetry and crash paths are disabled by the process-wide `TELEMETRY_POLICY`; channel configuration removes RudderStack credentials and Sentry configuration. Optional local log files via `SendTelemetryToFile` write under the log directory. Explicitly configured local OTLP remains available only through a literal loopback IP with an explicit port, redirects disabled, and proxies ignored. Privacy toggles default off. See [architecture/synth-fork.md](../../architecture/synth-fork.md#local-telemetry-transport-boundary) for the enforcement and verification boundary.
 - No persisted Warp user in secure storage and no personal Drive. Console `Unable to read user from secure storage: NotFound` and `Unable to create cloud preferences due to unset personal drive` are expected. Expected Windows `[WARN]` catalog: [guides/oss-windows-runtime-warnings.md](../../guides/oss-windows-runtime-warnings.md).
 - Settings → Privacy omits Warp account deletion ("Manage your data"); OSS has no hosted Warp account, and `server_root_url` is the TEST-NET discard sink (`http://192.0.2.0:9`)
 

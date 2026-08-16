@@ -107,12 +107,17 @@ impl AuthContext {
     }
 
     /// Creates a transport sharing the latest credential while leaving the exporter itself stable.
-    pub(super) fn http_client(&self) -> AuthenticatedHttpClient {
-        AuthenticatedHttpClient {
-            inner: reqwest::Client::new(),
+    pub(super) fn http_client(&self) -> anyhow::Result<AuthenticatedHttpClient> {
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .no_proxy()
+            .build()
+            .context("Failed to build the local-only cloud-agent OTLP HTTP client")?;
+        Ok(AuthenticatedHttpClient {
+            inner: client,
             token_store: self.token_store.clone(),
             refresh_hint_sender: self.refresh_hint_sender.clone(),
-        }
+        })
     }
 
     /// Transfers the bounded refresh-hint receiver to the one allowed coordinator.

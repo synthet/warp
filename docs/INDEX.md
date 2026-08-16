@@ -4,7 +4,7 @@ title: Documentation Index
 description: Index of all documentation pages in this bundle.
 resource: INDEX.md
 tags: [docs, index]
-timestamp: 2026-08-16T01:20:00Z
+timestamp: 2026-08-16T04:28:00Z
 okf_version: 0.1
 ---
 
@@ -42,7 +42,8 @@ okf_version: 0.1
 - [features/implemented/local-first.md](features/implemented/local-first.md) — local-first shipped behavior
 
 ## Planning
-- [planning/INDEX.md](planning/INDEX.md) — points at zed-warp roadmap
+- [planning/INDEX.md](planning/INDEX.md) — zed-warp roadmap plus conversation-derived fork queue
+- [planning/conversation-backlog.md](planning/conversation-backlog.md) — open work from Aug 2026 Cursor chats
 
 ## Technical
 - [technical/INDEX.md](technical/INDEX.md) — technical hub

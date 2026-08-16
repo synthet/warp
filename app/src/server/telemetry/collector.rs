@@ -5,6 +5,7 @@ use std::time::Duration;
 use anyhow::Context;
 use chrono::{LocalResult, TimeZone, Utc};
 use warp_core::execution_mode::AppExecutionMode;
+use warp_core::telemetry::TELEMETRY_POLICY;
 use warp_errors::{report_error, report_if_error};
 use warpui::r#async::{FutureExt as _, Timer};
 use warpui::{App, Entity, ModelContext, SingletonEntity};
@@ -42,7 +43,7 @@ impl TelemetryCollector {
     }
 
     pub fn initialize_telemetry_collection(&self, ctx: &mut ModelContext<TelemetryCollector>) {
-        let remote_export = ChannelState::telemetry_remote_export_enabled();
+        let remote_export = TELEMETRY_POLICY.remote_export_allowed();
 
         // Start a background thread to periodically flush events from the telemetry event queue.
         if remote_export

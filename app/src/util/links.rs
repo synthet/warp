@@ -5,8 +5,8 @@ pub const USER_DOCS_URL: &str = "https://docs.warp.dev/";
 pub const GITHUB_ISSUES_URL: &str = "https://github.com/warpdotdev/Warp/issues";
 pub const SLACK_URL: &str = "http://go.warp.dev/join-preview";
 pub const PRIVACY_POLICY_URL: &str = "https://www.warp.dev/privacy";
-pub const LICENSE_AGPL_URL: &str = "https://github.com/synthet/warp/blob/main/LICENSE-AGPL";
-pub const LICENSE_MIT_URL: &str = "https://github.com/synthet/warp/blob/main/LICENSE-MIT";
+pub const LICENSE_AGPL_URL: &str = "https://github.com/synthet/warp/blob/master/LICENSE-AGPL";
+pub const LICENSE_MIT_URL: &str = "https://github.com/synthet/warp/blob/master/LICENSE-MIT";
 
 pub fn feedback_form_url() -> String {
     let mut url = url::Url::parse("https://github.com/warpdotdev/Warp/issues/new/choose")

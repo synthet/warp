@@ -1,5 +1,4 @@
-use super::derive_http_origin_from_ws_url;
-use super::{is_hosted_warp_cloud_host, warp_cloud_enabled_for};
+use super::{derive_http_origin_from_ws_url, is_hosted_warp_cloud_host, warp_cloud_enabled_for};
 use crate::channel::{Channel, is_disabled_root_url};
 
 /// Mirrors `WarpServerConfig::disabled`'s blackhole root.
@@ -68,7 +67,10 @@ fn warp_cloud_for_oss_requires_a_self_hosted_root() {
         "https://app.warp.dev"
     ));
     // A user-supplied backend (see `SYNTH_WARP_SERVER_ROOT_URL`) opts back in.
-    assert!(warp_cloud_enabled_for(Channel::Oss, "http://localhost:8080"));
+    assert!(warp_cloud_enabled_for(
+        Channel::Oss,
+        "http://localhost:8080"
+    ));
 }
 
 #[test]

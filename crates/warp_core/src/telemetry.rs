@@ -12,6 +12,36 @@ use warpui_core::{AppContext, Entity, SingletonEntity};
 use crate::channel::{Channel, ChannelState};
 use crate::features::FeatureFlag;
 
+/// Process-wide policy for telemetry and crash-report egress.
+///
+/// This fork permits in-process diagnostics, local files, and separately validated local OTLP,
+/// but never permits a telemetry or crash-report exporter to target a remote collector.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TelemetryPolicy {
+    remote_export: RemoteExportPolicy,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RemoteExportPolicy {
+    Disabled,
+}
+
+impl TelemetryPolicy {
+    pub const fn local_only() -> Self {
+        Self {
+            remote_export: RemoteExportPolicy::Disabled,
+        }
+    }
+
+    pub const fn remote_export_allowed(self) -> bool {
+        match self.remote_export {
+            RemoteExportPolicy::Disabled => false,
+        }
+    }
+}
+
+pub const TELEMETRY_POLICY: TelemetryPolicy = TelemetryPolicy::local_only();
+
 /// Core trait defining telemetry event behavior.
 ///
 /// This trait encapsulates the basic functionality required for any telemetry event
@@ -260,3 +290,7 @@ pub mod testing {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "telemetry_tests.rs"]
+mod tests;

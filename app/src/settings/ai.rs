@@ -2219,9 +2219,7 @@ impl AISettings {
             // does not ship. Fall back so a stale stored value can't wedge the
             // user into a session mode that can never start.
             DefaultSessionMode::CloudAgent => {
-                if self.is_any_ai_enabled(app)
-                    && warp_core::channel::ChannelState::oz_enabled()
-                {
+                if self.is_any_ai_enabled(app) && warp_core::channel::ChannelState::oz_enabled() {
                     mode
                 } else {
                     DefaultSessionMode::Terminal

@@ -12,6 +12,7 @@ use crate::channel::config::{
     WarpServerConfig, is_disabled_root_url,
 };
 use crate::features::FeatureFlag;
+use crate::telemetry::TELEMETRY_POLICY;
 
 lazy_static! {
     static ref CHANNEL_STATE: Mutex<ChannelState> = Mutex::new(ChannelState::init());
@@ -214,7 +215,7 @@ impl ChannelState {
     /// Synth Warp is local-first: this is always `false`. In-process event
     /// recording and optional local file logs remain available.
     pub fn telemetry_remote_export_enabled() -> bool {
-        false
+        TELEMETRY_POLICY.remote_export_allowed()
     }
 
     /// Returns whether this build has a crash reporting config and can therefore
@@ -441,7 +442,8 @@ pub fn warp_cloud_enabled_for(channel: Channel, server_root_url: &str) -> bool {
         // unless the user points the client at their own backend (see
         // `SYNTH_WARP_SERVER_ROOT_URL`). Warp production is never re-enabled.
         Channel::Oss => {
-            !is_disabled_root_url(server_root_url) && !is_hosted_warp_production_url(server_root_url)
+            !is_disabled_root_url(server_root_url)
+                && !is_hosted_warp_production_url(server_root_url)
         }
         Channel::Local | Channel::Dev => !is_hosted_warp_production_url(server_root_url),
     }

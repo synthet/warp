@@ -22,8 +22,12 @@ fn about_version_fallback_is_not_placeholder() {
 
 #[test]
 fn license_urls_point_at_synth_warp_repo() {
-    assert!(links::LICENSE_AGPL_URL.contains("synthet/warp"));
-    assert!(links::LICENSE_AGPL_URL.ends_with("LICENSE-AGPL"));
-    assert!(links::LICENSE_MIT_URL.contains("synthet/warp"));
-    assert!(links::LICENSE_MIT_URL.ends_with("LICENSE-MIT"));
+    assert_eq!(
+        links::LICENSE_AGPL_URL,
+        "https://github.com/synthet/warp/blob/master/LICENSE-AGPL"
+    );
+    assert_eq!(
+        links::LICENSE_MIT_URL,
+        "https://github.com/synthet/warp/blob/master/LICENSE-MIT"
+    );
 }

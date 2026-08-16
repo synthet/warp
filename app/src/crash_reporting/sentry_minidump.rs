@@ -118,6 +118,11 @@ pub struct MinidumpGuard {
 
 /// Run the minidump server process.
 pub fn run_server(socket_path: &Path) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        warp_core::telemetry::TELEMETRY_POLICY.remote_export_allowed(),
+        "Remote crash export is disabled by process policy"
+    );
+
     // For troubleshooting, attempt to log from the minidump server. There's not much we can really
     // do if crash reporting fails, so creating the log file itself is best-effort.
     let log_dir = warp_core::paths::state_dir().join(warp_core::paths::WARP_LOGS_DIR);
@@ -267,6 +272,11 @@ impl MinidumpGuard {
     /// Set up minidump-backed crash reporting. This spawns a child process that reports crashes to
     /// Sentry, and a crash handler which sends crashes to that child process.
     pub fn start() -> anyhow::Result<Self> {
+        anyhow::ensure!(
+            warp_core::telemetry::TELEMETRY_POLICY.remote_export_allowed(),
+            "Remote crash export is disabled by process policy"
+        );
+
         let socket_name = format!("wcr-{}.sock", Uuid::new_v4().simple());
         let socket_path = if cfg!(target_os = "macos") {
             // On macOS, the maximum length of a socket path is fairly short, so use the temp directory.

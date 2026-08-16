@@ -181,6 +181,11 @@ impl ToSentryTags for CrashRecoveryMetadata {
 /// Initializes the crash reporting subsystem.  Returns whether or not crash
 /// reporting is active.
 pub(crate) fn init(ctx: &mut AppContext) -> bool {
+    if !warp_core::telemetry::TELEMETRY_POLICY.remote_export_allowed() {
+        log::info!("Remote crash export is disabled by policy; not initializing sentry.");
+        return false;
+    }
+
     if !FeatureFlag::CrashReporting.is_enabled() {
         log::info!("Crash reporting FeatureFlag is disabled; not initializing sentry.");
         return false;
@@ -299,7 +304,10 @@ fn get_environment() -> Cow<'static, str> {
 /// This must be called from the main thread to capture panics/crashes across the entire
 /// application.
 fn init_sentry(user_id: Option<UserUid>, email: Option<String>, ctx: &mut AppContext) {
-    if !ChannelState::is_crash_reporting_available() || ChannelState::sentry_url().is_empty() {
+    if !warp_core::telemetry::TELEMETRY_POLICY.remote_export_allowed()
+        || !ChannelState::is_crash_reporting_available()
+        || ChannelState::sentry_url().is_empty()
+    {
         log::info!("Crash reporting is unavailable in this build; not initializing sentry.");
         return;
     }

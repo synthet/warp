@@ -162,7 +162,7 @@ fn build_provider(
     let endpoint = traces_endpoint(base_endpoint)?;
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_http()
-        .with_http_client(auth_context.http_client())
+        .with_http_client(auth_context.http_client()?)
         .with_protocol(Protocol::HttpBinary)
         .with_endpoint(endpoint)
         .build()
@@ -212,9 +212,19 @@ pub(super) fn start_auth_refresh(client: Arc<dyn ManagedSecretsClient>, ctx: &mu
 /// hosts so cloud-agent traces cannot leave this machine.
 fn traces_endpoint(base_endpoint: &str) -> anyhow::Result<String> {
     let mut endpoint = Url::parse(base_endpoint).context("Invalid cloud-agent OTLP endpoint")?;
+    if !endpoint.username().is_empty() || endpoint.password().is_some() {
+        return Err(anyhow!(
+            "Cloud-agent OTLP endpoint must not contain userinfo"
+        ));
+    }
+    if endpoint.port().is_none() {
+        return Err(anyhow!(
+            "Cloud-agent OTLP endpoint must specify an explicit port"
+        ));
+    }
     if !endpoint_host_is_loopback(&endpoint) {
         return Err(anyhow!(
-            "Cloud-agent OTLP endpoint must target a loopback host"
+            "Cloud-agent OTLP endpoint must target a literal loopback IP"
         ));
     }
     match endpoint.scheme() {
@@ -234,10 +244,9 @@ fn traces_endpoint(base_endpoint: &str) -> anyhow::Result<String> {
 /// Returns whether the endpoint host is guaranteed to resolve to the local machine.
 fn endpoint_host_is_loopback(endpoint: &Url) -> bool {
     match endpoint.host() {
-        Some(Host::Domain(domain)) => domain.eq_ignore_ascii_case("localhost"),
         Some(Host::Ipv4(address)) => address.is_loopback(),
         Some(Host::Ipv6(address)) => address.is_loopback(),
-        None => false,
+        Some(Host::Domain(_)) | None => false,
     }
 }
 

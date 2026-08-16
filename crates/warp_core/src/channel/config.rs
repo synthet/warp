@@ -32,7 +32,9 @@ impl ChannelConfig {
     /// telemetry or crash reports off-machine, even if a channel-config generator
     /// embedded Warp keys.
     pub fn without_remote_telemetry(mut self) -> Self {
-        self.telemetry_config = None;
+        if let Some(telemetry_config) = self.telemetry_config.as_mut() {
+            telemetry_config.rudderstack_config = None;
+        }
         self.crash_reporting_config = None;
         self
     }
@@ -225,7 +227,11 @@ mod tests {
             oz_config: OzConfig::disabled(),
             telemetry_config: Some(TelemetryConfig {
                 telemetry_file_name: "telemetry.json".into(),
-                rudderstack_config: None,
+                rudderstack_config: Some(RudderStackConfig {
+                    write_key: "remote-write-key".into(),
+                    root_url: "https://telemetry.example.invalid".into(),
+                    ugc_write_key: "remote-ugc-write-key".into(),
+                }),
             }),
             autoupdate_config: None,
             crash_reporting_config: Some(CrashReportingConfig {
@@ -235,7 +241,9 @@ mod tests {
         }
         .without_remote_telemetry();
 
-        assert!(config.telemetry_config.is_none());
+        let telemetry_config = config.telemetry_config.unwrap();
+        assert_eq!(telemetry_config.telemetry_file_name, "telemetry.json");
+        assert!(telemetry_config.rudderstack_config.is_none());
         assert!(config.crash_reporting_config.is_none());
     }
 }

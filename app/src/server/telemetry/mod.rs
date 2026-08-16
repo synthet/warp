@@ -23,6 +23,7 @@ use rudder_message::{
     BatchMessageItem as RudderBatchMessage, Message as RudderMessage,
 };
 use warp_core::channel::RudderStackDestination;
+use warp_core::telemetry::TELEMETRY_POLICY;
 use warp_errors::report_error;
 use warpui::telemetry::Event;
 
@@ -101,7 +102,7 @@ impl TelemetryApi {
             self.persist_events_to_telemetry_log_file(events.clone())?;
         }
 
-        if ChannelState::telemetry_remote_export_enabled()
+        if TELEMETRY_POLICY.remote_export_allowed()
             && (ChannelState::is_release_bundle() || FeatureFlag::WithSandboxTelemetry.is_enabled())
         {
             self.send_batch_messages_to_rudder(
@@ -124,7 +125,7 @@ impl TelemetryApi {
         path: &Path,
         settings_snapshot: PrivacySettingsSnapshot,
     ) -> Result<()> {
-        if !ChannelState::telemetry_remote_export_enabled() {
+        if !TELEMETRY_POLICY.remote_export_allowed() {
             log::debug!(
                 "Skipping persisted Rudderstack flush because remote telemetry export is disabled."
             );
@@ -260,7 +261,7 @@ impl TelemetryApi {
                 self.persist_events_to_telemetry_log_file(vec![event.clone()])?;
             }
 
-            if !(ChannelState::telemetry_remote_export_enabled()
+            if !(TELEMETRY_POLICY.remote_export_allowed()
                 && (ChannelState::is_release_bundle()
                     || FeatureFlag::WithSandboxTelemetry.is_enabled()))
             {
@@ -315,7 +316,7 @@ impl TelemetryApi {
         messages: Vec<RudderBatchMessageWithMetadata>,
         settings_snapshot: PrivacySettingsSnapshot,
     ) -> Result<()> {
-        if !ChannelState::telemetry_remote_export_enabled() {
+        if !TELEMETRY_POLICY.remote_export_allowed() {
             log::debug!("Dropping RudderStack telemetry batch because remote export is disabled.");
             return Ok(());
         }
@@ -396,7 +397,7 @@ impl TelemetryApi {
         mut msg: RudderMessage,
         rudder_stack_destination: RudderStackDestination,
     ) -> Result<()> {
-        if !ChannelState::telemetry_remote_export_enabled() {
+        if !TELEMETRY_POLICY.remote_export_allowed() {
             log::debug!(
                 "Skipping RudderStack HTTP request because remote telemetry export is disabled."
             );
