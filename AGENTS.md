@@ -47,6 +47,7 @@ See [`.agent/SAFETY.md`](.agent/SAFETY.md) and [`docs/ai-workflow/README.md`](do
 | Date | Symptom | Root cause | Fix / guard |
 |------|---------|------------|-------------|
 | 2026-08-15 | Windows `warp-oss` compile: `NativeCommandError` / hung waiter / `false` in `enabled_features()` | Piping cargo `2>&1`; `Start-Process -NoNewWindow -Wait` after link; leftover `false` in a `FeatureFlag` array | [guides/build-and-run.md](docs/guides/build-and-run.md); [architecture/synth-fork.md](docs/architecture/synth-fork.md) |
+| 2026-08-15 | Privacy "Visit the data management page" opens `http://192.0.2.0:9/data_management` (`ERR_UNSAFE_PORT`) | OSS `WarpServerConfig::disabled()` uses TEST-NET-1:9 as a backstop; Chromium blocks port 9; Privacy still interpolated `server_root_url` | Hide DataManagementWidget / skip URL when `!warp_cloud_enabled()` |
 
 ## Backlog
 

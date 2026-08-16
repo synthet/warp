@@ -4,7 +4,7 @@ title: Windows local deploy
 description: Overlay Synth Warp OSS onto C:\Program Files\Warp without Inno Setup or the stable channel.
 resource: guides/windows-local-deploy.md
 tags: [docs, guides, windows, deploy]
-timestamp: 2026-08-15T17:00:00Z
+timestamp: 2026-08-16T01:15:00Z
 okf_version: 0.1
 ---
 
@@ -19,6 +19,8 @@ Repeatable file-copy overlay onto the live official install at `C:\Program Files
 .\script\windows\deploy.ps1 -SkipBuild   # copy last warp-oss.exe only
 .\script\windows\deploy.ps1 -Debug       # faster non-release overlay
 ```
+
+`build.ps1 -Release` defaults to `--features gui`. `deploy.ps1` defaults to `--features release_bundle,gui`, so a full deploy **rebuilds** `warp` / `warp_assets` even when `target\release\warp-oss.exe` already exists. Use `-SkipBuild` to overlay that last exe. Run a full `deploy.ps1` when the overlay should include the `release_bundle` feature set.
 
 `script/windows/deploy.cmd` is a double-click wrapper. UAC runs only for the copy into Program Files.
 

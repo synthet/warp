@@ -29,7 +29,6 @@ use warpui::{AppContext, Entity, ModelContext, SingletonEntity, UpdateModel};
 
 use crate::ai::execution_profiles::ExecutionProfilesConfig;
 use crate::ai::request_usage_model::RequestLimitInfo;
-use crate::auth::AuthStateProvider;
 use crate::settings::PrivacySettings;
 use crate::terminal::CLIAgent;
 use crate::workspaces::user_workspaces::UserWorkspaces;
@@ -2180,14 +2179,11 @@ impl AISettings {
     }
 
     pub fn is_any_ai_enabled(&self, app: &AppContext) -> bool {
-        // Disable AI for anonymous and logged-out users.
-        let is_anonymous_or_logged_out = AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out();
-
-        *self.is_any_ai_enabled
-            && !is_anonymous_or_logged_out
-            && !self.is_ai_disabled_due_to_remote_session_org_policy(app)
+        // Synth Warp does not gate AI on a Warp login: inference is BYOK, so the
+        // credential that matters is the user's own provider key, not a warp.dev
+        // account. Warp-hosted (paid) surfaces stay gated separately on
+        // `ChannelState::warp_cloud_enabled` / `ChannelState::oz_enabled`.
+        *self.is_any_ai_enabled && !self.is_ai_disabled_due_to_remote_session_org_policy(app)
     }
 
     /// Returns whether conversation history is available for the current
@@ -2211,9 +2207,21 @@ impl AISettings {
         match mode {
             // Terminal and TabConfig don't require AI.
             DefaultSessionMode::Terminal | DefaultSessionMode::TabConfig => mode,
-            // Agent and CloudAgent require AI to be enabled.
-            DefaultSessionMode::Agent | DefaultSessionMode::CloudAgent => {
+            // Agent requires AI to be enabled.
+            DefaultSessionMode::Agent => {
                 if self.is_any_ai_enabled(app) {
+                    mode
+                } else {
+                    DefaultSessionMode::Terminal
+                }
+            }
+            // CloudAgent additionally requires Warp-hosted Oz, which Synth Warp
+            // does not ship. Fall back so a stale stored value can't wedge the
+            // user into a session mode that can never start.
+            DefaultSessionMode::CloudAgent => {
+                if self.is_any_ai_enabled(app)
+                    && warp_core::channel::ChannelState::oz_enabled()
+                {
                     mode
                 } else {
                     DefaultSessionMode::Terminal

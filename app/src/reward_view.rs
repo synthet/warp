@@ -56,6 +56,8 @@ pub enum RewardEvent {
 #[derive(Clone, Copy)]
 pub enum RewardKind {
     SentReferralTheme,
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     ReceivedReferralTheme,
 }
 

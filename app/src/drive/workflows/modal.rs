@@ -179,6 +179,8 @@ pub enum WorkflowModalEvent {
     Close,
     UpdatedWorkflow(SyncId),
     AiAssistError(String),
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     AiAssistUpgradeError(Option<ServerId>, UserUid),
     ViewInWarpDrive(WarpDriveItemId),
 }

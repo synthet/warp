@@ -1,0 +1,25 @@
+name: 'Ayu Dark'
+accent: '#5ac1fe'
+cursor: '#5ac1fe'
+background: '#0d1016'
+foreground: '#bfbdb6'
+details: darker
+terminal_colors:
+  normal:
+    black: '#0d1016'
+    red: '#ef7177'
+    green: '#aad84c'
+    yellow: '#feb454'
+    blue: '#5ac1fe'
+    magenta: '#39bae5'
+    cyan: '#95e5cb'
+    white: '#bfbdb6'
+  bright:
+    black: '#545557'
+    red: '#83353b'
+    green: '#567627'
+    yellow: '#92582b'
+    blue: '#27618c'
+    magenta: '#205a78'
+    cyan: '#4c806f'
+    white: '#fafafa'

@@ -818,6 +818,7 @@ impl AuthViewBody {
         contents
     }
 
+    #[allow(dead_code)]
     pub fn set_auth_step(&mut self, step: AuthStep) {
         self.auth_step = step;
     }

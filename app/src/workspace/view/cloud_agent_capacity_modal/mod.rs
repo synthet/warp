@@ -30,8 +30,11 @@ const MODAL_HEIGHT: f32 = 532.;
 const COMPACT_MODAL_HEIGHT: f32 = 360.;
 const HEADER_HEIGHT: f32 = 92.;
 const BUTTON_DIAMETER: f32 = 20.;
+// Synth fork: billing/upgrade surface kept but unused.
+#[allow(dead_code)]
 const BILLING_AND_USAGE_PATH: &str = "settings/account";
 
+#[allow(dead_code)]
 fn billing_and_usage_url() -> String {
     // Synth Warp: no billing page; keep URI shape for any remaining callers.
     format!(
@@ -81,6 +84,7 @@ impl CloudAgentCapacityModal {
         self.variant = variant;
     }
 
+    #[allow(dead_code)]
     fn get_upgrade_url(ctx: &ViewContext<Self>) -> Option<String> {
         let auth_state = AuthStateProvider::handle(ctx).as_ref(ctx).get();
         if let Some(team) = UserWorkspaces::handle(ctx).as_ref(ctx).team_for_view(ctx) {

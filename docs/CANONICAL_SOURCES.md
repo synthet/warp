@@ -4,7 +4,7 @@ title: Canonical Sources
 description: Authority map — the single source of truth for each contract, convention, and config in this project.
 resource: CANONICAL_SOURCES.md
 tags: [docs, governance, authority]
-timestamp: 2026-08-15T17:00:00Z
+timestamp: 2026-08-16T01:20:00Z
 okf_version: 0.1
 ---
 
@@ -24,6 +24,7 @@ question.
 | Build / test / lint commands | [`../AGENTS.md`](../AGENTS.md) |
 | Windows GUI compile / resume | [`../script/windows/build.ps1`](../script/windows/build.ps1); wiki: [`guides/build-and-run.md`](guides/build-and-run.md) |
 | Windows local overlay onto Program Files | [`../script/windows/deploy.ps1`](../script/windows/deploy.ps1); wiki: [`guides/windows-local-deploy.md`](guides/windows-local-deploy.md) |
+| OSS disabled cloud URLs | [`../crates/warp_core/src/channel/config.rs`](../crates/warp_core/src/channel/config.rs) (`WarpServerConfig::disabled()`, `192.0.2.0:9`); wiki: [`guides/oss-windows-runtime-warnings.md`](guides/oss-windows-runtime-warnings.md) |
 | App ID / bundle identifiers | [`../crates/warp_core/src/app_id.rs`](../crates/warp_core/src/app_id.rs); wiki: [`technical/app-id.md`](technical/app-id.md) |
 | App feature enable list | [`../app/src/features.rs`](../app/src/features.rs) (`enabled_features()`); enum SoT remains `warp_features` |
 | Agent skill authoring | [`.claude/skills/`](../.claude/skills/) then `python scripts/sync_assistant_trees.py` — do not hand-edit `.cursor/` or `.agents/skills/` |

@@ -1072,7 +1072,7 @@ impl UserWorkspaces {
     ) {
         match result {
             Ok(response) => {
-                if let Some(pricing_info) = response.pricing_info {}
+                if let Some(_pricing_info) = response.pricing_info {}
 
                 if let Some(availability) = response.metadata.ai_credit_availability {
                     AIRequestUsageModel::handle(ctx).update(ctx, |usage_model, ctx| {

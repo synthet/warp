@@ -4,7 +4,7 @@ title: Documentation Index
 description: Index of all documentation pages in this bundle.
 resource: INDEX.md
 tags: [docs, index]
-timestamp: 2026-08-15T17:00:00Z
+timestamp: 2026-08-16T01:20:00Z
 okf_version: 0.1
 ---
 
@@ -20,19 +20,20 @@ okf_version: 0.1
 - [ARCHITECTURE.md](ARCHITECTURE.md) — system design entry
 - [DEVELOPMENT.md](DEVELOPMENT.md) — build and engineering entry
 - [TESTING.md](TESTING.md) — test kinds entry
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — build, resume compile, fork questions
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — build, resume compile, expected OSS runtime warnings, fork questions
 
 ## Architecture
 - [architecture/INDEX.md](architecture/INDEX.md) — architecture hub
 - [architecture/system-overview.md](architecture/system-overview.md) — GUI vs TUI and shared core
 - [architecture/crate-map.md](architecture/crate-map.md) — Warp crate map
 - [architecture/entity-handle.md](architecture/entity-handle.md) — Entity / `ViewHandle` / `AppContext`
-- [architecture/synth-fork.md](architecture/synth-fork.md) — local-first fork boundary, AppId, telemetry export
+- [architecture/synth-fork.md](architecture/synth-fork.md) — local-first fork boundary, AppId, telemetry export, OSS sinkhole URLs
 
 ## Guides
 - [guides/INDEX.md](guides/INDEX.md) — guides hub
 - [guides/build-and-run.md](guides/build-and-run.md) — bootstrap, Windows toolchain, `warp-oss` resume
 - [guides/windows-local-deploy.md](guides/windows-local-deploy.md) — overlay OSS onto `C:\Program Files\Warp`
+- [guides/oss-windows-runtime-warnings.md](guides/oss-windows-runtime-warnings.md) — expected logged-out `warp-oss.exe` `[WARN]` lines
 
 ## Features
 - [features/INDEX.md](features/INDEX.md) — planned vs implemented
@@ -53,7 +54,8 @@ okf_version: 0.1
 ## Reference, reports, archive
 - [reference/INDEX.md](reference/INDEX.md) — generated artifacts
 - [agent-asset-inventory.md](agent-asset-inventory.md) — generated command/skill/subagent index
-- [reports/INDEX.md](reports/INDEX.md) — point-in-time audits (empty)
+- [reports/INDEX.md](reports/INDEX.md) — point-in-time audits
+- [reports/oss-windows-startup-warnings-2026-08-15.md](reports/oss-windows-startup-warnings-2026-08-15.md) — 2026-08-15 `warp-oss.exe` WARN snapshot
 - [archive/INDEX.md](archive/INDEX.md) — deprecated pages (OKF lint excluded)
 
 ## Zed × Warp hybrid

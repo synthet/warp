@@ -114,6 +114,8 @@ pub struct CommandSearchView {
     zero_state_handle: ViewHandle<CommandSearchZeroStateView>,
     handle: WeakViewHandle<Self>,
     menu_positioning: MenuPositioning,
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     auth_state: Arc<AuthState>,
     ai_client: Arc<dyn AIClient>,
     state: CommandSearchViewState,

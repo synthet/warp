@@ -13,6 +13,8 @@ use super::ServerApi;
 use crate::server::graphql::{get_request_context, get_user_facing_error_message};
 
 /// Referral information for the logged-in user
+// Synth fork: billing/upgrade surface kept but unused.
+#[allow(dead_code)]
 pub struct ReferralInfo {
     /// Shareable URL that the user can use to invite friends
     pub url: String,
@@ -27,6 +29,7 @@ pub struct ReferralInfo {
 #[cfg_attr(test, automock)]
 #[cfg_attr(not(target_family = "wasm"), async_trait)]
 #[cfg_attr(target_family = "wasm", async_trait(?Send))]
+#[allow(dead_code)]
 pub trait ReferralsClient: 'static + Send + Sync {
     /// Gets the user's referral information.
     async fn get_referral_info(&self) -> Result<ReferralInfo>;

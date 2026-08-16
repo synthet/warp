@@ -61,6 +61,8 @@ pub fn onboarding_credit_packs(_ctx: &AppContext) -> Vec<CreditPackOption> {
     Vec::new()
 }
 
+// Synth fork: billing/upgrade surface kept but unused.
+#[allow(dead_code)]
 pub fn onboarding_promo_message(_ctx: &AppContext) -> Option<String> {
     // Synth Warp is commercial-free: never surface hosted pricing promotions.
     None

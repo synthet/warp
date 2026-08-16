@@ -1,0 +1,27 @@
+name: 'Phenomenon'
+accent: '#2e5d9e'
+background: '#121212'
+foreground: '#faf9f6'
+details: darker
+background_image:
+  path: 'synthet-theme/warp-defaults/phenomenon/background.jpg'
+  opacity: 100
+terminal_colors:
+  normal:
+    black: '#121212'
+    red: '#d22d1e'
+    green: '#1ca05a'
+    yellow: '#e5a01a'
+    blue: '#3780e9'
+    magenta: '#bf409d'
+    cyan: '#799c92'
+    white: '#faf9f6'
+  bright:
+    black: '#292929'
+    red: '#ae756f'
+    green: '#789b88'
+    yellow: '#bd9f65'
+    blue: '#6f839f'
+    magenta: '#a57899'
+    cyan: '#bfc5c3'
+    white: '#ffffff'

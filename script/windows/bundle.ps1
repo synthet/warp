@@ -277,13 +277,14 @@ if ($IS_TUI) {
 }
 
 Write-Output 'Building Warp installer'
+$appVersion = if ($env:GIT_RELEASE_TAG) { $env:GIT_RELEASE_TAG } else { '0.1.0' }
 $ISCC_ARGS = @(
     "$INSTALLER_SCRIPT",
     "/DReleaseChannel=$CHANNEL",
     "/DMyAppExeName=$BINARY_NAME",
     "/DTargetProfileDir=$CARGO_TARGET_OUTPUT_DIR",
     "/DMyAppName=$APP_NAME",
-    "/DMyAppVersion=$env:GIT_RELEASE_TAG",
+    "/DMyAppVersion=$appVersion",
     "/DArch=$ARCH",
     "/DOutputName=$INSTALLER_NAME"
 )

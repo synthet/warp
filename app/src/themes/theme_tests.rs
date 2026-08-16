@@ -485,3 +485,8 @@ fn in_memory_theme_generation_test() {
         )
     );
 }
+
+#[test]
+fn default_theme_config_contains_full_bundled_catalog() {
+    assert_eq!(WarpThemeConfig::new().theme_items().count(), 43);
+}

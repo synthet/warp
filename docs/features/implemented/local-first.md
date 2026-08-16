@@ -4,7 +4,7 @@ title: Local-first Synth Warp
 description: Shipped fork behavior — no Warp account required, no hosted Warp-credit AI, external CLI agents or BYOK.
 resource: features/implemented/local-first.md
 tags: [docs, features, fork]
-timestamp: 2026-08-15T17:00:00Z
+timestamp: 2026-08-16T01:20:00Z
 okf_version: 0.1
 ---
 
@@ -19,5 +19,7 @@ Shipped in this fork:
 - No Warp Drive cloud sync
 - No hosted Warp-credit AI; use external CLI agents (Claude Code, Codex, Gemini CLI, and others) or BYOK where the client supports them
 - Telemetry and crash reports are not exported remotely (`telemetry_remote_export_enabled` is always false; OSS ships no telemetry/Sentry config). Optional local log files via `SendTelemetryToFile` write under the log directory. Privacy toggles default off.
+- No persisted Warp user in secure storage and no personal Drive. Console `Unable to read user from secure storage: NotFound` and `Unable to create cloud preferences due to unset personal drive` are expected. Expected Windows `[WARN]` catalog: [guides/oss-windows-runtime-warnings.md](../../guides/oss-windows-runtime-warnings.md).
+- Settings → Privacy omits Warp account deletion ("Manage your data"); OSS has no hosted Warp account, and `server_root_url` is the TEST-NET discard sink (`http://192.0.2.0:9`)
 
 Warp’s server is not in this repository. A deeper Zed session bridge is planned, not shipped; see [zed-warp/overview.md](../../zed-warp/overview.md).

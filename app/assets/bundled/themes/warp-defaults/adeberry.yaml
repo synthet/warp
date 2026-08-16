@@ -1,0 +1,24 @@
+name: 'Adeberry'
+accent: '#6c96b4'
+background: '#1d2022'
+foreground: '#e4eef5'
+details: darker
+terminal_colors:
+  normal:
+    black: '#121212'
+    red: '#c76156'
+    green: '#57c78a'
+    yellow: '#c8a35a'
+    blue: '#5785c7'
+    magenta: '#c756a9'
+    cyan: '#57c7c3'
+    white: '#eeedeb'
+  bright:
+    black: '#292929'
+    red: '#d22d1e'
+    green: '#1ca05a'
+    yellow: '#e5a01a'
+    blue: '#1458b8'
+    magenta: '#a43787'
+    cyan: '#4d9989'
+    white: '#ffffff'

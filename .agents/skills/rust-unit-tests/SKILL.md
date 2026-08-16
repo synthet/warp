@@ -221,6 +221,7 @@ cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2
 ```bash
 cargo nextest run -p <crate_name>
 ```
+- The GUI crate lives in `app/` but the Cargo package name is `warp`. Use `-p warp`, never `-p app` (`error: package ID specification `app` did not match any packages`). Filter: `cargo nextest run -p warp <substring>`.
 - Single test (filter by name):
 ```bash
 cargo nextest run -E 'test(<substring>)'

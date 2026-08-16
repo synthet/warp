@@ -82,9 +82,12 @@ struct MouseStateHandles {
 #[derive(Clone, Debug)]
 pub enum LeftPanelAction {
     ProjectExplorer,
-    GlobalSearch { entry_focus: GlobalSearchEntryFocus },
+    GlobalSearch {
+        entry_focus: GlobalSearchEntryFocus,
+    },
     WarpDrive,
     ConversationListView,
+    #[allow(dead_code)]
     SignIn,
 }
 
@@ -141,6 +144,8 @@ pub enum LeftPanelEvent {
         conversation_title: String,
         terminal_view_id: Option<warpui::EntityId>,
     },
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     SignInRequested,
 }
 

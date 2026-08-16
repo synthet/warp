@@ -15,6 +15,7 @@ use warpui::elements::{
 };
 use warpui::fonts::FamilyId;
 
+use super::bundled_themes::additional_bundled_themes;
 use super::default_themes::*;
 use super::theme_creator::{pick_accent_color_from_options, top_colors_for_image};
 
@@ -88,6 +89,8 @@ pub enum ThemeKind {
     PinkCity,
     #[schemars(description = "Marble")]
     Marble,
+    #[schemars(description = "A theme embedded in the application theme catalog.")]
+    Bundled(BundledTheme),
     #[schemars(description = "A user-provided custom theme loaded from a file.")]
     Custom(CustomTheme),
     /// Base16 themes are a special case of custom themes with their own semantics for ANSI colors that override "bright" color variants.
@@ -133,11 +136,42 @@ impl std::fmt::Display for ThemeKind {
             ThemeKind::Adeberry => "Adeberry",
             ThemeKind::SentReferralReward => "Warp Referral",
             ThemeKind::ReceivedReferralReward => "Referred to Warp",
+            ThemeKind::Bundled(bundled_theme) => bundled_theme.display_name.as_str(),
             ThemeKind::Custom(custom_theme) => custom_theme.name.as_str(),
             ThemeKind::CustomBase16(custom_theme) => custom_theme.name.as_str(),
             ThemeKind::InMemory(in_memory_theme) => in_memory_theme.name.as_str(),
         };
         write!(f, "{value}")
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    PartialOrd,
+    Ord,
+    schemars::JsonSchema,
+    settings_value::SettingsValue,
+)]
+#[schemars(description = "A theme embedded in the application theme catalog.")]
+pub struct BundledTheme {
+    display_name: String,
+    collection: String,
+    id: String,
+}
+
+impl BundledTheme {
+    pub(crate) fn new(collection: &str, id: &str, display_name: &str) -> Self {
+        Self {
+            display_name: display_name.to_string(),
+            collection: collection.to_string(),
+            id: id.to_string(),
+        }
     }
 }
 
@@ -493,6 +527,10 @@ impl WarpThemeConfig {
             (ThemeKind::SolarFlare, solar_flare()),
             (ThemeKind::Adeberry, adeberry()),
         ]);
+        let mut theme_map = theme_map;
+        theme_map.extend(
+            additional_bundled_themes().map(|(kind, theme)| (ThemeKind::Bundled(kind), theme)),
+        );
         WarpThemeConfig { theme_map }
     }
 

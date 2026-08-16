@@ -1354,6 +1354,7 @@ impl ServerApiProvider {
         self.auth_client.clone()
     }
 
+    #[allow(dead_code)]
     pub fn get_referrals_client(&self) -> Arc<dyn ReferralsClient> {
         self.server_api.clone()
     }

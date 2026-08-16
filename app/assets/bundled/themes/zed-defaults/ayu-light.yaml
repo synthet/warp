@@ -1,0 +1,25 @@
+name: 'Ayu Light'
+accent: '#3b9ee5'
+cursor: '#3b9ee5'
+background: '#fcfcfc'
+foreground: '#5c6166'
+details: lighter
+terminal_colors:
+  normal:
+    black: '#5c6166'
+    red: '#ef7271'
+    green: '#85b304'
+    yellow: '#f1ad49'
+    blue: '#3b9ee5'
+    magenta: '#55b4d3'
+    cyan: '#4dbf99'
+    white: '#fcfcfc'
+  bright:
+    black: '#3b9ee5'
+    red: '#febab6'
+    green: '#c7d98f'
+    yellow: '#fed5a3'
+    blue: '#abcdf2'
+    magenta: '#b1d8e8'
+    cyan: '#ace0cb'
+    white: '#ffffff'

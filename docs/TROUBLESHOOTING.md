@@ -1,10 +1,10 @@
 ---
 type: Documentation Hub
 title: Troubleshooting
-description: Pointers for build failures, resume compiles, and fork-behavior questions.
+description: Pointers for build failures, resume compiles, expected OSS runtime warnings, and fork-behavior questions.
 resource: TROUBLESHOOTING.md
 tags: [docs, troubleshooting, hub]
-timestamp: 2026-08-15T17:00:00Z
+timestamp: 2026-08-16T01:20:00Z
 okf_version: 0.1
 ---
 
@@ -14,6 +14,7 @@ Thin hub. Failure log: [AGENTS.md](../AGENTS.md) (RCA table).
 
 - Windows OOM (`os error 1455` / page file), rustc `STATUS_STACK_BUFFER_OVERRUN`, resume builds, package-cache lock (including another repo’s cargo), PowerShell `NativeCommandError` from cargo stderr, hung waiter after a successful link: [guides/build-and-run.md](guides/build-and-run.md)
 - Overlaying this fork onto `C:\Program Files\Warp` (do not use `CHANNEL=stable`; do not uninstall official Warp): [guides/windows-local-deploy.md](guides/windows-local-deploy.md)
+- Logged-out Windows `warp-oss.exe` `[WARN]` spam (WAL, WSL GUID, empty modals, `=C:`, cloud prefs, Intel GPU): expected, not a failed launch — [guides/oss-windows-runtime-warnings.md](guides/oss-windows-runtime-warnings.md)
 - Bundle ID / AppId parse (`io.github.synthet.Warp*`): [technical/app-id.md](technical/app-id.md)
 - What this fork includes and excludes: [FAQ.md](../FAQ.md)
 - Deadlocks from terminal model locks: [technical/terminal-model-locking.md](technical/terminal-model-locking.md)

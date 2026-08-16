@@ -17,6 +17,60 @@ use warp_util::assets::{
 };
 use warp_util::path::app_target_dir;
 
+fn git_short_hash() -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let hash = String::from_utf8(output.stdout).ok()?;
+    let hash = hash.trim();
+    if hash.is_empty() {
+        None
+    } else {
+        Some(hash.to_owned())
+    }
+}
+
+fn display_version() -> String {
+    match env::var("GIT_RELEASE_TAG") {
+        Ok(tag) if !tag.is_empty() => tag,
+        _ => {
+            let pkg = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_owned());
+            match git_short_hash() {
+                Some(hash) => format!("v{pkg}+{hash}"),
+                None => format!("v{pkg}"),
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+fn file_version_tuple(pkg: &str) -> (u16, u16, u16, u16) {
+    let mut parts = pkg
+        .split(['.', '-', '+'])
+        .filter_map(|p| p.parse::<u16>().ok());
+    (
+        parts.next().unwrap_or(0),
+        parts.next().unwrap_or(0),
+        parts.next().unwrap_or(0),
+        parts.next().unwrap_or(0),
+    )
+}
+
+fn emit_display_version() {
+    println!("cargo:rerun-if-env-changed=GIT_RELEASE_TAG");
+    println!("cargo:rerun-if-changed=../.git/HEAD");
+    if let Ok(head) = fs::read_to_string("../.git/HEAD")
+        && let Some(git_ref) = head.strip_prefix("ref: ")
+    {
+        println!("cargo:rerun-if-changed=../.git/{}", git_ref.trim());
+    }
+    println!("cargo:rustc-env=WARP_DISPLAY_VERSION={}", display_version());
+}
+
 fn main() -> Result<()> {
     cfg_aliases! {
         linux_or_windows: { any(target_os = "linux", windows) },
@@ -26,6 +80,7 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_FAMILY");
+    emit_display_version();
 
     let target_os = env::var("CARGO_CFG_TARGET_OS")?;
     let target_family = env::var("CARGO_CFG_TARGET_FAMILY")?;
@@ -472,9 +527,11 @@ fn copy_windows_assets(target_dir: &Path) {
 fn embed_resource_file(target_dir: &Path) {
     use std::io::Write;
 
-    let version = env::var("GIT_RELEASE_TAG").unwrap_or("v0".to_owned());
-    let app_name = env::var("WARP_APP_NAME").unwrap_or("Warp".to_owned());
-    let bin_name = env::var("CARGO_BIN_NAME").unwrap_or("local".to_owned());
+    let version = display_version();
+    let app_name = env::var("WARP_APP_NAME").unwrap_or_else(|_| "Synth Warp".to_owned());
+    let bin_name = env::var("CARGO_BIN_NAME").unwrap_or_else(|_| "warp-oss".to_owned());
+    let pkg_version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_owned());
+    let (major, minor, patch, build) = file_version_tuple(&pkg_version);
 
     let icon_path = Path::new("channels")
         .join(bin_name)
@@ -482,7 +539,16 @@ fn embed_resource_file(target_dir: &Path) {
         .join("no-padding")
         .join("icon.ico");
 
-    fs::copy(icon_path, target_dir.join("icon.ico"))
+    if !icon_path.exists() {
+        // OSS / lib-test builds may not have generated channel icons.
+        println!(
+            "cargo:warning=Skipping Windows icon embed; {} not found",
+            icon_path.display()
+        );
+        return;
+    }
+
+    fs::copy(&icon_path, target_dir.join("icon.ico"))
         .unwrap_or_else(|err| panic!("Could not copy icon: {err:#}"));
 
     let resource_file_path = target_dir.join("resource.rc");
@@ -496,8 +562,8 @@ fn embed_resource_file(target_dir: &Path) {
 
 IDI_ICON ICON "icon.ico"
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION     1,0,0,0
-PRODUCTVERSION  1,0,0,0
+FILEVERSION     {major},{minor},{patch},{build}
+PRODUCTVERSION  {major},{minor},{patch},{build}
 FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
 FILEFLAGS       0
 FILEOS          VOS__WINDOWS32
@@ -508,13 +574,13 @@ BEGIN
     BEGIN
         BLOCK "040904E4"
         BEGIN
-            VALUE "CompanyName",      "Denver Technologies, Inc\0"
+            VALUE "CompanyName",      "Synth Warp\0"
             VALUE "FileDescription",  "{app_name}\0"
             VALUE "FileVersion",      "{version}\0"
-            VALUE "LegalCopyright",   "© 2025, Denver Technologies, Inc\0"
+            VALUE "LegalCopyright",   "© 2026 Synth Warp\0"
             VALUE "InternalName",     "\0"
             VALUE "OriginalFilename", "\0"
-            VALUE "ProductName",      "Warp\0"
+            VALUE "ProductName",      "Synth Warp\0"
             VALUE "ProductVersion",   "{version}\0"
         END
     END

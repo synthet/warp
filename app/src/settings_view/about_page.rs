@@ -14,7 +14,17 @@ use super::settings_page::{
 use crate::appearance::Appearance;
 use crate::channel::ChannelState;
 use crate::themes::theme::ColorScheme;
+use crate::util::links;
 use crate::workspace::WorkspaceAction;
+
+const DISPLAY_VERSION_FALLBACK: &str = match option_env!("WARP_DISPLAY_VERSION") {
+    Some(version) => version,
+    None => concat!("v", env!("CARGO_PKG_VERSION")),
+};
+
+pub(crate) fn about_version_text(release_tag: Option<&'static str>) -> &'static str {
+    release_tag.unwrap_or(DISPLAY_VERSION_FALLBACK)
+}
 
 pub struct AboutPageView {
     page: PageType<Self>,
@@ -45,13 +55,15 @@ impl View for AboutPageView {
 #[derive(Default)]
 struct AboutPageWidget {
     copy_version_button_mouse_state: MouseStateHandle,
+    agpl_license_mouse_state: MouseStateHandle,
+    mit_license_mouse_state: MouseStateHandle,
 }
 
 impl SettingsWidget for AboutPageWidget {
     type View = AboutPageView;
 
     fn search_terms(&self) -> &str {
-        "about synth warp version"
+        "about synth warp version license agpl mit copyright"
     }
 
     fn render(
@@ -69,7 +81,7 @@ impl SettingsWidget for AboutPageWidget {
             "bundled/svg/warp-logo-with-dark-title.svg"
         };
 
-        let version = ChannelState::app_version().unwrap_or("v#.##.###");
+        let version = about_version_text(ChannelState::app_version());
 
         let product_name = ui_builder
             .span("Synth Warp")
@@ -121,10 +133,43 @@ impl SettingsWidget for AboutPageWidget {
                 .with_child(product_name)
                 .with_child(version_row.finish())
                 .with_child(
+                    Container::new(
+                        Wrap::row()
+                            .with_main_axis_alignment(MainAxisAlignment::Center)
+                            .with_children([
+                                ui_builder.span("Licensed under ").build().finish(),
+                                ui_builder
+                                    .link(
+                                        "AGPL v3".into(),
+                                        Some(links::LICENSE_AGPL_URL.into()),
+                                        None,
+                                        self.agpl_license_mouse_state.clone(),
+                                    )
+                                    .soft_wrap(false)
+                                    .build()
+                                    .finish(),
+                                ui_builder.span(" · ").build().finish(),
+                                ui_builder
+                                    .link(
+                                        "MIT (warpui)".into(),
+                                        Some(links::LICENSE_MIT_URL.into()),
+                                        None,
+                                        self.mit_license_mouse_state.clone(),
+                                    )
+                                    .soft_wrap(false)
+                                    .build()
+                                    .finish(),
+                            ])
+                            .finish(),
+                    )
+                    .with_margin_top(16.)
+                    .finish(),
+                )
+                .with_child(
                     ui_builder
                         .span("Copyright 2026 Synth Warp")
                         .build()
-                        .with_margin_top(16.)
+                        .with_margin_top(8.)
                         .finish(),
                 )
                 .finish(),
@@ -160,3 +205,7 @@ impl From<ViewHandle<AboutPageView>> for SettingsPageViewHandle {
         SettingsPageViewHandle::About(view_handle)
     }
 }
+
+#[cfg(test)]
+#[path = "about_page_tests.rs"]
+mod tests;

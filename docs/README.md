@@ -4,7 +4,7 @@ title: Synth Warp wiki
 description: Internal LLM-maintained wiki for this fork. Not product docs for Warp's hosted service.
 resource: README.md
 tags: [docs, hub]
-timestamp: 2026-08-15T00:00:00Z
+timestamp: 2026-08-16T01:20:00Z
 okf_version: 0.1
 ---
 
@@ -18,7 +18,7 @@ Internal design notes for this fork. These pages are not product docs for Warp�
 - [Architecture](ARCHITECTURE.md) — system design hubs
 - [Development](DEVELOPMENT.md) — build and engineering conventions
 - [Testing](TESTING.md) — test kinds
-- [Troubleshooting](TROUBLESHOOTING.md) — build and fork questions
+- [Troubleshooting](TROUBLESHOOTING.md) — build, expected OSS runtime warnings, and fork questions
 - [Zed × Warp hybrid](zed-warp/README.md) — mirrored wiki (identical in Synth Zed `docs/zed-warp/`)
 - [AI workflow](ai-workflow/README.md) — agent assets and SDLC loop
 - [FAQ](../FAQ.md) — short answers for users of this fork

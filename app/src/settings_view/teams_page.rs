@@ -10,7 +10,6 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use warp_core::features::FeatureFlag;
 use warp_core::ui::theme::color::internal_colors;
 use warp_errors::report_error;
 use warpui::clipboard::ClipboardContent;
@@ -300,8 +299,12 @@ struct TeamsWidgetMouseHandles {
     approve_domains_button: MouseStateHandle,
     reset_invite_links_button: MouseStateHandle,
     invite_by_link_toggle_state: SwitchStateHandle,
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     upgrade_link: MouseStateHandle,
+    #[allow(dead_code)]
     stripe_billing_portal_link: MouseStateHandle,
+    #[allow(dead_code)]
     manage_plan_link: MouseStateHandle,
     enterprise_contact_us_link: MouseStateHandle,
     discoverable_team_toggle_state: SwitchStateHandle,
@@ -309,6 +312,7 @@ struct TeamsWidgetMouseHandles {
     admin_panel_button: MouseStateHandle,
     grow_team_warning_cta_button: MouseStateHandle,
     team_members_count_tooltip: MouseStateHandle,
+    #[allow(dead_code)]
     outgrow_upgrade_link: MouseStateHandle,
 }
 
@@ -2130,6 +2134,7 @@ impl TeamsWidget {
             .finish()
     }
 
+    #[allow(dead_code)]
     fn outgrow_upgrade_line_copy(
         billing_metadata: &BillingMetadata,
     ) -> (&'static str, &'static str) {

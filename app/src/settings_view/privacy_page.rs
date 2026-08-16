@@ -88,15 +88,18 @@ const DATA_MANAGEMENT_LINK_TEXT: &str = "Visit the data management page";
 const PRIVACY_POLICY_TITLE: &str = "Privacy policy";
 const PRIVACY_POLICY_LINK_TEXT: &str = "Read Warp's privacy policy";
 
-pub fn data_management_url(custom_token: Option<&str>) -> String {
-    match custom_token {
+pub fn data_management_url(custom_token: Option<&str>) -> Option<String> {
+    if !ChannelState::warp_cloud_enabled() {
+        return None;
+    }
+    Some(match custom_token {
         Some(token) => format!(
             "{}/data_management?customToken={}",
             ChannelState::server_root_url(),
             token
         ),
-        None => format!("{}/data_management", ChannelState::server_root_url(),),
-    }
+        None => format!("{}/data_management", ChannelState::server_root_url()),
+    })
 }
 
 pub struct PrivacyPageView {
@@ -228,7 +231,9 @@ impl PrivacyPageView {
         if ContextFlag::NetworkLogConsole.is_enabled() {
             widgets.push(Box::new(NetworkLogWidget::default()));
         }
-        widgets.push(Box::new(DataManagementWidget::default()));
+        if ChannelState::warp_cloud_enabled() {
+            widgets.push(Box::new(DataManagementWidget::default()));
+        }
         widgets.push(Box::new(PrivacyPolicyWidget::default()));
         PageType::new_uncategorized(widgets, Some("Privacy"))
     }
@@ -585,9 +590,18 @@ impl TypedActionView for PrivacyPageView {
                 self.queue_regex_removal(*idx, ctx);
             }
             PrivacyPageAction::OpenDataManagementWebpage => {
+                if !ChannelState::warp_cloud_enabled() {
+                    return;
+                }
                 AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
-                    auth_manager
-                        .open_url_maybe_with_anonymous_token(ctx, Box::new(data_management_url));
+                    auth_manager.open_url_maybe_with_anonymous_token(
+                        ctx,
+                        Box::new(|token| {
+                            data_management_url(token).expect(
+                                "data management URLs exist only when Warp cloud is enabled",
+                            )
+                        }),
+                    );
                 });
             }
             PrivacyPageAction::AddAllRecommendedRegexes => {
@@ -2024,3 +2038,7 @@ mod styles {
 fn description_text_color(theme: &WarpTheme) -> warp_core::ui::theme::Fill {
     theme.sub_text_color(theme.surface_2())
 }
+
+#[cfg(test)]
+#[path = "privacy_page_tests.rs"]
+mod tests;

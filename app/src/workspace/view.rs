@@ -335,7 +335,7 @@ use crate::server::telemetry::{
     AddTabWithShellSource, AnonymousUserSignupEntrypoint, CloseTarget, EnvVarTelemetryMetadata,
     FileTreeSource, KnowledgePaneEntrypoint, LaunchConfigUiLocation,
     MCPServerCollectionPaneEntrypoint, NotificationsTurnedOnSource, OpenedWarpAISource,
-    PaletteSource, SharingDialogSource, TabRenameEvent, TierLimitHitEvent, WarpDriveSource,
+    PaletteSource, SharingDialogSource, TabRenameEvent, WarpDriveSource,
 };
 use crate::session_management::{SessionNavigationData, SessionSource, TabNavigationData};
 use crate::settings::cloud_preferences::CloudPreferencesSettings;
@@ -1753,7 +1753,7 @@ impl Workspace {
     }
 
     fn build_settings_views(
-        global_resource_handles: GlobalResourceHandles,
+        _global_resource_handles: GlobalResourceHandles,
         tips_completed: ModelHandle<TipsCompleted>,
         ctx: &mut ViewContext<Self>,
     ) -> (ViewHandle<SettingsView>, ViewHandle<ThemeChooser>) {
@@ -2439,8 +2439,9 @@ impl Workspace {
     }
 
     pub(crate) fn show_session_config_modal(&mut self, ctx: &mut ViewContext<Self>) {
-        // Configure the modal to hide Oz when AI is disabled.
-        let show_oz = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
+        // Configure the modal to hide Oz when AI is disabled, or when Warp-hosted
+        // (paid) cloud agents are not shipped at all, as in Synth Warp.
+        let show_oz = AISettings::as_ref(ctx).is_any_ai_enabled(ctx) && ChannelState::oz_enabled();
         self.session_config_modal.view.update(ctx, |modal, ctx| {
             modal.body().update(ctx, |body, ctx| {
                 body.configure(show_oz);
@@ -19289,7 +19290,7 @@ impl Workspace {
 
     /// Determines if the changelog is currently being shown or if the changelog request is
     /// in-flight
-    ///
+    #[allow(dead_code)]
     fn is_changelog_open_or_pending(&self, ctx: &mut ViewContext<Self>) -> bool {
         self.current_workspace_state.is_resource_center_open
             || self.changelog_model.as_ref(ctx).is_check_pending()
@@ -23401,6 +23402,7 @@ impl Workspace {
         // Synth Warp is local-first: never start the Warp sign-up flow.
     }
 
+    #[allow(dead_code)]
     fn redirect_to_sign_in(&mut self) {
         // Synth Warp is local-first: never redirect to Warp sign-in.
     }

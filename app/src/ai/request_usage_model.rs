@@ -15,7 +15,7 @@ use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 use crate::BlocklistAIHistoryModel;
 use crate::ai::agent::AIAgentExchangeId;
 use crate::ai::agent::conversation::AIConversationId;
-use crate::ai::credit_availability::{AICreditAvailability, AICreditDenialReason, AICreditSource};
+use crate::ai::credit_availability::{AICreditAvailability, AICreditDenialReason};
 use crate::auth::AuthStateProvider;
 use crate::server::server_api::ai::AIClient;
 use crate::settings::AISettings;
@@ -41,6 +41,8 @@ impl BonusGrantScope {
     }
 }
 
+// Synth fork: billing/upgrade surface kept but unused.
+#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Default)]
 pub enum BuyCreditsBannerDisplayState {
     #[default]
@@ -216,6 +218,7 @@ pub struct AIRequestUsageModel {
     server_availability: ServerAvailabilityState,
 
     /// Whether the buy credits banner has been dismissed by the user.
+    #[allow(dead_code)]
     buy_addon_credits_banner_dismissed: bool,
 
     /// Whether the ambient trial credits banner has been dismissed by the user.
@@ -480,6 +483,7 @@ impl AIRequestUsageModel {
 
     /// Returns the number of remaining requests the user has based on their latest rate limit info.
     /// If the current time is past the next refresh time, then the number of remaining reqs is the limit.
+    #[allow(dead_code)]
     fn requests_remaining(&self) -> usize {
         // Synth Warp is commercial-free: treat quotas as unlimited.
         self.request_limit().max(1)
@@ -498,6 +502,7 @@ impl AIRequestUsageModel {
     }
 
     /// Trusts `available`; only `OutOfCredits` may be refined by local BYO credentials.
+    #[allow(dead_code)]
     fn server_availability_permits_ai(
         availability: AICreditAvailability,
         ctx: &AppContext,
@@ -513,6 +518,7 @@ impl AIRequestUsageModel {
 
     /// Whether a local BYO path is usable: stored API key/endpoint/Grok when
     /// BYOK is allowed, or loaded AWS credentials for an enabled Bedrock host.
+    #[allow(dead_code)]
     fn has_usable_byo_inference_path(ctx: &AppContext) -> bool {
         let user_workspaces = UserWorkspaces::as_ref(ctx);
         let api_keys = ApiKeyManager::as_ref(ctx);
@@ -527,6 +533,7 @@ impl AIRequestUsageModel {
     }
 
     /// Prefetch fallback used only before any successful server availability decision this session.
+    #[allow(dead_code)]
     fn has_any_ai_remaining_before_server_decision(&self, ctx: &AppContext) -> bool {
         let current_workspace = UserWorkspaces::as_ref(ctx).current_workspace();
 
@@ -596,6 +603,7 @@ impl AIRequestUsageModel {
         self.request_limit_info.next_refresh_time.utc()
     }
 
+    #[allow(dead_code)]
     pub fn next_refresh_time_local(&self) -> DateTime<Local> {
         self.next_refresh_time().with_timezone(&Local)
     }
@@ -681,6 +689,7 @@ impl AIRequestUsageModel {
     }
 
     /// Computes the current banner state based on live conditions.
+    #[allow(dead_code)]
     pub fn compute_buy_addon_credits_banner_display_state(
         &self,
         _ctx: &AppContext,
@@ -689,11 +698,13 @@ impl AIRequestUsageModel {
         BuyCreditsBannerDisplayState::Hidden
     }
 
+    #[allow(dead_code)]
     pub fn dismiss_credits_upsell_banner(&mut self, ctx: &mut ModelContext<Self>) {
         self.buy_addon_credits_banner_dismissed = true;
         ctx.notify();
     }
 
+    #[allow(dead_code)]
     pub fn enable_credits_upsell_banner(&mut self, ctx: &mut ModelContext<Self>) {
         self.buy_addon_credits_banner_dismissed = false;
         ctx.notify();
@@ -702,6 +713,7 @@ impl AIRequestUsageModel {
 
 /// Voice request usage, only available if built with voice input support.
 #[cfg(feature = "voice_input")]
+#[allow(dead_code)]
 impl AIRequestUsageModel {
     fn voice_requests(&self) -> usize {
         self.request_limit_info

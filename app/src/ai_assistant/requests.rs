@@ -169,7 +169,7 @@ impl Requests {
     pub fn issue_request(
         &mut self,
         request: String,
-        team_uid: Option<ServerId>,
+        _team_uid: Option<ServerId>,
         ctx: &mut ModelContext<Self>,
     ) {
         let server_api = self.server_api.clone();

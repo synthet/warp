@@ -61,6 +61,8 @@ pub enum AuthManagerEvent {
     /// refresh the entire user, only their token, which is when this event might be emitted.
     NeedsReauth,
     /// The user is anonymous and has attempted to access a login-gated feature or link.
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     AttemptedLoginGatedFeature {
         auth_view_variant: AuthViewVariant,
     },

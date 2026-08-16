@@ -9,7 +9,7 @@ use super::Channel;
 use crate::AppId;
 use crate::channel::config::{
     ChannelConfig, IapConfig, McpOAuthProviderConfig, OzConfig, RudderStackDestination,
-    WarpServerConfig,
+    WarpServerConfig, is_disabled_root_url,
 };
 use crate::features::FeatureFlag;
 
@@ -292,6 +292,15 @@ impl ChannelState {
         CHANNEL_STATE.lock().config.oz_config.oz_root_url.clone()
     }
 
+    /// Whether Warp-hosted cloud agents (Oz) are reachable. Synth Warp ships
+    /// [`OzConfig::disabled`], so this is `false` for OSS: Oz is a paid
+    /// warp.dev service with no local equivalent, and unlike BYOK inference it
+    /// cannot be repointed at a self-hosted backend.
+    pub fn oz_enabled() -> bool {
+        let state = CHANNEL_STATE.lock();
+        !is_disabled_root_url(state.config.oz_config.oz_root_url.as_ref())
+    }
+
     pub fn server_root_url() -> Cow<'static, str> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "test-util")] {
@@ -426,13 +435,20 @@ impl ChannelState {
 /// configured server root. See [`ChannelState::warp_cloud_enabled`].
 pub fn warp_cloud_enabled_for(channel: Channel, server_root_url: &str) -> bool {
     match channel {
-        Channel::Oss | Channel::Integration => false,
+        Channel::Integration => false,
         Channel::Stable | Channel::Preview => true,
+        // Synth Warp ships `WarpServerConfig::disabled()`, so OSS stays offline
+        // unless the user points the client at their own backend (see
+        // `SYNTH_WARP_SERVER_ROOT_URL`). Warp production is never re-enabled.
+        Channel::Oss => {
+            !is_disabled_root_url(server_root_url) && !is_hosted_warp_production_url(server_root_url)
+        }
         Channel::Local | Channel::Dev => !is_hosted_warp_production_url(server_root_url),
     }
 }
 
-fn is_hosted_warp_production_url(url: &str) -> bool {
+/// Whether `url`'s host belongs to Warp's hosted cloud. See [`is_hosted_warp_cloud_host`].
+pub fn is_hosted_warp_production_url(url: &str) -> bool {
     Url::parse(url)
         .ok()
         .and_then(|parsed| parsed.host_str().map(is_hosted_warp_cloud_host))

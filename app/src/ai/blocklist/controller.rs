@@ -2966,7 +2966,7 @@ impl BlocklistAIController {
                                     );
                                 },
                             );
-                            AIRequestUsageModel::handle(ctx).update(ctx, |model, ctx| {});
+                            AIRequestUsageModel::handle(ctx).update(ctx, |_model, _ctx| {});
                         }
 
                         // A resume scheduled for this failure keeps the conversation in

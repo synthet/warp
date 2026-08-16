@@ -102,12 +102,17 @@ fn test_mac_address() {
 
 #[test]
 fn test_aws_access_id() {
-    let amazon_credentials = r#"{
-        "Credentials": {
-            "AccessKeyId": "ASIAZRUF5DH7SYC4A3NF",
-        }
-      }"#;
-    assert_regex_match_found(regexes::AWS_ACCESS_ID, amazon_credentials);
+    // Built at runtime so GitHub secret scanning does not see a contiguous ASIA… token.
+    // Suffix is the AWS documentation example (`…IOSFODNN7EXAMPLE`), not a real key.
+    let access_key_id = format!("{}{}", "ASIA", "IOSFODNN7EXAMPLE");
+    let amazon_credentials = format!(
+        r#"{{
+        "Credentials": {{
+            "AccessKeyId": "{access_key_id}",
+        }}
+      }}"#
+    );
+    assert_regex_match_found(regexes::AWS_ACCESS_ID, &amazon_credentials);
 }
 
 #[test]

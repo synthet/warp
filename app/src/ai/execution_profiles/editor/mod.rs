@@ -7,8 +7,8 @@ use thousands::Separable;
 use warp_core::ui::theme::color::internal_colors;
 use warpui::elements::{
     Align, Border, ChildView, ClippedScrollStateHandle, ClippedScrollable, ConstrainedBox,
-    Container, CrossAxisAlignment, Expanded, Flex, MouseStateHandle, ParentElement,
-    PartialClickableElement, ScrollbarWidth, Text,
+    Container, CrossAxisAlignment, Expanded, Flex, MouseStateHandle, ParentElement, ScrollbarWidth,
+    Text,
 };
 use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::switch::SwitchStateHandle;

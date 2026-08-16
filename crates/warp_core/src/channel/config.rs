@@ -69,6 +69,12 @@ pub struct WarpServerConfig {
 const DISABLED_HTTP_ROOT: &str = "http://192.0.2.0:9";
 const DISABLED_RTC_URL: &str = "ws://192.0.2.0:9/graphql/v2";
 
+/// Whether `url` is the blackhole root used by [`WarpServerConfig::disabled`] and
+/// [`OzConfig::disabled`], i.e. "no backend is configured for this surface".
+pub fn is_disabled_root_url(url: &str) -> bool {
+    url == DISABLED_HTTP_ROOT
+}
+
 impl WarpServerConfig {
     pub fn production() -> Self {
         Self {

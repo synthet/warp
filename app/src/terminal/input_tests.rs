@@ -318,7 +318,7 @@ pub fn initialize_app(app: &mut App) {
         app.add_singleton_model(SystemInfo::new);
     }
 
-    app.update(experiments::init);
+    app.update(crate::experiments::init);
     AltScreenReporting::register(app);
     app.add_singleton_model(|_| RestoredAgentConversations::new_seeded(vec![]));
     app.add_singleton_model(OneTimeModalModel::new);

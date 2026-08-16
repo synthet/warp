@@ -5,6 +5,7 @@ use markdown_parser::{
 };
 use pathfinder_color::ColorU;
 use settings::Setting;
+use warp_core::channel::ChannelState;
 use warp_core::ui::theme::Fill;
 use warp_core::ui::theme::phenomenon::PhenomenonStyle;
 use warpui::elements::{
@@ -189,7 +190,8 @@ pub struct HoaOnboardingFlow {
 
 impl HoaOnboardingFlow {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
-        let show_oz = AISettings::as_ref(ctx).is_any_ai_enabled(ctx);
+        // Oz is a Warp-hosted (paid) service; Synth Warp never ships it.
+        let show_oz = AISettings::as_ref(ctx).is_any_ai_enabled(ctx) && ChannelState::oz_enabled();
         let session_types = session_config_rendering::visible_session_types(show_oz);
         let pill_mouse_states: Vec<_> = session_types
             .iter()

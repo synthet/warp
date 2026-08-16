@@ -39,9 +39,13 @@ const NON_ADMIN_ASK_ADMIN_TO_INCREASE_OVERAGES_TEXT: &str =
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptAlertAction {
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     SignUpClickedForAnonymousUser,
     OpenSettingsClicked,
-    ManageBillingClicked { team_uid: ServerId },
+    ManageBillingClicked {
+        team_uid: ServerId,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

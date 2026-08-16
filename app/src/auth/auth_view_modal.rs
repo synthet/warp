@@ -143,6 +143,8 @@ const MODAL_WIDTH: f32 = 352.;
 pub enum AuthViewVariant {
     Initial,
     RequireLoginCloseable,
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     HitDriveObjectLimitCloseable,
     ShareRequirementCloseable,
 }
@@ -202,6 +204,7 @@ impl AuthView {
         );
     }
 
+    #[allow(dead_code)]
     fn set_auth_step(&mut self, ctx: &mut ViewContext<Self>, step: AuthStep) {
         self.update_auth_body(
             ctx,
@@ -211,10 +214,12 @@ impl AuthView {
         );
     }
 
+    #[allow(dead_code)]
     pub fn skip_to_browser_open_step(&mut self, ctx: &mut ViewContext<Self>) {
         self.set_auth_step(ctx, AuthStep::BrowserOpen);
     }
 
+    #[allow(dead_code)]
     pub fn start_sign_in(&mut self, ctx: &mut ViewContext<Self>) {
         self.update_auth_body(ctx, |body, ctx| {
             body.handle_action(&AuthViewBodyAction::Login, ctx);

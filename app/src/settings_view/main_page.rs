@@ -8,14 +8,13 @@ use warp_core::context_flag::ContextFlag;
 use warp_core::features::FeatureFlag;
 use warp_errors::{report_error, report_if_error};
 #[cfg(not(target_family = "wasm"))]
-use warp_server_client::iap::{IapCredentialsState, IapManager, IapManagerEvent};
+use warp_server_client::iap::{IapCredentialsState, IapManager};
 use warpui::assets::asset_cache::AssetSource;
 use warpui::elements::{
     Align, Border, CacheOption, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
     Element, Empty, Flex, Image, MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement,
     Radius, Shrinkable, Text,
 };
-use warpui::fonts::Weight;
 use warpui::keymap::ContextPredicate;
 use warpui::platform::Cursor;
 use warpui::ui_components::button::ButtonVariant;

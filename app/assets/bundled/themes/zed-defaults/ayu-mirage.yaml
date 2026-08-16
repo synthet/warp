@@ -1,0 +1,25 @@
+name: 'Ayu Mirage'
+accent: '#72cffe'
+cursor: '#72cffe'
+background: '#242835'
+foreground: '#cccac2'
+details: darker
+terminal_colors:
+  normal:
+    black: '#242835'
+    red: '#f18779'
+    green: '#d5fe80'
+    yellow: '#fecf72'
+    blue: '#72cffe'
+    magenta: '#5bcde5'
+    cyan: '#95e5cb'
+    white: '#cccac2'
+  bright:
+    black: '#67696e'
+    red: '#833f3c'
+    green: '#75993c'
+    yellow: '#937237'
+    blue: '#336d8d'
+    magenta: '#2b6c7b'
+    cyan: '#4c806f'
+    white: '#fafafa'

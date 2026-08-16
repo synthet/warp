@@ -1,0 +1,27 @@
+name: 'Solar Flare'
+accent: '#34895c'
+background: '#1b1c18'
+foreground: '#dde6ee'
+details: darker
+background_image:
+  path: 'synthet-theme/warp-defaults/solar-flare/background.jpg'
+  opacity: 20
+terminal_colors:
+  normal:
+    black: '#2e333d'
+    red: '#d66060'
+    green: '#64af86'
+    yellow: '#caa358'
+    blue: '#5c80b2'
+    magenta: '#b766a1'
+    cyan: '#8069a1'
+    white: '#f0f4f7'
+  bright:
+    black: '#37404a'
+    red: '#eb8282'
+    green: '#64af86'
+    yellow: '#caa358'
+    blue: '#5c80b2'
+    magenta: '#b766a1'
+    cyan: '#8069a1'
+    white: '#ffffff'

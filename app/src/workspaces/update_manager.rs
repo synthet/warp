@@ -343,7 +343,7 @@ impl TeamUpdateManager {
     ) {
         match result {
             Ok(response) => {
-                if let Some(pricing_info) = response.pricing_info {}
+                if let Some(_pricing_info) = response.pricing_info {}
 
                 if let Some(availability) = response.metadata.ai_credit_availability {
                     AIRequestUsageModel::handle(ctx).update(ctx, |usage_model, ctx| {
@@ -415,7 +415,7 @@ impl TeamUpdateManager {
         match result {
             Err(_) => ctx.emit(TeamUpdateManagerEvent::RenameTeamError),
             Ok(response) => {
-                if let Some(pricing_info) = response.pricing_info.clone() {}
+                if let Some(_pricing_info) = response.pricing_info.clone() {}
 
                 self.on_workspaces_updated(Ok(response.metadata.clone()), ctx);
 
@@ -437,7 +437,7 @@ impl TeamUpdateManager {
     ) {
         match request_state {
             RequestState::RequestSucceeded(response) => {
-                if let Some(pricing_info) = response.pricing_info.clone() {}
+                if let Some(_pricing_info) = response.pricing_info.clone() {}
 
                 // Right now, this function is coupled with how we handle leaving a team.
                 // TODO(zheng) refactor so we can separate these two cases and have clearer logic.

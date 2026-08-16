@@ -1,0 +1,25 @@
+name: 'JetBrains Darcula'
+accent: '#cc7832'
+cursor: '#a9b7c6'
+background: '#2b2b2b'
+foreground: '#a9b7c6'
+details: darker
+terminal_colors:
+  normal:
+    black: '#2b2b2b'
+    red: '#cc7832'
+    green: '#6a8759'
+    yellow: '#ffc66d'
+    blue: '#6897bb'
+    magenta: '#9876aa'
+    cyan: '#629755'
+    white: '#a9b7c6'
+  bright:
+    black: '#808080'
+    red: '#ff8a4c'
+    green: '#8fbf78'
+    yellow: '#ffd98a'
+    blue: '#85b6dd'
+    magenta: '#b796c7'
+    cyan: '#8abeb7'
+    white: '#ffffff'

@@ -152,6 +152,8 @@ const POSITION_ID: &str = "settings_pane";
 
 struct PlanHeaderPresentation {
     badge_label: Option<String>,
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     show_personal_upgrade: bool,
 }
 

@@ -1,6 +1,9 @@
 use super::derive_http_origin_from_ws_url;
 use super::{is_hosted_warp_cloud_host, warp_cloud_enabled_for};
-use crate::channel::Channel;
+use crate::channel::{Channel, is_disabled_root_url};
+
+/// Mirrors `WarpServerConfig::disabled`'s blackhole root.
+const DISABLED_ROOT: &str = "http://192.0.2.0:9";
 
 #[test]
 fn wss_becomes_https_and_strips_path() {
@@ -44,19 +47,35 @@ fn hosted_warp_cloud_hosts_exclude_byok_and_localhost() {
 }
 
 #[test]
-fn warp_cloud_is_always_off_for_oss_and_integration() {
-    assert!(!warp_cloud_enabled_for(
-        Channel::Oss,
-        "https://app.warp.dev"
-    ));
-    assert!(!warp_cloud_enabled_for(
-        Channel::Oss,
-        "http://localhost:8080"
-    ));
+fn warp_cloud_is_always_off_for_integration() {
     assert!(!warp_cloud_enabled_for(
         Channel::Integration,
         "https://app.warp.dev"
     ));
+    assert!(!warp_cloud_enabled_for(
+        Channel::Integration,
+        "http://localhost:8080"
+    ));
+}
+
+#[test]
+fn warp_cloud_for_oss_requires_a_self_hosted_root() {
+    // Shipped default: `WarpServerConfig::disabled()`, i.e. no backend at all.
+    assert!(!warp_cloud_enabled_for(Channel::Oss, DISABLED_ROOT));
+    // Warp production is never re-enabled, even if configured explicitly.
+    assert!(!warp_cloud_enabled_for(
+        Channel::Oss,
+        "https://app.warp.dev"
+    ));
+    // A user-supplied backend (see `SYNTH_WARP_SERVER_ROOT_URL`) opts back in.
+    assert!(warp_cloud_enabled_for(Channel::Oss, "http://localhost:8080"));
+}
+
+#[test]
+fn disabled_root_url_matches_only_the_blackhole_root() {
+    assert!(is_disabled_root_url(DISABLED_ROOT));
+    assert!(!is_disabled_root_url("http://localhost:8080"));
+    assert!(!is_disabled_root_url("https://app.warp.dev"));
 }
 
 #[test]

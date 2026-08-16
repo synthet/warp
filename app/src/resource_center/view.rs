@@ -2,8 +2,8 @@ use vec1::{Vec1, vec1};
 use warp_core::features::FeatureFlag;
 use warp_core::ui::builder::AnimatedButtonOptions;
 use warpui::elements::{
-    Align, Border, ConstrainedBox, Container, CrossAxisAlignment, Element, Empty, Flex, Icon,
-    MainAxisAlignment, MainAxisSize, MouseStateHandle, ParentElement, SavePosition, Shrinkable,
+    Align, ConstrainedBox, Container, CrossAxisAlignment, Element, Empty, Flex, Icon,
+    MouseStateHandle, ParentElement, SavePosition, Shrinkable,
 };
 use warpui::fonts::Weight;
 use warpui::platform::Cursor;
@@ -19,7 +19,6 @@ use warpui::{
 use super::keybindings_page::KeybindingsEvent;
 use super::section_views::{
     FOOTER_ICON_SIZE, HEADER_FONT_SIZE, ICON_PADDING, KEYBOARD_ICON_SIZE, SCROLLBAR_OFFSET,
-    SECTION_SPACING,
 };
 use super::{KeybindingsView, ResourceCenterMainEvent, ResourceCenterMainView, TipsCompleted};
 use crate::appearance::Appearance;

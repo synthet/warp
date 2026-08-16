@@ -1,3 +1,4 @@
+mod bundled_themes;
 pub mod default_themes;
 pub mod theme;
 pub mod theme_chooser;

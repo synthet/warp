@@ -1,6 +1,6 @@
 # Skill inventory — Synth Warp
 
-**Last reviewed:** 2026-08-14. Companion to [SKILL_CHANGE_AST10_REVIEW.md](SKILL_CHANGE_AST10_REVIEW.md)
+**Last reviewed:** 2026-08-15. Companion to [SKILL_CHANGE_AST10_REVIEW.md](SKILL_CHANGE_AST10_REVIEW.md)
 and [SKILL_COMPILATION.md](SKILL_COMPILATION.md).
 Update this file (new row or **Last reviewed** date) in the same PR as any skill change.
 
@@ -73,7 +73,7 @@ commands or edit code/config as part of its procedure.
 | promote-feature | Roll a feature flag to a channel | L2 | 2026-08-14 |
 | remove-feature-flag | Remove a stabilized feature flag | L2 | 2026-08-14 |
 | review-pr-local | Warp-specific PR review | L1 | 2026-08-14 |
-| rust-unit-tests | Warp crate unit tests (GUI/TUI escalation) | L2 | 2026-08-14 |
+| rust-unit-tests | Warp crate unit tests (GUI/TUI escalation) | L2 | 2026-08-15 |
 | triage-issue-local | Warp-specific issue triage | L2 | 2026-08-14 |
 | tui-testing | TUI render-to-lines tests | L2 | 2026-08-14 |
 | tui-ui-guidelines | TUI cell-grid guidelines | L1 | 2026-08-14 |

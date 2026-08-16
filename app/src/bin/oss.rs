@@ -25,8 +25,37 @@ fn main() -> Result<()> {
         state = state.with_additional_features(warp_core::features::DEBUG_FLAGS);
     }
     ChannelState::set(state);
+    apply_server_root_override();
 
     warp::run()
+}
+
+/// Environment variable used to point Synth Warp at a self-hosted agent backend.
+///
+/// Synth Warp ships no inference server: BYOK provider keys and custom endpoints
+/// are relayed by whatever backend `server_root_url` names, so without this the
+/// agent has nothing to talk to. Warp production hosts are rejected — this fork
+/// does not re-enable paid warp.dev services.
+const SERVER_ROOT_URL_ENV: &str = "SYNTH_WARP_SERVER_ROOT_URL";
+
+fn apply_server_root_override() {
+    let Ok(url) = std::env::var(SERVER_ROOT_URL_ENV) else {
+        return;
+    };
+    let url = url.trim();
+    if url.is_empty() {
+        return;
+    }
+    if warp_core::channel::is_hosted_warp_production_url(url) {
+        eprintln!(
+            "{SERVER_ROOT_URL_ENV} points at Warp's hosted cloud ({url}); ignoring it. \
+             Synth Warp only talks to a self-hosted backend."
+        );
+        return;
+    }
+    if let Err(e) = ChannelState::override_server_root_url(url.to_owned()) {
+        eprintln!("{SERVER_ROOT_URL_ENV} is not a valid URL ({url}): {e}");
+    }
 }
 
 // If we're not using an external plist, embed the following as the Info.plist.
@@ -61,7 +90,7 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>CFBundleURLTypes</key>
     <array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>warposs</string></array></dict></array>
     <key>NSHumanReadableCopyright</key>
-    <string>© 2025, Synth Warp contributors</string>
+    <string>© 2026 Synth Warp</string>
     </dict>
     </plist>
 "#.as_bytes());

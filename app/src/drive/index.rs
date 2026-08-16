@@ -9,7 +9,6 @@ use pathfinder_geometry::vector::{Vector2F, vec2f};
 use url::Url;
 use warp_core::context_flag::ContextFlag;
 use warp_core::settings::Setting;
-use warp_core::ui::theme::color::internal_colors;
 use warp_errors::{report_error, report_if_error};
 use warp_util::sync::Condition;
 use warpui::clipboard::ClipboardContent;
@@ -496,10 +495,15 @@ struct MouseStateHandles {
     exit_trash_button_mouse_state: MouseStateHandle,
     join_team_button_mouse_state: MouseStateHandle,
     create_team_button_mouse_state: MouseStateHandle,
+    // Synth fork: billing/upgrade surface kept but unused.
+    #[allow(dead_code)]
     shared_object_limit_hit_banner_button_mouse_state: MouseStateHandle,
     shared_object_limit_hit_banner_close_mouse_state: MouseStateHandle,
+    #[allow(dead_code)]
     payment_issue_banner_button_mouse_state: MouseStateHandle,
+    #[allow(dead_code)]
     anonymous_sign_up_button_mouse_state: MouseStateHandle,
+    #[allow(dead_code)]
     anonymous_object_limit_close_button_mouse_state: MouseStateHandle,
     search_button_mouse_state: MouseStateHandle,
 }
@@ -3955,6 +3959,7 @@ impl DriveIndex {
         None
     }
 
+    #[allow(dead_code)]
     fn render_personal_object_limit_row(
         &self,
         appearance: &Appearance,
