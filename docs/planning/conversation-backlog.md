@@ -63,13 +63,18 @@ Documented in [FAQ.md](../../FAQ.md) and [architecture/synth-fork.md](../archite
 - Leave as-is (CLI agents only; BYOK needs `SYNTH_WARP_SERVER_ROOT_URL`)
 - LocalBackend phase 1c: `AIClient` methods that still matter → OpenAI / Anthropic / Ollama locally (planned, not started)
 
-### 6. Retarget leftover Warp.dev menu / help links — Open
+### 6. Retarget leftover Warp.dev menu / help links — Done
 
-[app/src/util/links.rs](../../app/src/util/links.rs) still has `docs.warp.dev`, `github.com/warpdotdev/Warp/issues`, Slack preview, and warp.dev privacy. The feedback form still files issues on **upstream**. Sign in/up CTAs were hidden; docs/feedback URLs were not retargeted.
+Gate: `Channel::shows_warp_inc_links()` in [channel/mod.rs](../../crates/warp_core/src/channel/mod.rs), false only for `Oss`. Deliberately **not** `warp_cloud_enabled()` — that varies with `server_root_url`, and self-hosting a backend must not re-enable Warp Inc.'s support destinations.
 
-- Point Issues/Feedback at `synthet/warp` **or** hide them (issues are disabled)
-- Hide Slack / warp.dev download / contact-sales / `mailto:support@warp.dev` on OSS
-- Keep or replace the privacy-policy URL (no Synth privacy page exists yet)
+Audit result: most of the surface named above was already dead code, so the live leak was narrower than this item assumed.
+
+- **Live, now fixed:** `/feedback` slash command (opened the upstream new-issue form) is no longer registered on OSS ([static_commands/commands.rs](../../app/src/search/slash_command_menu/static_commands/commands.rs)); `feedback_form_url()` returns `Option` and is `None` on OSS so no caller can fall back to a URL. Privacy-policy link (command palette, app menu, Privacy settings page) now resolves via `privacy_policy_url()`.
+- **Already dead, left alone:** `make_new_help_menu` (GitHub Issues + Slack items) and `render_footer_button` (resource-center Docs/Slack/Feedback) are both `#[allow(dead_code)]` and never called. `JoinSlack` / `ViewUserDocs` have no live dispatcher since the fork trimmed `add_overflow_menu_items_as_editable_binding`. `USER_DOCS_URL` / `SLACK_URL` / `GITHUB_ISSUES_URL` are therefore unreachable, not user-visible.
+- **Out of scope, verified unreachable:** `mailto:support@warp.dev` and `warp.dev/contact-sales` in [admin_actions.rs](../../app/src/settings_view/admin_actions.rs) are reached only from `teams_page.rs`, and Teams is already hidden on OSS. `warp.dev/download` in [workspace/view.rs](../../app/src/workspace/view.rs) is inside a `#[cfg(target_family = "wasm")]` webapp-only path.
+- **Kept:** `docs.warp.dev` still describes the terminal accurately, so `USER_DOCS_URL` was not retargeted.
+
+**Verify:** `cargo test -p warp_core --lib channel` (14 pass); `cargo test -p warp --lib --features gui links` (4 new `util::links::tests` pass); `-- privacy_page slash_command static_commands` (128 pass).
 
 ### 7. TUI local-only auth tests were left in progress — Verify
 
@@ -128,13 +133,164 @@ From [guides/oss-windows-runtime-warnings.md](../guides/oss-windows-runtime-warn
 
 Do **not** “fix” WSL GUID, SQLite WAL 283, NVIDIA Vulkan ranking, Git/K8s chips before cwd, or cloud prefs without Drive.
 
-### 14. Warp crate test-binary compile errors — Verify
+### 14. Warp crate test-binary compile errors — Done (no longer reproduces)
 
-The cloud-cutoff session: [app/src/search/command_search/view_tests.rs](../../app/src/search/command_search/view_tests.rs) and [app/src/terminal/input_tests.rs](../../app/src/terminal/input_tests.rs) failed to compile, so some new tests never ran. Confirm whether still broken; if yes, fix enough that `cargo test -p warp --lib` / nextest for those modules can execute.
+Verified 16 Aug 2026: `cargo test -p warp --lib --features gui` builds the whole lib test binary (6180 tests) and both modules are present and running — `search::command_search::view::tests::test_render_view` is listed, and `terminal::input::tests::*` pass in a 128-test run. No fix was needed; whatever broke them was resolved by the commits since.
+
+Only remaining noise is two pre-existing warnings in [request_usage_model_tests.rs](../../app/src/ai/request_usage_model_tests.rs) (unused `warp_graphql::billing` imports and an unused `app` param on a stubbed-out helper) — leftovers from the billing strip, not compile errors. Fold into item 12.
 
 ### 15. Windows overlay: release deploy vs debug overlay — Open
 
 `C:\Program Files\Warp` currently has a **debug** `warp-oss` overlay (console window). When cargo is free, run `.\script\windows\deploy.ps1` (release, features `release_bundle,gui`). Documented mismatch: `build.ps1 -Release` is `--features gui` only. See [guides/windows-local-deploy.md](../guides/windows-local-deploy.md).
+
+### 19. Clippy gate on `warp` and `warp_core` — Done
+
+Found 16 Aug 2026 while running clippy for item 6; all four findings were pre-existing on HEAD (confirmed by stashing), none introduced by that work.
+
+- `clippy::nonminimal_bool` **error** in [teams_page.rs](../../app/src/settings_view/teams_page.rs) `should_show_reload_credits_confirmation` — `2aaba072` hard-disabled the check by prepending `false &&`. Collapsed to a plain `false` with a comment; the `ai_request_usage_model` field is still used elsewhere, so nothing was orphaned.
+- Unused `warp_graphql::billing` imports and an unused `app` param on the emptied `set_addon_credits_pricing_info` stub in [request_usage_model_tests.rs](../../app/src/ai/request_usage_model_tests.rs) — billing-strip leftovers. Import dropped, param renamed `_app`; the stub is still called by 6 tests so it stays.
+- `clippy::let_and_return` in [agent_message_bar.rs](../../app/src/ai/blocklist/agent_view/agent_message_bar.rs) — upstream style, fixed only because `-D warnings` makes it fatal.
+- `clippy::items_after_test_module` in [channel/state.rs](../../crates/warp_core/src/channel/state.rs) — moved `app_id_from_bundle` above the two test modules.
+
+**Verify:** `cargo clippy -p warp --lib --features gui --tests -- -D warnings` and `cargo clippy -p warp_core --all-targets --tests -- -D warnings` both exit 0.
+
+Scope caveat: only these two packages were cleared. [`./script/presubmit`](../../script/presubmit) runs `--workspace --all-targets --all-features`, which is far broader and was **not** verified.
+
+### 20. 18 stale test failures in `ai::request_usage_model` — Done
+
+Resolved 17 Aug 2026. `cargo test -p warp --lib --features gui -- request_usage` is now **28 passed, 0 failed** (was 18 of 42 failing).
+
+Verdict per group: the **model is correct, the tests were stale**. The commercial strip hard-wired
+`has_any_ai_remaining() -> true`, `has_base_plan_requests_remaining() -> true`, `is_unlimited() -> true`,
+and `requests_remaining() -> request_limit().max(1)`, each with a "Synth Warp is commercial-free"
+comment. `has_any_ai_remaining` is still called from 11 production sites, so the constant is
+deliberate policy, not dead code. No model behavior was changed.
+
+- **2 numeric tests** (`test_request_limit_info`, `..._with_limit`): expectation updated to the full
+  limit (200, 999999999) since usage is no longer deducted. `requests_remaining` has no production
+  caller but is kept covered.
+- **9 `..._false_...` gating tests** deleted. Their hosted-billing setups (`PurchaseAddOnCreditsPolicy`,
+  `max_monthly_spend_cents`, `EnterpriseCreditsAutoReloadPolicy`, …) are inert — nothing they configure
+  reaches the answer any more, so flipping the assertion would have produced a test that reads as
+  though premium auto-reload were still evaluated. Replaced by one guard,
+  `test_has_any_ai_remaining_is_not_gated_by_hosted_quota`, asserting the fork invariant (quota spent,
+  no bonus, no BYO key, **and** a server `OutOfCredits` denial ⇒ still available).
+- **4 server-refinement tests** deleted (`test_server_availability_overrides_locally_derived_state`,
+  `test_out_of_credits_refined_by_local_byo_key`, `..._bedrock_credentials`,
+  `test_server_unavailable_overrides_local_byo_key`): they exercise `server_availability_permits_ai`
+  and `has_any_ai_remaining_before_server_decision`, both now `#[allow(dead_code)]` and uncalled.
+- **2 availability-state tests kept**, with only the stale `has_any_ai_remaining` assertions dropped —
+  `apply_server_availability` / `reset_server_availability` are live, so their state assertions still
+  earn their place. `test_reset_server_availability_restores_prefetch_fallback` renamed to
+  `..._clears_the_stored_decision` to match what it now proves.
+- **1 test inverted** — this one was *not* a stale number. `test_byo_api_key_disabled_for_anonymous_firebase_user`
+  failed on its **first** assertion, not the gating one: `UserWorkspaces::is_byo_api_key_enabled` is
+  now hard-`true`, so BYOK works without a Warp account. That is the intended BYOK ungating (item 1),
+  so the test became `test_byo_api_key_enabled_for_anonymous_firebase_user`. Its doc comment in
+  [user_workspaces.rs](../../app/src/workspaces/user_workspaces.rs) still claimed "Anonymous or
+  logged-out users are not allowed to use BYO API keys" while the body returned `true`; corrected.
+
+Orphaned by the deletions and removed: `std::time::SystemTime`, `AwsCredentials`, `AwsCredentialsState`.
+
+**Verify:** `cargo test -p warp --lib --features gui -- request_usage` → 28 passed, 0 failed;
+`cargo clippy -p warp --lib --features gui --tests -- -D warnings` exit 0; `cargo fmt -p warp -- --check` clean.
+
+Follow-up not done (deliberately out of scope): **11 `test_has_any_ai_remaining_true_*` tests now pass
+vacuously.** Their setups are just as inert as the deleted ones — `..._true_with_payg_enabled` would
+pass with no setup at all — so they now imply PAYG matters with no counter-example left to show it
+does not. They are green, so removing them was not needed to close this item; decide whether to delete
+them or keep the scaffolding for a possible future re-enablement.
+
+### 21. Full `-p warp --lib` suite triage — Partial (23 failures left, all classified)
+
+Found 17 Aug 2026 while closing item 20. Everything before this had only ever been run **filtered**,
+which hid the true state. `cargo test -p warp --lib --features gui` (whole suite, ~6146 tests):
+
+| Run | Result |
+|-----|--------|
+| Baseline (HEAD + working tree) | 44 failed = item 20's 18 + 26 others |
+| After item 20 | 29 failed |
+| After this pass | **6123 passed, 23 failed** |
+
+Note: item 14 declared `terminal::input::tests::*` green on 16 Aug from a 128-test filtered run — the
+full suite shows 4 of them failing. Filtered runs are not evidence about this suite.
+
+#### Fixed this pass (4)
+
+- **`themes::bundled_themes` — a real shipped bug, not a test problem.**
+  [pink-city.yaml](../../app/assets/bundled/themes/warp-defaults/pink-city.yaml), added by `12fb942`,
+  was the only bundled theme using `details: !custom`. The workspace pins `serde_yaml = "0.8"`, which
+  does not read YAML tags for externally-tagged enums — it takes the map's first key as the variant,
+  hence `unknown variant main_text_opacity`. The theme would fail to load in the app, so this was never
+  only a test failure. Its ten opacities are byte-identical to both `DARKER_DETAILS` and
+  `LIGHTER_DETAILS` ([color.rs](../../crates/warp_core/src/ui/theme/color.rs)), so `details: lighter`
+  parses, matches every other light theme, and changes no rendered value.
+- **`uri::test_settings_section_for_simple_subpage`** — [uri/mod.rs](../../app/src/uri/mod.rs) maps
+  `"billing_and_usage" => None` on purpose; the test still expected `Some(SettingsSection::Account)`.
+- **`tracing::native::traces_endpoint_rejects_remote_https`** — test bug from the 15 Aug loopback
+  hardening: `traces_endpoint("https://example.com")` has no port, so the missing-port check fires
+  before the loopback check and the error never contains `"loopback"`. Gave the URL an explicit port.
+  Its sibling `..._rejects_remote_http` asserts only `is_err()`, so it passes for the same wrong
+  reason — left green, but it is not testing what its name says.
+- **`prompt_alert::test_server_out_of_credits_maps_to_request_limit_reached`** — item 20's class, but
+  it mattered more than a stale number. `state_from_server_availability` refines `OutOfCredits` /
+  `Unknown` / `None` through `has_any_ai_remaining`, which the strip hard-wired to `true`, so the state
+  is `NoAlert`. Keeping `RequestLimitReached` would have asserted a paywall: `does_alert_block_ai_requests`
+  treats it as blocking, so a dead hosted quota would block local AI. Renamed to `..._maps_to_no_alert`.
+  Consequence: `out_of_credits_presentation` and the `RequestLimitReached` arm are now unreachable via
+  the server path. Not deleted — decide separately.
+
+#### A. Child-process spawn is blocked by a job object (8) — environment, not fork drift
+
+All 7 `ai::agent_sdk::driver::environment::tests::*` real-git fixtures fail with
+`git should be runnable: Os { code: 5, kind: PermissionDenied }`, and
+`terminal::local_tty::windows::child::tests::test_event_is_emitted_when_child_exits` fails identically
+on `Command::new("cmd.exe").spawn()`.
+
+Root cause: [blocking.rs](../../crates/command/src/blocking.rs) `Command::new` unconditionally ORs
+`CREATE_BREAKAWAY_FROM_JOB` on Windows. `CreateProcess` rejects that flag with `ERROR_ACCESS_DENIED`
+(os error 5) when the parent is inside a job object lacking `JOB_OBJECT_LIMIT_BREAKAWAY_OK`.
+
+Verified, not assumed: the agent shell reports `IsProcessInJob == True`; the identical git fixture
+(bare origin with `uploadpack.allowFilter` + `allowAnySHA1InWant`, a commit hidden under
+`refs/pinned/base`, `file://C:\…` clone, then the exact `checkout_command_for` string through `sh -c`)
+**succeeds** when run directly; `sh.exe` is on `PATH`. Disabling the tool sandbox does not help.
+
+So these 8 cannot pass under any agent-run `cargo test` here, and will also fail for anyone whose
+shell is job-constrained. Decide: skip when spawning is unavailable, or accept them as
+"local terminal only". Do not chase them as fork bugs.
+
+#### B. Order-dependent shared globals (2–3) — pass in isolation
+
+`experiments::tests::test_create_experiment_layer_mappings` (wants 2, sees 5) and
+`server::telemetry::tests::test_persist_events_doesnt_include_ugc_events` (wants 1, sees 9, with
+"More telemetry events in queue than the limit to persist" in the log) both **pass when run alone**.
+`EXPERIMENT_LAYER_MAPPINGS` ([experiments/mod.rs](../../app/src/experiments/mod.rs)) is a
+`lazy_static` `DashMap`, insert-only and never reset. `test_detect_secrets_no_regexes_configured` is
+the same class and fires intermittently depending on the parallel schedule.
+
+Fix the shared state, do not chase them as regressions.
+
+#### C. Deterministic and still untriaged (13)
+
+These reproduce in isolation, so they are genuine behavior mismatches, not pollution:
+
+- `terminal::input::tests::test_history_up{,_buffer_restoration,_multiline,_multiline_vim}` (4) —
+  the suggestion list holds 7422/7421 items where the fixture supplies 4/2. **Confirmed
+  deterministic**: identical counts across separate full runs, and `test_history_up` fails on its own.
+  So it is not the developer's live history bleeding in; some suggestion source is returning a large
+  fixed corpus instead of the fixture's history.
+- `terminal::view::tests::` `test_insert` (`"One"` vs `"None"`), `test_reinput_blocks` (`"pwd"` vs
+  `"sudo pwd"`), `test_insert_into_input`, `test_viewport_iter_most_recent_at_bottom`,
+  `test_scroll_position_doesnt_change_when_block_finished` (5). The first two both look like leading
+  characters being dropped — check for one shared cause before treating them as five bugs.
+- `workspace::view::tests::` `test_terminal_model_isnt_leaked`,
+  `test_worktree_sidecar_hides_linked_worktrees_from_repo_list`, and
+  `test_open_cloud_agent_setup_guide_action_opens_management_view_and_is_idempotent` (3). The last one
+  belongs to the in-flight `show_setup_guide_from_link` cloud-agent gating (item 4), not to this item.
+- `workspaces::user_workspaces::user_workspaces_tests::test_member_team_settings_win_over_workspace_settings` (1).
+
+Verify: `cargo test -p warp --lib --features gui` (~75 s of test time after a warm build).
 
 ## P4 — Docs, wiki, housekeeping
 
@@ -149,9 +305,11 @@ This page is the persist. Remaining:
 - Optionally `/log-session` into `.agent-memory` (`memory.md` is still empty)
 - Delete or gitignore local artifacts: `cargo-check-synth.log`, the setup-wizard transcript (local paths)
 
-### 18. Privacy / telemetry copy still points at Warp docs — Open
+### 18. Privacy / telemetry copy still points at Warp docs — Done
 
-[privacy_page.rs](../../app/src/settings_view/privacy_page.rs) `TELEMETRY_DOCS_URL` is warp.dev. Replace with the fork wiki ([features/implemented/local-first.md](../features/implemented/local-first.md)) or hide the link.
+[privacy_page.rs](../../app/src/settings_view/privacy_page.rs) `TELEMETRY_DOCS_URL` became `WARP_TELEMETRY_DOCS_URL` plus a `telemetry_docs_url()` that returns `links::SYNTH_PRIVACY_URL` on OSS — the GitHub-hosted [features/implemented/local-first.md](../features/implemented/local-first.md). Same substitution backs `privacy_policy_url()` (item 6), so both Privacy-page links and the app-menu entry agree.
+
+Not changed: the link labels ("Read Warp's privacy policy", "Read more about Warp's use of data") still say Warp, which remains true of this fork.
 
 ## P5 — Zed × Warp hybrid
 
@@ -187,11 +345,12 @@ Do **not** embed WarpUI in GPUI, copy AGPL into Zed, or stand up a third session
 
 ## Suggested execution order
 
-1. Commit working-tree polish (item 1)
+1. ~~Commit working-tree polish (item 1)~~ — landed as `d4369d6`
 2. Rebuild + verify wizard (item 2)
 3. Close PR #1 (item 3)
 4. Warp Agent page decision + stop Drive sync of AI toggle (item 4)
 5. LocalBackend Phase 1 + LocalProfile (items 8–10)
-6. Link/menu retarget (item 6)
-7. Overlay warning hygiene + unused-code verify (items 12–13)
+6. ~~Link/menu retarget (items 6, 18)~~ — done
+7. Finish the full-suite triage (item 21) — 23 left, all classified; group C is the real work
+8. Overlay warning hygiene + unused-code verify (items 12–13)
 8. Hybrid Level 1 Windows editor + `warposs://` when the daily driver needs it (P5)

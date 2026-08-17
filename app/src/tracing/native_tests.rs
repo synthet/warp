@@ -4,7 +4,9 @@ use super::{endpoint_host_is_loopback, traces_endpoint};
 
 #[test]
 fn traces_endpoint_rejects_remote_https() {
-    let err = traces_endpoint("https://example.com").unwrap_err();
+    // Needs an explicit port: the missing-port check runs before the loopback
+    // check, so a portless URL is rejected for the wrong reason.
+    let err = traces_endpoint("https://example.com:4318").unwrap_err();
     assert!(
         err.to_string().contains("loopback"),
         "unexpected error: {err:#}"

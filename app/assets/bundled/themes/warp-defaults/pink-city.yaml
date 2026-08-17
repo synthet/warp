@@ -2,17 +2,7 @@ name: 'Pink City'
 accent: '#e10087'
 background: '#fbeff6'
 foreground: '#000000'
-details: !custom
-  main_text_opacity: 90
-  sub_text_opacity: 60
-  hint_text_opacity: 40
-  disabled_text_opacity: 20
-  foreground_button_opacity: 30
-  accent_button_opacity: 0
-  button_hover_opacity: 10
-  button_click_opacity: 20
-  keybinding_row_overlay_opacity: 40
-  welcome_tips_completion_overlay_opacity: 90
+details: lighter
 background_image:
   path: 'synthet-theme/warp-defaults/pink-city/background.jpg'
   opacity: 40

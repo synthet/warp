@@ -100,11 +100,14 @@ fn test_server_spend_limit_reasons_map_to_spend_limit_alert() {
 }
 
 #[test]
-fn test_server_out_of_credits_maps_to_request_limit_reached() {
+fn test_server_out_of_credits_maps_to_no_alert() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);
-        // With no workspace overage policy in play, an out-of-credits denial
-        // falls through to the generic request limit alert.
+        // Synth Warp is commercial-free: an out-of-credits denial is refined by
+        // `has_any_ai_remaining`, which never gates on a hosted plan, so no alert
+        // is raised. Upstream fell through to `RequestLimitReached` here — which
+        // `does_alert_block_ai_requests` treats as blocking, so keeping that
+        // expectation would mean a dead hosted quota could block local AI.
         for reason in [
             AICreditDenialReason::OutOfCredits,
             AICreditDenialReason::Unknown,
@@ -112,7 +115,7 @@ fn test_server_out_of_credits_maps_to_request_limit_reached() {
             apply_server_availability(&mut app, AICreditAvailability::unavailable(reason));
             assert_eq!(
                 determine_state(&mut app),
-                PromptAlertState::RequestLimitReached,
+                PromptAlertState::NoAlert,
                 "unexpected alert state for {reason:?}",
             );
         }

@@ -759,9 +759,11 @@ fn test_settings_section_for_simple_subpage() {
         settings_section_for_simple_subpage("appearance"),
         Some(SettingsSection::Appearance),
     );
+    // Synth Warp is commercial-free: the billing deeplink is mapped to `None`
+    // on purpose, so the subpage is not reachable by URI.
     assert_eq!(
         settings_section_for_simple_subpage("billing_and_usage"),
-        Some(SettingsSection::Account),
+        None
     );
     assert_eq!(
         settings_section_for_simple_subpage("platform"),

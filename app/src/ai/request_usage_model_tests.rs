@@ -1,12 +1,10 @@
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use ai::LLMProvider;
-use ai::api_keys::{ApiKeyManager, AwsCredentials, AwsCredentialsState, GrokTokens};
+use ai::api_keys::{ApiKeyManager, GrokTokens};
 use chrono::Duration;
 use warp_core::features::FeatureFlag;
 use warp_core::telemetry::testing::MockTelemetryContextProvider;
-use warp_graphql::billing::{AddonCreditsOption, OveragesPricing, PricingInfo};
 use warpui::{App, ModelHandle};
 
 use super::*;
@@ -86,7 +84,9 @@ fn add_request_usage_model_with_client(
     app.add_singleton_model(|ctx| AIRequestUsageModel::new_for_test(ai_client, ctx))
 }
 
-fn set_addon_credits_pricing_info(app: &mut App) {}
+/// No-op since the commercial strip removed hosted add-on credit pricing. Kept so the
+/// tests that used to seed pricing still read the same.
+fn set_addon_credits_pricing_info(_app: &mut App) {}
 
 fn standard_purchase_policy() -> PurchaseAddOnCreditsPolicy {
     PurchaseAddOnCreditsPolicy {
@@ -146,7 +146,9 @@ fn test_request_limit_info() {
             };
             assert_eq!(200, request_usage_model.request_limit());
             assert_eq!(39, request_usage_model.requests_used());
-            assert_eq!(161, request_usage_model.requests_remaining());
+            // Synth Warp does not deduct usage from the quota, so the full limit
+            // always remains regardless of `num_requests_used_since_refresh`.
+            assert_eq!(200, request_usage_model.requests_remaining());
         })
     });
 }
@@ -172,7 +174,7 @@ fn test_request_limit_info_with_limit() {
             };
             assert_eq!(999999999, request_usage_model.request_limit());
             assert_eq!(39, request_usage_model.requests_used());
-            assert_eq!(999999960, request_usage_model.requests_remaining());
+            assert_eq!(999999999, request_usage_model.requests_remaining());
         })
     });
 }
@@ -625,8 +627,12 @@ fn test_ambient_credits_banner_dismissal_loads_from_preferences() {
         });
     });
 }
+/// Synth Warp is commercial-free: `has_any_ai_remaining` never gates on a hosted
+/// plan. This guards against re-introducing a paywall — upstream returned `false`
+/// for exactly this state (base quota spent, no bonus credits, no overages, no
+/// BYO key), and every upstream `..._false_...` case reduced to some variant of it.
 #[test]
-fn test_has_any_ai_remaining_false_when_no_requests_or_bonus() {
+fn test_has_any_ai_remaining_is_not_gated_by_hosted_quota() {
     App::test((), |mut app| async move {
         app.add_singleton_model(UserWorkspaces::default_mock);
         let request_usage_model = add_request_usage_model(&mut app);
@@ -634,7 +640,18 @@ fn test_has_any_ai_remaining_false_when_no_requests_or_bonus() {
         request_usage_model.update(&mut app, |model, ctx| {
             // At limit, no bonus credits and no overages.
             model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            assert!(!model.has_any_ai_remaining(ctx));
+            model.bonus_grants.clear();
+            assert!(model.has_any_ai_remaining(ctx));
+
+            // A server denial does not gate it either: the fork does not consult
+            // hosted credit availability when deciding whether AI may be used.
+            model.apply_server_availability(
+                Ok(AICreditAvailability::unavailable(
+                    AICreditDenialReason::OutOfCredits,
+                )),
+                ctx,
+            );
+            assert!(model.has_any_ai_remaining(ctx));
         });
     });
 }
@@ -826,31 +843,6 @@ fn test_has_any_ai_remaining_true_with_enterprise_auto_reload() {
 }
 
 #[test]
-fn test_has_any_ai_remaining_false_with_enterprise_auto_reload_policy_on_non_enterprise() {
-    App::test((), |mut app| async move {
-        let (_uid, mut workspace) = create_test_workspace();
-        workspace
-            .billing_metadata
-            .tier
-            .enterprise_credits_auto_reload_policy =
-            Some(EnterpriseCreditsAutoReloadPolicy { enabled: true });
-
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.bonus_grants.clear();
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false when enterprise auto-reload policy is enabled for a non-enterprise workspace",
-            );
-        });
-    });
-}
-
-#[test]
 fn test_has_any_ai_remaining_true_with_self_serve_auto_reload() {
     App::test((), |mut app| async move {
         let (_uid, mut workspace) = create_test_workspace();
@@ -903,39 +895,6 @@ fn test_has_any_ai_remaining_true_with_premium_auto_reload() {
 }
 
 #[test]
-fn test_has_any_ai_remaining_false_when_premium_auto_reload_would_exceed_limit() {
-    App::test((), |mut app| async move {
-        let (_uid, mut workspace) = create_test_workspace();
-        workspace
-            .billing_metadata
-            .tier
-            .purchase_add_on_credits_policy = Some(premium_purchase_policy());
-        enable_auto_reload(&mut workspace);
-        // The reload's list price is $10.00 but the premium price is $11.00;
-        // a $10.50 monthly limit only blocks the reload when the premium
-        // surcharge is included in the check.
-        workspace
-            .settings
-            .addon_credits_settings
-            .max_monthly_spend_cents = Some(1050);
-
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-        set_addon_credits_pricing_info(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.bonus_grants.clear();
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false when the premium-priced reload would exceed the monthly spend limit",
-            );
-        });
-    });
-}
-
-#[test]
 fn test_has_any_ai_remaining_true_with_self_serve_auto_reload_and_billing_v2_disabled() {
     App::test((), |mut app| async move {
         let _guard = FeatureFlag::AgentView.override_enabled(false);
@@ -964,90 +923,6 @@ fn test_has_any_ai_remaining_true_with_self_serve_auto_reload_and_billing_v2_dis
 }
 
 #[test]
-fn test_has_any_ai_remaining_false_with_add_on_credits_policy_when_purchase_would_exceed_limit() {
-    App::test((), |mut app| async move {
-        let (_uid, mut workspace) = create_test_workspace();
-        workspace
-            .billing_metadata
-            .tier
-            .purchase_add_on_credits_policy = Some(standard_purchase_policy());
-        enable_auto_reload(&mut workspace);
-        workspace
-            .settings
-            .addon_credits_settings
-            .max_monthly_spend_cents = Some(1000);
-        workspace.bonus_grants_purchased_this_month.cents_spent = 500;
-
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-        set_addon_credits_pricing_info(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.bonus_grants.clear();
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false when add-on credit purchase would exceed the monthly spend limit",
-            );
-        });
-    });
-}
-
-#[test]
-fn test_has_any_ai_remaining_false_with_workspace_no_pricing_no_overages_no_credits() {
-    App::test((), |mut app| async move {
-        // Create a workspace with no tier pricing (default).
-        let (_uid, workspace) = create_test_workspace();
-
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            // No standard requests remaining, no bonus credits.
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.bonus_grants.clear();
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false with no pricing, no overages, no credits",
-            );
-        });
-    });
-}
-
-#[test]
-fn test_has_any_ai_remaining_false_both_payg_and_autoreload_disabled() {
-    App::test((), |mut app| async move {
-        // Create a workspace with policies but payg disabled and auto-reload disabled.
-        let (_uid, mut workspace) = create_test_workspace();
-        workspace
-            .billing_metadata
-            .tier
-            .enterprise_pay_as_you_go_policy = Some(EnterprisePayAsYouGoPolicy { enabled: false });
-        workspace
-            .billing_metadata
-            .tier
-            .enterprise_credits_auto_reload_policy =
-            Some(EnterpriseCreditsAutoReloadPolicy { enabled: false });
-
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            // No standard requests remaining, no bonus credits.
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.bonus_grants.clear();
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false with policies but payg and auto-reload disabled",
-            );
-        });
-    });
-}
-
-#[test]
 fn test_has_any_ai_remaining_true_with_byok_enabled_and_key_provided() {
     App::test((), |mut app| async move {
         // Create a workspace with BYOK (Bring Your Own Key) enabled.
@@ -1070,30 +945,6 @@ fn test_has_any_ai_remaining_true_with_byok_enabled_and_key_provided() {
             assert!(
                 model.has_any_ai_remaining(ctx),
                 "expected has_any_ai_remaining to be true when BYOK is enabled and a key is provided",
-            );
-        });
-    });
-}
-
-#[test]
-fn test_has_any_ai_remaining_false_with_byok_enabled_but_no_key() {
-    App::test((), |mut app| async move {
-        // Create a workspace with BYOK enabled but no key provided.
-        let (_uid, mut workspace) = create_test_workspace();
-        workspace.billing_metadata.tier.byo_api_key_policy =
-            Some(ByoApiKeyPolicy { enabled: true });
-
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            // No standard requests remaining, no bonus credits.
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.bonus_grants.clear();
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false when BYOK is enabled but no key is provided",
             );
         });
     });
@@ -1136,38 +987,6 @@ fn test_has_any_ai_remaining_true_with_grok_subscription_connected() {
 }
 
 #[test]
-fn test_has_any_ai_remaining_false_with_grok_subscription_but_byo_disabled() {
-    App::test((), |mut app| async move {
-        // No BYO policy: the Grok token can't be sent, so it must not count as
-        // available AI.
-        let (_uid, workspace) = create_test_workspace();
-
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        ApiKeyManager::handle(&app).update(&mut app, |manager, ctx| {
-            manager.set_grok_tokens(
-                Some(GrokTokens {
-                    access_token: "grok-test-token".to_string(),
-                    ..Default::default()
-                }),
-                ctx,
-            );
-        });
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.bonus_grants.clear();
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false when a Grok subscription is connected but BYO is disabled",
-            );
-        });
-    });
-}
-
-#[test]
 fn test_has_any_ai_remaining_true_with_byo_key_and_no_workspace() {
     App::test((), |mut app| async move {
         let _guard = FeatureFlag::SoloUserByok.override_enabled(true);
@@ -1193,98 +1012,17 @@ fn test_has_any_ai_remaining_true_with_byo_key_and_no_workspace() {
     });
 }
 
+/// BYOK is the fork's primary inference path, so it is allowed without a Warp
+/// account — including for anonymous Firebase users, whom upstream denied.
 #[test]
-fn test_byo_api_key_disabled_for_anonymous_firebase_user() {
+fn test_byo_api_key_enabled_for_anonymous_firebase_user() {
     App::test((), |mut app| async move {
-        let _guard = FeatureFlag::SoloUserByok.override_enabled(true);
-
         app.add_singleton_model(UserWorkspaces::default_mock);
-        let request_usage_model = add_request_usage_model_for_anonymous_users(&mut app);
-
-        ApiKeyManager::handle(&app).update(&mut app, |manager, ctx| {
-            manager.set_provider_key(LLMProvider::OpenAI, Some("test-key".to_string()), ctx);
-        });
+        // Registers the anonymous auth provider the assertion reads.
+        let _request_usage_model = add_request_usage_model_for_anonymous_users(&mut app);
 
         app.read(|ctx| {
-            assert!(
-                !UserWorkspaces::as_ref(ctx).is_byo_api_key_enabled(ctx),
-                "expected is_byo_api_key_enabled to be false for anonymous Firebase users even with SoloUserByok enabled",
-            );
-        });
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.bonus_grants.clear();
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false for anonymous Firebase user even with BYO key and SoloUserByok enabled",
-            );
-        });
-    });
-}
-
-#[test]
-fn test_has_any_ai_remaining_false_with_only_ambient_bonus_credits() {
-    App::test((), |mut app| async move {
-        app.add_singleton_model(UserWorkspaces::default_mock);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            // No standard requests remaining.
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-
-            // Only ambient-only bonus credits.
-            model.bonus_grants = vec![BonusGrant {
-                created_at: Utc::now(),
-                cost_cents: 0,
-                expiration: Some(Utc::now() + chrono::Duration::days(7)),
-                grant_type: BonusGrantType::AmbientOnly,
-                reason: "ambient trial credits".to_string(),
-                user_facing_message: None,
-                request_credits_granted: 1000,
-                request_credits_remaining: 1000,
-                scope: BonusGrantScope::User,
-            }];
-
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "expected has_any_ai_remaining to be false when only ambient-only bonus credits exist",
-            );
-        });
-    });
-}
-
-#[test]
-fn test_server_availability_overrides_locally_derived_state() {
-    App::test((), |mut app| async move {
-        app.add_singleton_model(UserWorkspaces::default_mock);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            // Local state says AI is available.
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 5);
-            assert!(model.has_any_ai_remaining(ctx));
-
-            // The server-authoritative decision wins over local state.
-            model.apply_server_availability(
-                Ok(AICreditAvailability::unavailable(
-                    AICreditDenialReason::OutOfCredits,
-                )),
-                ctx,
-            );
-            assert!(!model.has_any_ai_remaining(ctx));
-
-            // And in the other direction: local state is exhausted, but the
-            // server reports a usable fallback source.
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.apply_server_availability(
-                Ok(AICreditAvailability::available_with_source(Some(
-                    AICreditSource::BonusGrant,
-                ))),
-                ctx,
-            );
-            assert!(model.has_any_ai_remaining(ctx));
+            assert!(UserWorkspaces::as_ref(ctx).is_byo_api_key_enabled(ctx));
         });
     });
 }
@@ -1305,10 +1043,8 @@ fn test_availability_refresh_failure_keeps_last_known_good() {
             model.apply_server_availability(Err(anyhow::anyhow!("transient failure")), ctx);
 
             // The last-known-good server decision is retained: the error is
-            // recorded but neither flips availability nor re-enables the
-            // pre-server-decision fallback.
+            // recorded but does not overwrite it.
             assert_eq!(model.server_availability(), Some(denied));
-            assert!(!model.has_any_ai_remaining(ctx));
             assert_eq!(
                 model.server_availability.last_error.as_deref(),
                 Some("transient failure")
@@ -1336,114 +1072,21 @@ fn test_availability_refresh_failure_before_first_success_uses_prefetch_fallback
 }
 
 #[test]
-fn test_reset_server_availability_restores_prefetch_fallback() {
+fn test_reset_server_availability_clears_the_stored_decision() {
     App::test((), |mut app| async move {
         app.add_singleton_model(UserWorkspaces::default_mock);
         let request_usage_model = add_request_usage_model(&mut app);
 
         request_usage_model.update(&mut app, |model, ctx| {
             model.request_limit_info = RequestLimitInfo::new_for_test(10, 5);
-            model.apply_server_availability(
-                Ok(AICreditAvailability::unavailable(
-                    AICreditDenialReason::OutOfCredits,
-                )),
-                ctx,
-            );
-            assert!(!model.has_any_ai_remaining(ctx));
+            let denied = AICreditAvailability::unavailable(AICreditDenialReason::OutOfCredits);
+            model.apply_server_availability(Ok(denied), ctx);
+            assert_eq!(model.server_availability(), Some(denied));
 
-            // On logout the server decision is cleared and the pre-server-decision
-            // fallback is restored for the next principal.
+            // On logout the server decision is cleared so it cannot leak into the
+            // next principal's session.
             model.reset_server_availability(ctx);
             assert_eq!(model.server_availability(), None);
-            assert!(model.has_any_ai_remaining(ctx));
-        });
-    });
-}
-
-#[test]
-fn test_out_of_credits_refined_by_local_byo_key() {
-    App::test((), |mut app| async move {
-        // BYOK is allowed by policy, but no key has been stored locally.
-        let (_uid, mut workspace) = create_test_workspace();
-        workspace.billing_metadata.tier.byo_api_key_policy =
-            Some(ByoApiKeyPolicy { enabled: true });
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        // OUT_OF_CREDITS means the server found no path it can see; locally
-        // stored keys are request-level parameters invisible to it.
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.apply_server_availability(
-                Ok(AICreditAvailability::unavailable(
-                    AICreditDenialReason::OutOfCredits,
-                )),
-                ctx,
-            );
-            assert!(
-                !model.has_any_ai_remaining(ctx),
-                "out of credits without a stored key should gate AI",
-            );
-        });
-
-        // Storing a key supplies the one fact the server cannot know.
-        ApiKeyManager::handle(&app).update(&mut app, |manager, ctx| {
-            manager.set_provider_key(LLMProvider::OpenAI, Some("test-key".to_string()), ctx);
-        });
-        request_usage_model.read(&app, |model, ctx| {
-            assert!(
-                model.has_any_ai_remaining(ctx),
-                "out of credits with a stored key should permit AI",
-            );
-        });
-    });
-}
-
-#[test]
-fn test_out_of_credits_refined_by_local_bedrock_credentials() {
-    App::test((), |mut app| async move {
-        // Bedrock via the local AWS chain: the org enables the host, but the
-        // credentials live on this machine.
-        let (_uid, mut workspace) = create_test_workspace();
-        workspace.settings.llm_settings.enabled = true;
-        workspace.settings.llm_settings.host_configs.insert(
-            crate::ai::llms::LLMModelHost::AwsBedrock,
-            crate::workspaces::workspace::LlmHostSettings {
-                enabled: true,
-                enablement_setting: crate::workspaces::workspace::HostEnablementSetting::Enforce,
-                ..Default::default()
-            },
-        );
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.request_limit_info = RequestLimitInfo::new_for_test(10, 10);
-            model.apply_server_availability(
-                Ok(AICreditAvailability::unavailable(
-                    AICreditDenialReason::OutOfCredits,
-                )),
-                ctx,
-            );
-            assert!(!model.has_any_ai_remaining(ctx));
-        });
-
-        ApiKeyManager::handle(&app).update(&mut app, |manager, ctx| {
-            manager.set_aws_credentials_state(
-                AwsCredentialsState::Loaded {
-                    credentials: AwsCredentials::new(
-                        "access".to_string(),
-                        "secret".to_string(),
-                        None,
-                        None,
-                    ),
-                    loaded_at: SystemTime::now(),
-                },
-                ctx,
-            );
-        });
-        request_usage_model.read(&app, |model, ctx| {
-            assert!(model.has_any_ai_remaining(ctx));
         });
     });
 }
@@ -1464,33 +1107,6 @@ fn test_server_managed_availability_trusted_without_local_keys() {
                 ctx,
             );
             assert!(model.has_any_ai_remaining(ctx));
-        });
-    });
-}
-
-#[test]
-fn test_server_unavailable_overrides_local_byo_key() {
-    App::test((), |mut app| async move {
-        // A locally stored key never overrides a hard server denial — the
-        // local refinement applies only to OUT_OF_CREDITS.
-        let (_uid, mut workspace) = create_test_workspace();
-        workspace.billing_metadata.tier.byo_api_key_policy =
-            Some(ByoApiKeyPolicy { enabled: true });
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        ApiKeyManager::handle(&app).update(&mut app, |manager, ctx| {
-            manager.set_provider_key(LLMProvider::OpenAI, Some("test-key".to_string()), ctx);
-        });
-
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.apply_server_availability(
-                Ok(AICreditAvailability::unavailable(
-                    AICreditDenialReason::Delinquent,
-                )),
-                ctx,
-            );
-            assert!(!model.has_any_ai_remaining(ctx));
         });
     });
 }
