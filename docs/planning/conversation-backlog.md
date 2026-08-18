@@ -201,96 +201,107 @@ pass with no setup at all — so they now imply PAYG matters with no counter-exa
 does not. They are green, so removing them was not needed to close this item; decide whether to delete
 them or keep the scaffolding for a possible future re-enablement.
 
-### 21. Full `-p warp --lib` suite triage — Partial (23 failures left, all classified)
+### 21. Full `-p warp --lib` suite triage — Partial (5 failures left, 4 not ours)
 
 Found 17 Aug 2026 while closing item 20. Everything before this had only ever been run **filtered**,
-which hid the true state. `cargo test -p warp --lib --features gui` (whole suite, ~6146 tests):
+which hid the true state. `cargo test -p warp --lib --features gui` (whole suite, ~6179 tests):
 
 | Run | Result |
 |-----|--------|
 | Baseline (HEAD + working tree) | 44 failed = item 20's 18 + 26 others |
 | After item 20 | 29 failed |
-| After this pass | **6123 passed, 23 failed** |
+| 17 Aug pass | 23 failed |
+| 17 Aug, later | 10 failed |
+| 18 Aug (this pass) | **6145 passed, 5 failed, 29 ignored in 107.5 s** |
 
-Note: item 14 declared `terminal::input::tests::*` green on 16 Aug from a 128-test filtered run — the
-full suite shows 4 of them failing. Filtered runs are not evidence about this suite.
+Standing rule, earned here: a filtered run is never evidence about this suite. Item 14 declared
+`terminal::input::tests::*` green on 16 Aug from a 128-test filtered run; the full suite showed 4 of
+them failing.
 
-#### Fixed this pass (4)
+Caveat on every row: the tree also carries a second, still-active session's uncommitted work, so the
+failure *set* moves between runs even when this item does nothing.
 
-- **`themes::bundled_themes` — a real shipped bug, not a test problem.**
-  [pink-city.yaml](../../app/assets/bundled/themes/warp-defaults/pink-city.yaml), added by `12fb942`,
-  was the only bundled theme using `details: !custom`. The workspace pins `serde_yaml = "0.8"`, which
-  does not read YAML tags for externally-tagged enums — it takes the map's first key as the variant,
-  hence `unknown variant main_text_opacity`. The theme would fail to load in the app, so this was never
-  only a test failure. Its ten opacities are byte-identical to both `DARKER_DETAILS` and
-  `LIGHTER_DETAILS` ([color.rs](../../crates/warp_core/src/ui/theme/color.rs)), so `details: lighter`
-  parses, matches every other light theme, and changes no rendered value.
-- **`uri::test_settings_section_for_simple_subpage`** — [uri/mod.rs](../../app/src/uri/mod.rs) maps
-  `"billing_and_usage" => None` on purpose; the test still expected `Some(SettingsSection::Account)`.
-- **`tracing::native::traces_endpoint_rejects_remote_https`** — test bug from the 15 Aug loopback
-  hardening: `traces_endpoint("https://example.com")` has no port, so the missing-port check fires
-  before the loopback check and the error never contains `"loopback"`. Gave the URL an explicit port.
-  Its sibling `..._rejects_remote_http` asserts only `is_err()`, so it passes for the same wrong
-  reason — left green, but it is not testing what its name says.
-- **`prompt_alert::test_server_out_of_credits_maps_to_request_limit_reached`** — item 20's class, but
-  it mattered more than a stale number. `state_from_server_availability` refines `OutOfCredits` /
-  `Unknown` / `None` through `has_any_ai_remaining`, which the strip hard-wired to `true`, so the state
-  is `NoAlert`. Keeping `RequestLimitReached` would have asserted a paywall: `does_alert_block_ai_requests`
-  treats it as blocking, so a dead hosted quota would block local AI. Renamed to `..._maps_to_no_alert`.
-  Consequence: `out_of_credits_presentation` and the `RequestLimitReached` arm are now unreachable via
-  the server path. Not deleted — decide separately.
+#### Root causes, all read out of the code rather than inferred from symptoms
 
-#### A. Child-process spawn is blocked by a job object (8) — environment, not fork drift
+- **Child-process spawn under a job object (8 tests).** `CreateProcess` rejects
+  `CREATE_BREAKAWAY_FROM_JOB` with `ERROR_ACCESS_DENIED` when the caller is in a job object lacking
+  `JOB_OBJECT_LIMIT_BREAKAWAY_OK`. [blocking.rs](../../crates/command/src/blocking.rs) never got the
+  `not(feature = "test-util")` guard that [async.rs](../../crates/command/src/async.rs) already had,
+  so every test-binary spawn failed. Warp *does* assign itself a breakaway-permitting job in
+  [windows.rs](../../crates/command/src/windows.rs) `init`, but a nested job cannot widen the limits
+  of the job it is nested in, which is why that inner job does not save these.
+- **Shell history (4 tests).** `SessionInfo::new_for_test()` left `histfile` as `None`, which
+  `read_history_for_local_session` reads as "use the shell's real history files" — so the tests loaded
+  the developer's own PSReadLine history (16,904 lines / 7,501 unique, matching the observed
+  7,422 / 7,421 suggestion counts). The 17 Aug note claiming this was *not* live history bleeding in
+  was wrong. Fixed by pointing at a path that is never created; the run now logs
+  *"No history file found for shell pwsh, starting with empty history"*.
+- **`FeatureFlag::AgentView` is a cargo default (5 tests).** `agent_view` sits in `app/Cargo.toml`'s
+  `default` list (upstream, from `7d93fa4`), so it is always on under `cargo test`. Not a dropped
+  `ClearSelectedBlock` subscription (that event is declared and handled but never emitted, upstream
+  included) and not the emptied sign-up banner. Three block-selection tests plus
+  `test_viewport_iter_most_recent_at_bottom` and
+  `test_scroll_position_doesnt_change_when_block_finished` now take the file's existing
+  `override_enabled(false)` guard.
+- **Process-wide globals (3 tests).** `EXPERIMENT_LAYER_MAPPINGS` (insert-only `lazy_static`), the
+  telemetry queue, and `ChannelState::set_app_version` are all shared across the parallel schedule.
+  The first two now assert on what each test itself produced. The five `autoupdate` tests that write
+  `set_app_version` — one of them to `None`, which makes `should_update` return `No` instead of
+  `CanDownload` — are serialized with the repo's existing `#[serial_test::serial]` convention.
+- **Windows path presentation (1 test).**
+  `workspace::view::test_worktree_sidecar_hides_linked_worktrees_from_repo_list` compared menu labels
+  against a raw `TempDir` path. The sidecar renders through `warp_util::path::user_friendly_path`, and
+  on Windows the temp directory lives *under* the home directory, so the label is
+  `~\AppData\Local\Temp\...`. Invisible on macOS/Linux, where temp sits outside `$HOME`. The test now
+  builds its expectation with the same helper.
 
-All 7 `ai::agent_sdk::driver::environment::tests::*` real-git fixtures fail with
-`git should be runnable: Os { code: 5, kind: PermissionDenied }`, and
-`terminal::local_tty::windows::child::tests::test_event_is_emitted_when_child_exits` fails identically
-on `Command::new("cmd.exe").spawn()`.
+#### Production fix that came out of this (not just tests)
 
-Root cause: [blocking.rs](../../crates/command/src/blocking.rs) `Command::new` unconditionally ORs
-`CREATE_BREAKAWAY_FROM_JOB` on Windows. `CreateProcess` rejects that flag with `ERROR_ACCESS_DENIED`
-(os error 5) when the parent is inside a job object lacking `JOB_OBJECT_LIMIT_BREAKAWAY_OK`.
+The breakaway flag was never only a test problem: launched inside a job object that forbids breakaway,
+Warp could not spawn a shell at all. All spawn sites now try the flag first and retry once without it
+on `ERROR_ACCESS_DENIED`, warning once —
+[local_tty/windows/mod.rs](../../app/src/terminal/local_tty/windows/mod.rs) for the PTY, and all six
+entry points in `crates/command` through three shared helpers in `command::windows`. A shell that
+exits with Warp beats a window that can never open one.
 
-Verified, not assumed: the agent shell reports `IsProcessInJob == True`; the identical git fixture
-(bare origin with `uploadpack.allowFilter` + `allowAnySHA1InWant`, a commit hidden under
-`refs/pinned/base`, `file://C:\…` clone, then the exact `checkout_command_for` string through `sh -c`)
-**succeeds** when run directly; `sh.exe` is on `PATH`. Disabling the tool sandbox does not help.
+**Unverified:** the constrained-parent launch cannot be scripted here, and the `#[cfg(not(windows))]`
+branches cannot be compiled on this machine (only `x86_64-pc-windows-msvc` is installed).
 
-So these 8 cannot pass under any agent-run `cargo test` here, and will also fail for anyone whose
-shell is job-constrained. Decide: skip when spawning is unavailable, or accept them as
-"local terminal only". Do not chase them as fork bugs.
+#### The 5 that remain
 
-#### B. Order-dependent shared globals (2–3) — pass in isolation
+Four belong to the **second session**, whose `features.rs` change adds
+`ChannelState::filter_unsupported_features(&mut flags)`
+([state.rs](../../crates/warp_core/src/channel/state.rs)), globally stripping every
+`CLOUD_AGENT_FEATURES` flag when cloud agents are off, plus its in-flight theme-catalog work. Do not
+edit them — the input-mode default is that session's design decision:
 
-`experiments::tests::test_create_experiment_layer_mappings` (wants 2, sees 5) and
-`server::telemetry::tests::test_persist_events_doesnt_include_ugc_events` (wants 1, sees 9, with
-"More telemetry events in queue than the limit to persist" in the log) both **pass when run alone**.
-`EXPERIMENT_LAYER_MAPPINGS` ([experiments/mod.rs](../../app/src/experiments/mod.rs)) is a
-`lazy_static` `DashMap`, insert-only and never reset. `test_detect_secrets_no_regexes_configured` is
-the same class and fires intermittently depending on the parallel schedule.
+- `terminal::input::test_shell_input_prefix_with_no_udi` — `"!some text"` vs `"some text"`
+- `terminal::input::test_remove_ignored_suggestion_on_ai_query_execution` (`input_tests.rs:8510`)
+- `themes::theme::default_theme_config_contains_full_bundled_catalog` — 39 vs 43
+  (`theme_tests.rs:500`, its own dirty file)
+- `workspace::view::test_open_cloud_agent_setup_guide_action_opens_management_view_and_is_idempotent`
+  — item 4, explicitly in flight
 
-Fix the shared state, do not chase them as regressions.
+One is ours and still open:
 
-#### C. Deterministic and still untriaged (13)
+- `workspace::view::test_terminal_model_isnt_leaked` (`view_tests.rs:2315`) — **passes in isolation**,
+  fails in the parallel schedule, so it is cross-test retention rather than a leak on this path. The
+  `Session abandoned before bootstrap` line in the run is a red herring: it is emitted from
+  `Drop for TerminalView`, which is evidence the view *was* dropped.
 
-These reproduce in isolation, so they are genuine behavior mismatches, not pollution:
+#### Carried-forward notes
 
-- `terminal::input::tests::test_history_up{,_buffer_restoration,_multiline,_multiline_vim}` (4) —
-  the suggestion list holds 7422/7421 items where the fixture supplies 4/2. **Confirmed
-  deterministic**: identical counts across separate full runs, and `test_history_up` fails on its own.
-  So it is not the developer's live history bleeding in; some suggestion source is returning a large
-  fixed corpus instead of the fixture's history.
-- `terminal::view::tests::` `test_insert` (`"One"` vs `"None"`), `test_reinput_blocks` (`"pwd"` vs
-  `"sudo pwd"`), `test_insert_into_input`, `test_viewport_iter_most_recent_at_bottom`,
-  `test_scroll_position_doesnt_change_when_block_finished` (5). The first two both look like leading
-  characters being dropped — check for one shared cause before treating them as five bugs.
-- `workspace::view::tests::` `test_terminal_model_isnt_leaked`,
-  `test_worktree_sidecar_hides_linked_worktrees_from_repo_list`, and
-  `test_open_cloud_agent_setup_guide_action_opens_management_view_and_is_idempotent` (3). The last one
-  belongs to the in-flight `show_setup_guide_from_link` cloud-agent gating (item 4), not to this item.
-- `workspaces::user_workspaces::user_workspaces_tests::test_member_team_settings_win_over_workspace_settings` (1).
+- `tracing::native::traces_endpoint_rejects_remote_http` asserts only `is_err()`, so it passes for the
+  wrong reason — it is not testing what its name says.
+- `out_of_credits_presentation` and the `PromptAlertState::RequestLimitReached` arm are unreachable
+  via the server path after the billing strip. Not deleted; decide separately.
+- **Worth its own item:** with `AgentView` on — the shipping default — terminal scroll position is not
+  held when a long-running block finishes; it resets to `FollowsBottomOfMostRecentBlock`. Measured,
+  not inferred. Whether that is intended in agent view is a product question, separate from the
+  per-test guards.
 
-Verify: `cargo test -p warp --lib --features gui` (~75 s of test time after a warm build).
+Verify: `cargo test -p warp --lib --features gui` (~110 s of test time after a warm build; the build
+itself is ~13 min from cold).
 
 ## P4 — Docs, wiki, housekeeping
 

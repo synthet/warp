@@ -3823,8 +3823,16 @@ fn test_worktree_sidecar_hides_linked_worktrees_from_repo_list() {
                     .collect::<Vec<_>>()
             });
 
-            let main_repo_label = main_repo.to_string_lossy().to_string();
-            let linked_worktree_label = linked_worktree.to_string_lossy().to_string();
+            // The sidecar renders paths through `user_friendly_path`, which rewrites a
+            // leading home directory to `~`. On Windows the temp dir lives under the home
+            // directory, so comparing against the raw path would never match there.
+            let home = dirs::home_dir().map(|path| path.display().to_string());
+            let friendly = |path: &std::path::Path| {
+                warp_util::path::user_friendly_path(&path.to_string_lossy(), home.as_deref())
+                    .into_owned()
+            };
+            let main_repo_label = friendly(&main_repo);
+            let linked_worktree_label = friendly(&linked_worktree);
 
             assert!(labels.iter().any(|label| label == "Search repos"));
             assert!(labels.iter().any(|label| label == &main_repo_label));

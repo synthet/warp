@@ -3775,6 +3775,11 @@ fn test_find_bar_select() {
 #[test]
 fn test_viewport_iter_most_recent_at_bottom() {
     App::test((), |mut app| async move {
+        // The third item this asserts is the empty active block `simulate_block` leaves
+        // behind, whose height is exactly `0.`. `BlockListViewport`'s iterator skips
+        // zero-height entries while `AgentView` is on (see `block_list_viewport.rs`), so
+        // the flag has to be off for the iterator to yield it.
+        let _agent_view = FeatureFlag::AgentView.override_enabled(false);
         initialize_app_for_terminal_view(&mut app);
 
         let terminal = add_window_with_terminal(&mut app, None);
@@ -5926,6 +5931,11 @@ fn test_scroll_position_doesnt_change_when_block_finished() {
     use futures_lite::StreamExt;
 
     App::test((), |mut app| async move {
+        // This asserts terminal-mode scroll semantics. With `AgentView` on the viewport
+        // iterator drops the zero-height entries around the finishing block, which changes
+        // the content height and sends the scroll position back to
+        // `FollowsBottomOfMostRecentBlock` instead of holding where the user scrolled to.
+        let _agent_view = FeatureFlag::AgentView.override_enabled(false);
         initialize_app_for_terminal_view(&mut app);
         let terminal = add_window_with_terminal(&mut app, None);
 
