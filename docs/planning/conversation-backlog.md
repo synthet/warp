@@ -345,6 +345,30 @@ looking for a regression.
 
 ## P4 — Docs, wiki, housekeeping
 
+### 23. Nothing here has ever run a workspace-wide build — Partial
+
+Found 18 Aug 2026 after closing item 21. `cargo check --workspace --exclude command-signatures-v2
+--all-targets` had never been run in this fork. The first attempt found `crates/integration` had not
+compiled since `2aaba07`: the commercial strip removed `SettingsSection::Referrals` and left
+`session_restoration.rs` asserting on it. Fixed in `94c292a` by pointing the fixture at `Privacy`
+rather than asserting the fallback, which would have been vacuous -- `from_str` failure resolves to
+`Account`, the `#[default]`, which is what the pane shows with no restoration at all.
+
+The workspace now checks clean (0 errors, 43.5 s). Four dead-code warnings remain, all pre-existing:
+`check_installed`, `set_logged_out_phase`, `post_logout_authentication_started`, and the `PostLogout`
+variant. Those belong with items 12-13.
+
+Still open, and the reason this went unnoticed for so long:
+
+- **`./script/presubmit` cannot run on this machine.** It needs `cargo nextest`, `wgslfmt`, and
+  `clang-format`; none are installed. Until they are, "presubmit passes" is not a claim anyone here
+  can make, and the routine `-p warp --lib` command does not compile `crates/integration` at all.
+- **`command-signatures-v2` cannot build either** -- its build script shells out to yarn/node. Both
+  `presubmit` and `CLAUDE.md` already exclude it by name, so exclude it in any workspace command.
+- **`crates/integration` still has not been *run*.** It is a GUI harness; `94c292a` is compile-verified
+  only. It also carries ~70 unguarded `FeatureFlag::*.set_enabled()` calls of the kind that caused the
+  item 21 failures, left alone because it is a separate binary and nothing here can exercise it.
+
 ### 16. Copy `docs/zed-warp/` into the Synth Zed checkout — Open
 
 Keep the byte-identical mirror. Sibling path named in docs: `D:\Projects\zed\docs\zed-warp`.
