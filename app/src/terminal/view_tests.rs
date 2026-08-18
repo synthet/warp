@@ -3255,6 +3255,11 @@ fn read_from_clipboard(ctx: &mut ViewContext<TerminalView>) -> String {
 fn test_insert() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
+        // This test distinguishes shell mode from agent mode by the AI input model,
+        // so the flag must be off: with `AgentView` enabled, blocks stay selected in
+        // terminal mode too (they are attachable as agent context) and shell mode
+        // would never clear.
+        let _agent_view = FeatureFlag::AgentView.override_enabled(false);
         let terminal = add_window_with_terminal(&mut app, None);
 
         let select_text = |view: &mut TerminalView, ctx: &mut ViewContext<TerminalView>| {
@@ -3376,6 +3381,9 @@ fn test_insert_into_input() {
     // (where we don't want UI updates making the test brittle, due to hardcoded mouse positions).
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
+        // Inserting into the input only clears the block selection when `AgentView`
+        // is off; with it on the selection is preserved as agent context.
+        let _agent_view = FeatureFlag::AgentView.override_enabled(false);
         let terminal = add_window_with_terminal(&mut app, None);
 
         // TODO: Potentially explore if we can re-use helpers from `input_test.rs` (`select_first_command_line_of_block` and `insert_dummy_block`).
@@ -4643,6 +4651,10 @@ fn test_copy_blocks() {
 fn test_reinput_blocks() {
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
+        // Re-inputting focuses the input, which only clears the block selection when
+        // `AgentView` is off. With it on the first selection survives, so the second
+        // `toggle` below would deselect and `reinput_commands` would do nothing.
+        let _agent_view = FeatureFlag::AgentView.override_enabled(false);
 
         let terminal = add_window_with_terminal(&mut app, None);
         terminal.update(&mut app, |view, ctx| {

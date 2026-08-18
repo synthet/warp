@@ -2085,8 +2085,13 @@ fn test_teamless_user_falls_back_to_workspace_settings() {
     })
 }
 
+/// Upstream also asserted here that a member team's `llm_settings.enabled = false`
+/// beat the workspace's `true`. Synth Warp is local-first: `is_custom_llm_enabled_for_team`
+/// is unconditionally `true`, so no team policy can switch custom LLMs off and that
+/// half of the test can no longer reach an answer. What remains live is the filtering:
+/// a team the user is merely a member of must survive into `sole_team()`.
 #[test]
-fn test_member_team_settings_win_over_workspace_settings() {
+fn test_member_team_survives_workspace_filtering() {
     App::test((), |mut app| async move {
         initialize_window_team_test_app(&mut app, vec![]);
         register_ai_usage_model(&mut app);
@@ -2103,10 +2108,8 @@ fn test_member_team_settings_win_over_workspace_settings() {
             let user_workspaces = UserWorkspaces::as_ref(ctx);
             let team = user_workspaces.sole_team();
             assert!(team.is_some(), "the member team should survive filtering");
-            assert!(
-                !user_workspaces.is_custom_llm_enabled_for_team(team),
-                "the team's own settings should win when the user has a team"
-            );
+            // Not gated on team policy any more: the fork always permits custom LLMs.
+            assert!(user_workspaces.is_custom_llm_enabled_for_team(team));
         });
     })
 }

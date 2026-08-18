@@ -48,10 +48,24 @@ fn test_persist_events_doesnt_include_ugc_events() {
                 serde_json::from_reader(File::open(file_path).expect("Failed to open file"))
                     .expect("Failed to parse file");
 
-            assert_eq!(file_content.len(), 1);
-
-            let track = file_content[0].unwrap_track();
-            assert_eq!(track.event, "non UGC event name");
+            // `record_event` feeds a process-wide queue that other tests write to as
+            // well, so a whole-suite run flushes their events here too. Assert on the
+            // two events this test recorded rather than on the total.
+            let event_names: Vec<&str> = file_content
+                .iter()
+                .filter_map(|message| match message {
+                    RudderBatchMessage::Track(track) => Some(track.event.as_str()),
+                    _ => None,
+                })
+                .collect();
+            assert!(
+                event_names.contains(&"non UGC event name"),
+                "the non-UGC event should be persisted, got {event_names:?}"
+            );
+            assert!(
+                !event_names.contains(&"UGC event name"),
+                "the UGC event must never be persisted, got {event_names:?}"
+            );
         },
     );
 }
@@ -142,13 +156,4 @@ fn flush_persisted_events_does_not_http_when_remote_export_disabled() {
         !requested.load(std::sync::atomic::Ordering::SeqCst),
         "persisted Rudderstack flush must not HTTP when remote export is disabled"
     );
-}
-
-impl RudderBatchMessage {
-    fn unwrap_track(&self) -> &Track {
-        match self {
-            RudderBatchMessage::Track(track) => track,
-            _ => panic!("Expected a track event"),
-        }
-    }
 }

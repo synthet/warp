@@ -80,8 +80,16 @@ impl Command {
             // We need to set the `CREATE_BREAKAWAY_FROM_JOB` flag to avoid assigning
             // the process to the same Job Object as the Warp process, otherwise the
             // process will be killed when the Warp process is killed.
+            //
+            // Not under `test-util`: a test binary is itself often inside a job object
+            // that does not permit breakaway, and `CreateProcess` then rejects the flag
+            // and fails the whole spawn with `ERROR_ACCESS_DENIED`. `async::Command`
+            // already excludes it the same way.
+            #[cfg(not(feature = "test-util"))]
             let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0
                 | windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0;
+            #[cfg(feature = "test-util")]
+            let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0;
             inner.creation_flags(flags);
         }
         Self {

@@ -149,7 +149,9 @@ fn test_create_experiment_layer_mappings() {
     let layers = vec![&*TEST_LAYER];
     create_experiment_layer_mappings(&layers);
 
-    assert_eq!(EXPERIMENT_LAYER_MAPPINGS.len(), 2);
+    // `EXPERIMENT_LAYER_MAPPINGS` is a process-wide `lazy_static` that is only ever
+    // inserted into, so its total length depends on which other tests have already
+    // run. Assert the mappings this call is responsible for instead.
     assert_eq!(
         EXPERIMENT_LAYER_MAPPINGS
             .get(TestExperiment::name())

@@ -1741,11 +1741,22 @@ pub mod testing {
             #[cfg(windows)]
             let shell_type = ShellType::PowerShell;
 
+            // Hermetic by default. `read_history_for_local_session` treats `None` as
+            // "use the shell's real history files", which on Windows is the developer's
+            // own PSReadLine history — tests would then see thousands of their commands
+            // instead of the ones they seeded. Point at a path that is never created;
+            // the loader finds nothing and starts with empty history. Tests that want a
+            // history file call `with_histfile` explicitly.
+            let histfile = std::env::temp_dir()
+                .join("warp-test-nonexistent-histfile")
+                .display()
+                .to_string();
+
             Self {
                 session_id: SessionId::from(0),
                 shell: Shell::new(shell_type, None, None, Default::default(), None),
                 launch_data: None,
-                histfile: None,
+                histfile: Some(histfile),
                 user: "local:user".to_owned(),
                 hostname: "local:host".to_owned(),
                 session_type: BootstrapSessionType::Local,
