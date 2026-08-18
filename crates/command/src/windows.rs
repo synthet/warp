@@ -111,6 +111,40 @@ impl JobObject {
     }
 }
 
+/// Whether `flags` asks `CreateProcess` to break the new process out of this
+/// process's job object.
+pub(crate) fn has_breakaway(flags: u32) -> bool {
+    flags & windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0 != 0
+}
+
+/// Whether a spawn failed because `CREATE_BREAKAWAY_FROM_JOB` was refused.
+///
+/// Warp puts itself in a job object that permits breakaway (see [`init`]), but a
+/// nested job cannot widen the limits of the job it is nested in. Launched from a
+/// more restrictive parent, `CreateProcess` rejects the flag outright and the spawn
+/// fails with `ERROR_ACCESS_DENIED`, so no command runs at all. Callers retry once
+/// without the flag: a child that exits with Warp is a much smaller problem than a
+/// child that never starts.
+pub(crate) fn is_breakaway_denied<T>(result: &std::io::Result<T>) -> bool {
+    const ACCESS_DENIED: i32 = windows::Win32::Foundation::ERROR_ACCESS_DENIED.0 as i32;
+
+    result.as_ref().err().and_then(std::io::Error::raw_os_error) == Some(ACCESS_DENIED)
+}
+
+/// Clears `CREATE_BREAKAWAY_FROM_JOB` from `flags`, warning the first time it happens.
+pub(crate) fn without_breakaway(flags: u32) -> u32 {
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        log::warn!(
+            "CreateProcess denied CREATE_BREAKAWAY_FROM_JOB: Warp is inside a job object \
+             that forbids breakaway. Retrying without it; spawned processes will exit \
+             with Warp."
+        );
+    });
+
+    flags & !windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0
+}
+
 pub fn init() {
     if let Err(e) = JobObject::new()
         .kill_children_on_close()

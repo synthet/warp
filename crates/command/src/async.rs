@@ -14,6 +14,10 @@ use async_process::Child;
 /// `CREATE_NO_WINDOW` flag to avoid a console window temporarily popping up.
 pub struct Command {
     pub(super) inner: async_process::Command,
+    /// The flags handed to `CreateProcess`, mirrored here because
+    /// [`async_process::Command`] does not expose them for reading.
+    #[cfg(windows)]
+    creation_flags: u32,
     stdin_is_default: bool,
     stdout_is_default: bool,
     stderr_is_default: bool,
@@ -98,7 +102,7 @@ impl Command {
     #[allow(unused_mut)]
     fn new_internal(mut inner: async_process::Command) -> Command {
         #[cfg(all(windows, not(feature = "test-util")))]
-        {
+        let creation_flags = {
             use async_process::windows::CommandExt;
             // We need to set the `CREATE_BREAKAWAY_FROM_JOB` flag to avoid assigning
             // the process to the same Job Object as the Warp process, otherwise the
@@ -106,9 +110,14 @@ impl Command {
             let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0
                 | windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0;
             inner.creation_flags(flags);
-        }
+            flags
+        };
+        #[cfg(all(windows, feature = "test-util"))]
+        let creation_flags = 0;
         Self {
             inner,
+            #[cfg(windows)]
+            creation_flags,
             stdin_is_default: true,
             stdout_is_default: true,
             stderr_is_default: true,
@@ -347,6 +356,69 @@ impl Command {
         self
     }
 
+    /// Runs `attempt`, retrying it once without `CREATE_BREAKAWAY_FROM_JOB` when the
+    /// spawn was refused because Warp sits in a job object that forbids breakaway.
+    /// See [`crate::windows::is_breakaway_denied`].
+    #[cfg(windows)]
+    fn retrying_without_breakaway<T>(
+        &mut self,
+        mut attempt: impl FnMut(&mut Self) -> io::Result<T>,
+    ) -> io::Result<T> {
+        let result = attempt(self);
+        if !self.drop_breakaway_after(&result) {
+            return result;
+        }
+        attempt(self)
+    }
+
+    #[cfg(not(windows))]
+    fn retrying_without_breakaway<T>(
+        &mut self,
+        attempt: impl FnOnce(&mut Self) -> io::Result<T>,
+    ) -> io::Result<T> {
+        attempt(self)
+    }
+
+    /// The awaiting counterpart of [`Self::retrying_without_breakaway`], for the
+    /// entry points that hand back a future instead of a [`Child`].
+    #[cfg(windows)]
+    async fn retrying_without_breakaway_async<T, F: Future<Output = io::Result<T>>>(
+        &mut self,
+        mut attempt: impl FnMut(&mut Self) -> F,
+    ) -> io::Result<T> {
+        let result = attempt(self).await;
+        if !self.drop_breakaway_after(&result) {
+            return result;
+        }
+        attempt(self).await
+    }
+
+    #[cfg(not(windows))]
+    async fn retrying_without_breakaway_async<T, F: Future<Output = io::Result<T>>>(
+        &mut self,
+        attempt: impl FnOnce(&mut Self) -> F,
+    ) -> io::Result<T> {
+        attempt(self).await
+    }
+
+    /// Whether `result` is a denied breakaway, clearing the flag if it is so that
+    /// the next attempt can succeed.
+    #[cfg(windows)]
+    fn drop_breakaway_after<T>(&mut self, result: &io::Result<T>) -> bool {
+        use async_process::windows::CommandExt as _;
+
+        if !crate::windows::has_breakaway(self.creation_flags)
+            || !crate::windows::is_breakaway_denied(result)
+        {
+            return false;
+        }
+
+        let flags = crate::windows::without_breakaway(self.creation_flags);
+        self.creation_flags = flags;
+        self.inner.creation_flags(flags);
+        true
+    }
+
     /// Executes the command and returns the [`Child`] handle to it.
     ///
     /// If not configured, stdin, stdout and stderr will be set to [`Stdio::null()`].
@@ -371,7 +443,7 @@ impl Command {
             self.inner.stderr(Stdio::null());
         }
 
-        self.inner.spawn()
+        self.retrying_without_breakaway(|command| command.inner.spawn())
     }
 
     /// Executes the command, waits for it to exit, and returns the exit status.
@@ -402,7 +474,7 @@ impl Command {
             self.inner.stderr(Stdio::null());
         }
 
-        self.inner.status()
+        self.retrying_without_breakaway_async(|command| command.inner.status())
     }
 
     /// Executes the command and collects its output.
@@ -433,6 +505,6 @@ impl Command {
             self.inner.stderr(Stdio::piped());
         }
 
-        self.inner.output()
+        self.retrying_without_breakaway_async(|command| command.inner.output())
     }
 }

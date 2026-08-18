@@ -18,14 +18,16 @@ pub use environment::get_user_and_system_env_variable;
 use thiserror::Error;
 use warp_errors::{report_error, report_if_error};
 use warpui::{AppContext, SingletonEntity};
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows::Win32::Foundation::{
+    CloseHandle, ERROR_ACCESS_DENIED, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT,
+};
 use windows::Win32::System::Console::{COORD, HPCON};
 use windows::Win32::System::Threading::{
     CREATE_BREAKAWAY_FROM_JOB, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
     EXTENDED_STARTUPINFO_PRESENT, PROCESS_CREATION_FLAGS, PROCESS_INFORMATION,
     STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW, TerminateProcess, WaitForSingleObject,
 };
-use windows::core::{HSTRING, PCWSTR, PWSTR};
+use windows::core::{HRESULT, HSTRING, PCWSTR, PWSTR};
 
 use super::event_loop::{PTY_TOKEN, SIGNALS_TOKEN};
 use super::shell::{DirectShellStarter, ShellStarter, WslShellStarter};
@@ -230,17 +232,16 @@ pub(super) fn spawn(
         })
         .map(|path| HSTRING::from(path.as_os_str()));
 
-    unsafe {
+    let base_creation_flags =
+        PROCESS_CREATION_FLAGS(0) | EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT;
+    let mut create_process = |creation_flags| unsafe {
         CreateProcessW(
             PCWSTR::null(), /* lpApplicationName */
             Some(PWSTR::from_raw(shell_command.as_ptr().cast_mut())),
             None,  /* lpProcessAttributes */
             None,  /* lpThreadAttributes */
             false, /* bInheritHandles */
-            PROCESS_CREATION_FLAGS(0)
-                | EXTENDED_STARTUPINFO_PRESENT
-                | CREATE_UNICODE_ENVIRONMENT
-                | CREATE_BREAKAWAY_FROM_JOB,
+            creation_flags,
             Some(environment_block.as_ptr() as *const std::ffi::c_void),
             start_directory
                 .as_ref()
@@ -249,11 +250,27 @@ pub(super) fn spawn(
             &startup_info.StartupInfo as *const STARTUPINFOW,
             &mut process_information,
         )
-        .map_err(|error| {
-            let detail = shell_starter.shell_detail();
-            PtySpawnError::CreateShellProcessFailed { detail, error }
-        })?;
+    };
+
+    // `CREATE_BREAKAWAY_FROM_JOB` keeps the shell out of Warp's job object, so it
+    // survives Warp exiting. When Warp is itself launched inside a job object that
+    // forbids breakaway, `CreateProcess` refuses the flag with `ERROR_ACCESS_DENIED`
+    // and no shell starts at all. Retry without it: a shell that dies with Warp is
+    // far better than a window that can never open one.
+    let mut spawned = create_process(base_creation_flags | CREATE_BREAKAWAY_FROM_JOB);
+    if spawned
+        .as_ref()
+        .is_err_and(|error| error.code() == HRESULT::from_win32(ERROR_ACCESS_DENIED.0))
+    {
+        log::warn!(
+            "CreateProcess denied CREATE_BREAKAWAY_FROM_JOB for the shell; retrying without it"
+        );
+        spawned = create_process(base_creation_flags);
     }
+    spawned.map_err(|error| {
+        let detail = shell_starter.shell_detail();
+        PtySpawnError::CreateShellProcessFailed { detail, error }
+    })?;
 
     let _ = unsafe { conpty_api.release(pty_handle) };
 

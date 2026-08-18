@@ -19,6 +19,10 @@ use {super::windows::JobObject, std::os::windows::io::AsRawHandle};
 #[derive(Debug)]
 pub struct Command {
     pub(super) inner: std::process::Command,
+    /// The flags handed to `CreateProcess`, mirrored here because
+    /// [`std::process::Command`] does not expose them for reading.
+    #[cfg(windows)]
+    creation_flags: u32,
     #[cfg(windows)]
     kill_on_parent_process_close: bool,
     stdin_is_default: bool,
@@ -75,7 +79,7 @@ impl Command {
         let mut inner = std::process::Command::new(program);
 
         #[cfg(windows)]
-        {
+        let creation_flags = {
             use std::os::windows::process::CommandExt;
             // We need to set the `CREATE_BREAKAWAY_FROM_JOB` flag to avoid assigning
             // the process to the same Job Object as the Warp process, otherwise the
@@ -91,9 +95,12 @@ impl Command {
             #[cfg(feature = "test-util")]
             let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0;
             inner.creation_flags(flags);
-        }
+            flags
+        };
         Self {
             inner,
+            #[cfg(windows)]
+            creation_flags,
             #[cfg(windows)]
             kill_on_parent_process_close: false,
             stdin_is_default: true,
@@ -112,6 +119,7 @@ impl Command {
     pub fn creation_flags(&mut self, flags: u32) -> &mut Self {
         use std::os::windows::process::CommandExt;
         let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0 | flags;
+        self.creation_flags = flags;
         self.inner.creation_flags(flags);
         self
     }
@@ -488,6 +496,37 @@ impl Command {
         self
     }
 
+    /// Runs `attempt`, retrying it once without `CREATE_BREAKAWAY_FROM_JOB` when the
+    /// spawn was refused because Warp sits in a job object that forbids breakaway.
+    /// See [`crate::windows::is_breakaway_denied`].
+    #[cfg(windows)]
+    fn retrying_without_breakaway<T>(
+        &mut self,
+        mut attempt: impl FnMut(&mut Self) -> io::Result<T>,
+    ) -> io::Result<T> {
+        use std::os::windows::process::CommandExt as _;
+
+        let result = attempt(self);
+        if !crate::windows::has_breakaway(self.creation_flags)
+            || !crate::windows::is_breakaway_denied(&result)
+        {
+            return result;
+        }
+
+        let flags = crate::windows::without_breakaway(self.creation_flags);
+        self.creation_flags = flags;
+        self.inner.creation_flags(flags);
+        attempt(self)
+    }
+
+    #[cfg(not(windows))]
+    fn retrying_without_breakaway<T>(
+        &mut self,
+        attempt: impl FnOnce(&mut Self) -> io::Result<T>,
+    ) -> io::Result<T> {
+        attempt(self)
+    }
+
     /// Executes the command as a child process, returning a handle to it.
     ///
     /// By default, stdin, stdout and stderr are set to null (diverging from
@@ -515,7 +554,7 @@ impl Command {
             self.inner.stderr(Stdio::null());
         }
 
-        let child = self.inner.spawn();
+        let child = self.retrying_without_breakaway(|command| command.inner.spawn());
 
         #[cfg(windows)]
         if self.kill_on_parent_process_close
@@ -569,7 +608,7 @@ impl Command {
             self.inner.stderr(Stdio::piped());
         }
 
-        self.inner.output()
+        self.retrying_without_breakaway(|command| command.inner.output())
     }
 
     /// Executes a command as a child process, waiting for it to finish and
@@ -603,7 +642,7 @@ impl Command {
             self.inner.stderr(Stdio::null());
         }
 
-        self.inner.status()
+        self.retrying_without_breakaway(|command| command.inner.status())
     }
 
     /// Returns the path to the program that was given to [`std::process::Command::new`].
