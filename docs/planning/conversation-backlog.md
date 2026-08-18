@@ -201,7 +201,7 @@ pass with no setup at all — so they now imply PAYG matters with no counter-exa
 does not. They are green, so removing them was not needed to close this item; decide whether to delete
 them or keep the scaffolding for a possible future re-enablement.
 
-### 21. Full `-p warp --lib` suite triage — Partial (5 failures left, 4 not ours)
+### 21. Full `-p warp --lib` suite triage — Done for this fork (1 failure left, not ours)
 
 Found 17 Aug 2026 while closing item 20. Everything before this had only ever been run **filtered**,
 which hid the true state. `cargo test -p warp --lib --features gui` (whole suite, ~6179 tests):
@@ -212,7 +212,8 @@ which hid the true state. `cargo test -p warp --lib --features gui` (whole suite
 | After item 20 | 29 failed |
 | 17 Aug pass | 23 failed |
 | 17 Aug, later | 10 failed |
-| 18 Aug (this pass) | **6145 passed, 5 failed, 29 ignored in 107.5 s** |
+| 18 Aug | 6145 passed, 5 failed |
+| 18 Aug (this pass) | **6151 passed, 1 failed, 29 ignored in 62.8 s**, reproduced twice |
 
 Standing rule, earned here: a filtered run is never evidence about this suite. Item 14 declared
 `terminal::input::tests::*` green on 16 Aug from a 128-test filtered run; the full suite showed 4 of
@@ -267,27 +268,37 @@ exits with Warp beats a window that can never open one.
 **Unverified:** the constrained-parent launch cannot be scripted here, and the `#[cfg(not(windows))]`
 branches cannot be compiled on this machine (only `x86_64-pc-windows-msvc` is installed).
 
-#### The 5 that remain
+#### Unguarded process-wide state was the whole story
 
-Four belong to the **second session**, whose `features.rs` change adds
-`ChannelState::filter_unsupported_features(&mut flags)`
-([state.rs](../../crates/warp_core/src/channel/state.rs)), globally stripping every
-`CLOUD_AGENT_FEATURES` flag when cloud agents are off, plus its in-flight theme-catalog work. Do not
-edit them — the input-mode default is that session's design decision:
+The last fork-owned failure, `workspace::view::test_terminal_model_isnt_leaked`, bisected down to a
+single-test repro: run
+`terminal::view::tests::agent_footer_updates_chip_groups_when_side_assignment_changes` before it and
+it fails. That test called `FeatureFlag::AgentView.set_enabled(true)` -- the **global** setter, with
+no restore -- rather than the scoped `override_enabled` guard the rest of the file uses. `warp_features`
+documents this -- "Tests should create overrides early on and allow them to be dropped
+automatically" -- and even panics on `set_enabled` under `cfg(test)`, but that `cfg` is
+evaluated inside `warp_features` itself, so it never fires for `warp`'s test binary.
 
-- `terminal::input::test_shell_input_prefix_with_no_udi` — `"!some text"` vs `"some text"`
-- `terminal::input::test_remove_ignored_suggestion_on_ai_query_execution` (`input_tests.rs:8510`)
-- `themes::theme::default_theme_config_contains_full_bundled_catalog` — 39 vs 43
-  (`theme_tests.rs:500`, its own dirty file)
-- `workspace::view::test_open_cloud_agent_setup_guide_action_opens_management_view_and_is_idempotent`
-  — item 4, explicitly in flight
+There were 27 such calls across four unit-test files (`view_tests.rs`, `blocks_tests.rs`,
+`available_shells_tests.rs`, `use_agent_footer/mod_tests.rs`), which is why skipping
+`terminal::view::` and `terminal::model::` was each independently enough to make the leak test pass:
+both modules contain writers. All 27 are now scoped guards.
 
-One is ours and still open:
+The secret regexes are the same shape. `set_user_and_enterprise_secret_regexes` writes a process-wide
+global that nothing resets; `secret_redaction_tests.rs` already serialized its writers with
+`#[serial]`, but `secrets_tests.rs` and `grep_tests.rs` did not, and
+`test_detect_secrets_no_regexes_configured` *reads* the global and asserts it is empty -- which
+serialization alone cannot guarantee, since whichever writer ran last leaves its regexes behind. The
+writers joined the existing `#[serial]` group and the reader now clears the global itself.
 
-- `workspace::view::test_terminal_model_isnt_leaked` (`view_tests.rs:2315`) — **passes in isolation**,
-  fails in the parallel schedule, so it is cross-test retention rather than a leak on this path. The
-  `Session abandoned before bootstrap` line in the run is a red herring: it is emitted from
-  `Drop for TerminalView`, which is evidence the view *was* dropped.
+#### The 1 that remains
+
+`workspace::view::test_open_cloud_agent_setup_guide_action_opens_management_view_and_is_idempotent`
+belongs to the **second session** (item 4, explicitly in flight). Do not edit it.
+
+Its other four failures from earlier in the day cleared on their own as that session kept working:
+the `terminal::input` mode defaults from `ChannelState::filter_unsupported_features`
+([state.rs](../../crates/warp_core/src/channel/state.rs)) and the theme-catalog counts.
 
 #### Carried-forward notes
 
@@ -300,8 +311,15 @@ One is ours and still open:
   not inferred. Whether that is intended in agent view is a product question, separate from the
   per-test guards.
 
-Verify: `cargo test -p warp --lib --features gui` (~110 s of test time after a warm build; the build
-itself is ~13 min from cold).
+Verify: `cargo test -p warp --lib --features gui` (~63 s of test time after a warm build; the build
+itself is ~2-13 min depending on what changed). Build with `--no-run` first when running from an
+agent session -- a combined build-and-run exceeds the foreground command timeout.
+
+Standing lesson from this item, worth applying beyond it: every remaining failure traced to
+process-wide state that one test wrote and no test reset -- feature flags, secret regexes,
+`ChannelState::set_app_version`, `EXPERIMENT_LAYER_MAPPINGS`, the telemetry queue, and the shell
+history file. When a test in this suite fails only in the full run, look for a global before
+looking for a regression.
 
 ## P4 — Docs, wiki, housekeeping
 

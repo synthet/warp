@@ -1,8 +1,10 @@
 use super::*;
 use crate::terminal::model::secrets::regexes::FIREBASE_AUTH_DOMAIN;
 use crate::terminal::shell::ShellType;
+use serial_test::serial;
 
 #[test]
+#[serial]
 fn test_create_redacted_grep_error_event() {
     crate::terminal::model::set_user_and_enterprise_secret_regexes(
         [&regex::Regex::new(FIREBASE_AUTH_DOMAIN).expect("Should be able to construct regex")],
