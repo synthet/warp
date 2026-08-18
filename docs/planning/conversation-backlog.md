@@ -56,6 +56,28 @@ The header switch fired `ToggleGlobalAI` but sub-toggles stayed grey because AI 
 
 Also: `sync_to_cloud` on `is_any_ai_enabled` still tries Drive and logs `Unable to create cloud preferences due to unset personal drive`. Stop cloud-syncing that setting on OSS.
 
+### 22. `agent_view` is a cargo default while the fork strips cloud — Open
+
+Found 18 Aug 2026 while closing item 21. `agent_view` sits in `app/Cargo.toml`'s `default` feature
+list (upstream, from `7d93fa4`) and is not in `CLOUD_AGENT_FEATURES`, so the fork's cloud strip leaves
+it on. Five suite failures traced to it. Two separate questions came out of that:
+
+**Product:** should agent view be on by default in a fork that has no cloud agent? It is the flag that
+decides whether blocks stay selected as agent context, whether the viewport keeps zero-height entries,
+and which input mode a session starts in. Deciding this is upstream of item 4, which is choosing what
+to do with the Warp Agent settings page.
+
+**Behavior, measured not inferred:** with `agent_view` on -- the shipping default -- terminal scroll
+position is *not* held when a long-running block finishes. It resets to
+`FollowsBottomOfMostRecentBlock` instead of staying where the user scrolled to.
+`terminal::view::test_scroll_position_doesnt_change_when_block_finished` asserts the opposite and only
+passes with the flag forced off. The likely mechanism is `BlockListViewport`'s iterator skipping
+zero-height entries while the flag is on ([block_list_viewport.rs](../../app/src/terminal/block_list_viewport.rs)),
+which changes content height as a block finishes; the exact reset path was not confirmed.
+
+If agent view stays on, that scroll behavior is a real user-visible defect and the test is right. If it
+goes off by default here, both resolve at once and the per-test guards added in `cf7f535` can come out.
+
 ### 5. Built-in agent still has no local inference — Open
 
 Documented in [FAQ.md](../../FAQ.md) and [architecture/synth-fork.md](../architecture/synth-fork.md): ungating the UI does **not** make Warp Agent work. Keys are relayed through `server_root_url`. Out of the box, send fails. Options (pick one later; do not do all):
@@ -380,6 +402,7 @@ Do **not** embed WarpUI in GPUI, copy AGPL into Zed, or stand up a third session
 4. Warp Agent page decision + stop Drive sync of AI toggle (item 4)
 5. LocalBackend Phase 1 + LocalProfile (items 8–10)
 6. ~~Link/menu retarget (items 6, 18)~~ — done
-7. Finish the full-suite triage (item 21) — 23 left, all classified; group C is the real work
-8. Overlay warning hygiene + unused-code verify (items 12–13)
-8. Hybrid Level 1 Windows editor + `warposs://` when the daily driver needs it (P5)
+7. ~~Finish the full-suite triage (item 21)~~ — done for this fork; 1 failure left and it is item 4's
+8. Decide whether `agent_view` stays a default here (item 22) — gates item 4 and a real scroll defect
+9. Overlay warning hygiene + unused-code verify (items 12–13)
+10. Hybrid Level 1 Windows editor + `warposs://` when the daily driver needs it (P5)
