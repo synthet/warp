@@ -1066,13 +1066,10 @@ impl TeamsPageView {
         }
     }
 
-    fn should_show_reload_credits_confirmation(&self, ctx: &AppContext) -> bool {
+    /// Always false on Synth Warp: bonus credits are a hosted billing concept that the
+    /// commercial strip removed, so leaving a team never warns about reloading them.
+    fn should_show_reload_credits_confirmation(&self, _ctx: &AppContext) -> bool {
         false
-            && self
-                .ai_request_usage_model
-                .as_ref(ctx)
-                .total_user_interactive_bonus_credits_remaining()
-                > 0
     }
 
     fn show_team_action_confirmation(

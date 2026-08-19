@@ -237,7 +237,7 @@ impl AgentMessageBar {
             }
         });
 
-        let message_bar = Self {
+        Self {
             agent_view_controller,
             ephemeral_message_model,
             shortcut_view_model,
@@ -250,8 +250,7 @@ impl AgentMessageBar {
             terminal_model,
             mouse_states: AgentMessageBarMouseStates::default(),
             figma_detected: false,
-        };
-        message_bar
+        }
     }
 }
 
