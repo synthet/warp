@@ -129,7 +129,9 @@ $AdditionalLicenses = @(
     @{ Name = 'Claude API Skill'; License = 'Apache-2.0'; Path = 'resources\bundled\skills\claude-api\LICENSE.txt' },
     @{ Name = 'rudder-sdk-rust'; License = 'MIT'; Path = 'app\src\server\telemetry\LICENSE-RUDDER-SDK-RUST.txt' },
     @{ Name = 'Windows Terminal'; License = 'MIT'; Path = 'app\assets\windows\LICENSE-WINDOWS-TERMINAL' },
-    @{ Name = 'GitHub Desktop'; License = 'MIT'; Path = 'app\src\code_review\GITHUB-DESKTOP-LICENSE' }
+    @{ Name = 'GitHub Desktop'; License = 'MIT'; Path = 'app\src\code_review\GITHUB-DESKTOP-LICENSE' },
+    @{ Name = 'Bundled themes'; License = 'MIT'; Path = 'app\assets\bundled\themes\LICENSE-MIT' },
+    @{ Name = 'Bundled themes'; License = 'Apache-2.0'; Path = 'app\assets\bundled\themes\LICENSE-APACHE-2.0' }
 )
 # Windows-only components:
 $AdditionalLicenses += @(

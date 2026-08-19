@@ -1,8 +1,36 @@
+use std::collections::HashSet;
+
 use settings_value::SettingsValue as _;
 
 use super::*;
 use crate::user_config;
 use crate::util::color::OPAQUE;
+
+#[test]
+fn referral_themes_use_plain_appearance_names() {
+    let referral_themes = [
+        (
+            ThemeKind::SentReferralReward,
+            sent_referral_reward(),
+            include_str!("../../assets/bundled/themes/warp-defaults/sent-referral-reward.yaml"),
+            "Referral Dark",
+        ),
+        (
+            ThemeKind::ReceivedReferralReward,
+            received_referral_reward(),
+            include_str!("../../assets/bundled/themes/warp-defaults/received-referral-reward.yaml"),
+            "Referral Light",
+        ),
+    ];
+
+    for (kind, constructed_theme, yaml, expected_name) in referral_themes {
+        let yaml_theme = serde_yaml::from_str::<WarpTheme>(yaml).unwrap();
+
+        assert_eq!(kind.to_string(), expected_name);
+        assert_eq!(constructed_theme.name().as_deref(), Some(expected_name));
+        assert_eq!(yaml_theme.name().as_deref(), Some(expected_name));
+    }
+}
 
 fn custom_theme_json(path: &str) -> serde_json::Value {
     serde_json::json!({
@@ -488,5 +516,18 @@ fn in_memory_theme_generation_test() {
 
 #[test]
 fn default_theme_config_contains_full_bundled_catalog() {
-    assert_eq!(WarpThemeConfig::new().theme_items().count(), 43);
+    let theme_config = WarpThemeConfig::new();
+    let display_names = theme_config
+        .theme_items()
+        .map(|(kind, _)| kind.to_string())
+        .collect::<Vec<_>>();
+    let unique_display_names = display_names.iter().collect::<HashSet<_>>();
+
+    assert_eq!(display_names.len(), 37);
+    assert_eq!(unique_display_names.len(), display_names.len());
+    assert!(display_names.iter().all(|name| {
+        !name.contains("Synthet") && !name.contains("(Popular)") && !name.contains("(Zed)")
+    }));
+    assert!(!display_names.iter().any(|name| name == "Monokai Pro"));
+    assert!(!display_names.iter().any(|name| name == "One Dark Pro"));
 }
