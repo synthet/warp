@@ -137,23 +137,39 @@ Inventory remaining `send_graphql_request` call sites (referral, workspace/billi
 
 ## P3 — Log / compile / runtime hygiene
 
-### 12. Finish unused-code warning quieting — Verify
+### 12. Finish unused-code warning quieting — Done
 
-Mechanical unused-import fixes and `#[allow(dead_code)]` on kept stubs landed; the post-check is still open.
+Verified 18 Aug 2026. `cargo check -p warp --bin warp-oss --features gui` is clean apart from one
+warning, `check_installed` in
+[plugin_manager/claude.rs](../../app/src/terminal/cli_agent_sessions/plugin_manager/claude.rs), which
+belongs to a concurrent session and not to this item. The 15 Aug unused-import / dead_code list is gone.
 
-- `cargo check -p warp --bin warp-oss --features gui` when `target\` is free
-- Confirm the 15 Aug unused-import / dead_code list is gone
+Newly visible, and *not* part of the original list: a workspace build enables `warp/tui` through feature
+unification and surfaces three more dead symbols in [tui/](../../app/src/tui/) --
+`set_logged_out_phase`, `Journey::PostLogout`, and `post_logout_authentication_started`. They are
+logout-flow leftovers, dead because the fork removed the logout path. Left in place rather than deleted
+unasked; worth a decision alongside whatever else the TUI still carries from the strip.
 
-### 13. Cheap overlay `log::warn` hygiene — Open
+### 13. Cheap overlay `log::warn` hygiene — Done
 
-From [guides/oss-windows-runtime-warnings.md](../guides/oss-windows-runtime-warnings.md). Not product bugs. Demote expected empty-state warnings:
+From [guides/oss-windows-runtime-warnings.md](../guides/oss-windows-runtime-warnings.md). Not product
+bugs. Demoted 18 Aug 2026, each with a comment saying why the empty state is expected:
 
-- Share modal without a model
-- Native modal with no alert
-- `SuggestedAgentModeWorkflowModal` not initialized
-- Optional: first-frame `HandleFocusChange`, `=C:` env skip → `debug`
+- `Tried to render share modal without a model` -- [share_block_modal.rs](../../app/src/terminal/share_block_modal.rs)
+- `No alert dialog was set for the native modal` -- [native_modal.rs](../../app/src/workspace/native_modal.rs)
+- `SuggestedAgentModeWorkflowModal has not been initialized` -- [suggested_agent_mode_workflow_modal.rs](../../app/src/ai/blocklist/suggested_agent_mode_workflow_modal.rs)
+- `Environment variable "=C:" was invalid` -- [windows/environment.rs](../../app/src/terminal/local_tty/windows/environment.rs);
+  Windows always sets drive-cwd vars, so it fired on every launch
 
-Do **not** “fix” WSL GUID, SQLite WAL 283, NVIDIA Vulkan ranking, Git/K8s chips before cwd, or cloud prefs without Drive.
+All four are `render()`-path or launch-path noise: `AppContext::render_views` calls `render()` on every
+view in the window, including closed overlays.
+
+Deliberately **not** demoted: `HandleFocusChange ... no view handled it`. That message comes from a
+generic unhandled-action warning in [warpui_core](../../crates/warpui_core/src/core/app.rs), not from
+anything focus-specific, so demoting it would silence a real diagnostic for every action in the app.
+
+Do **not** "fix" WSL GUID, SQLite WAL 283, NVIDIA Vulkan ranking, Git/K8s chips before cwd, or cloud
+prefs without Drive.
 
 ### 14. Warp crate test-binary compile errors — Done (no longer reproduces)
 

@@ -385,9 +385,11 @@ fn environment_block(env: impl Iterator<Item = (OsString, EnvEntry)>) -> Vec<u16
     let mut block = vec![];
 
     for (_, entry) in env {
-        // Environment variable names cannot contain an "=".
+        // Environment variable names cannot contain an "=". Windows always sets
+        // drive-cwd vars (`=C:`, `=D:`, ...), so this fires on every launch and is
+        // not worth a warning.
         if entry.preferred_key.is_empty() || entry.preferred_key.to_string_lossy().contains('=') {
-            log::warn!(
+            log::debug!(
                 "Environment variable {:?} was invalid. Not adding to shell process environment block",
                 entry.preferred_key
             );

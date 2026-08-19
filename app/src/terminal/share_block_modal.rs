@@ -1022,7 +1022,9 @@ impl ShareBlockModal {
                 .finish()
             }
             None => {
-                log::warn!("Tried to render share modal without a model");
+                // Expected: `render_views` renders every view in the window, including
+                // this overlay while it is closed and has no model.
+                log::debug!("Tried to render share modal without a model");
                 Empty::new().finish()
             }
         };

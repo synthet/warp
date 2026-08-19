@@ -232,7 +232,9 @@ impl View for SuggestedAgentModeWorkflowModal {
         if let Some(modal) = &self.modal {
             ChildView::new(modal).finish()
         } else {
-            log::warn!("SuggestedAgentModeWorkflowModal has not been initialized");
+            // Expected: `render_views` renders every view in the window, including this
+            // modal before anything initializes it.
+            log::debug!("SuggestedAgentModeWorkflowModal has not been initialized");
             Empty::new().finish()
         }
     }
