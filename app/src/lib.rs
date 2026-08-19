@@ -56,6 +56,7 @@ mod platform;
 #[cfg(feature = "plugin_host")]
 mod plugin;
 mod prefix;
+mod pricing;
 #[cfg(target_os = "macos")]
 mod preview_config_migration;
 mod profiling;
@@ -1832,6 +1833,8 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(|_| RecordingController::new());
     ctx.add_singleton_model(|_| ExecutionProfileEditorManager::default());
     ctx.add_singleton_model(|_| NetworkLogPaneManager::default());
+    ctx.add_singleton_model(|_| pricing::PricingInfoModel::new());
+    ctx.add_singleton_model(ai::pricing_promotion::PricingPromotionState::new);
     ctx.add_singleton_model(|ctx| {
         // Not using the *Provider types isn't ideal, but it's worth it for the ability to move managed secrets to a separate crate.
         ManagedSecretManager::new(

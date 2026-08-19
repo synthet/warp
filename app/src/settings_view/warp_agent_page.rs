@@ -31,14 +31,13 @@ use warp_editor::editor::NavigationKey;
 use warp_errors::report_if_error;
 use warpui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Empty, Expanded, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable, HyperlinkLens,
+    Empty, Expanded, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable,
     HyperlinkUrl, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
     ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::keymap::{ContextPredicate, Keystroke};
 use warpui::platform::Cursor;
-use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
 use warpui::{
@@ -79,7 +78,6 @@ use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::geap_credentials::force_refresh_geap_credentials;
 use crate::ai::llms::{LLMId, LLMPreferences, LLMProvider, is_using_api_key_for_provider};
 use crate::appearance::{Appearance, AppearanceEvent};
-use crate::auth::AuthStateProvider;
 use crate::editor::{
     EditorOptions, EditorView, Event as EditorEvent, PropagateAndNoOpNavigationKeys,
     SingleLineEditorOptions, TextColors, TextOptions,

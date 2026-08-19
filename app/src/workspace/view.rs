@@ -15031,6 +15031,7 @@ impl Workspace {
                 self.initiate_user_signup(AnonymousUserSignupEntrypoint::SignUpButton, ctx);
             }
             SettingsViewEvent::Pane(_) | SettingsViewEvent::StartResize => {}
+            SettingsViewEvent::OpenWarpDrive => {}
             SettingsViewEvent::ShowToast { message, flavor } => {
                 self.toast_stack.update(ctx, |toast_stack, ctx| {
                     toast_stack
