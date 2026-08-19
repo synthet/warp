@@ -3712,6 +3712,13 @@ impl FeaturesPageView {
                 let mut items: Vec<DropdownItem<FeaturesPageAction>> = DefaultSessionMode::iter()
                     .filter(|val| *val != DefaultSessionMode::TabConfig)
                     .filter(|val| {
+                        *val != DefaultSessionMode::Agent || ChannelState::warp_cloud_enabled()
+                    })
+                    .filter(|val| {
+                        *val != DefaultSessionMode::CloudAgent
+                            || ChannelState::cloud_agents_enabled()
+                    })
+                    .filter(|val| {
                         *val != DefaultSessionMode::DockerSandbox || docker_sandbox_enabled
                     })
                     .map(|val| {

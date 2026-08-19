@@ -7,6 +7,7 @@
 
 use ai::agent::action::RunAgentsExecutionMode;
 use warp_cli::agent::Harness;
+use warp_core::channel::ChannelState;
 use warpui::{AppContext, SingletonEntity};
 
 use super::config_state::{AuthSecretSelection, OrchestrationConfigState};
@@ -126,6 +127,13 @@ impl OptionSnapshot {
 // its own Cloud/Local mode toggle.
 #[cfg_attr(not(feature = "tui"), allow(dead_code))]
 pub fn location_snapshot(state: &OrchestrationConfigState, _ctx: &AppContext) -> OptionSnapshot {
+    if !ChannelState::cloud_agents_enabled() {
+        return OptionSnapshot::ready(
+            vec![OptionRow::new(LOCATION_LOCAL_ID, "Local")],
+            Some(LOCATION_LOCAL_ID.to_string()),
+        );
+    }
+
     let rows = vec![
         OptionRow::new(LOCATION_CLOUD_ID, "Cloud"),
         OptionRow::new(LOCATION_LOCAL_ID, "Local"),

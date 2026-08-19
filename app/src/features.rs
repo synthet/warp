@@ -515,5 +515,6 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::TerminalLifecycleRecovery,
     ]);
 
+    ChannelState::filter_unsupported_features(&mut flags);
     flags
 }

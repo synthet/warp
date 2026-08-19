@@ -53,7 +53,7 @@ use crate::terminal::safe_mode_settings::{
 };
 use crate::ui_components::buttons::icon_button;
 use crate::ui_components::icons::Icon;
-use crate::util::links::PRIVACY_POLICY_URL;
+use crate::util::links::privacy_policy_url;
 use crate::view_components::{Dropdown, DropdownItem};
 use crate::workspaces::user_workspaces::UserWorkspaces;
 use crate::workspaces::workspace::{
@@ -78,7 +78,18 @@ const TELEMETRY_DESCRIPTION_OLD: &str = "App analytics help us make the product 
 const TELEMETRY_TITLE: &str = "Help improve Warp";
 const TELEMETRY_DESCRIPTION: &str = "App analytics help us make the product better for you. We may collect \
     certain console interactions to improve Warp's AI capabilities.";
-const TELEMETRY_DOCS_URL: &str = "https://docs.warp.dev/support-and-community/privacy-and-security/privacy#what-telemetry-data-does-warp-collect-and-why";
+const WARP_TELEMETRY_DOCS_URL: &str = "https://docs.warp.dev/support-and-community/privacy-and-security/privacy#what-telemetry-data-does-warp-collect-and-why";
+
+/// Where "Read more about Warp's use of data" points. Warp Inc.'s telemetry docs
+/// describe collection this build does not perform, so the fork links its own
+/// local-first page instead.
+fn telemetry_docs_url() -> &'static str {
+    if crate::util::links::warp_inc_links_enabled() {
+        WARP_TELEMETRY_DOCS_URL
+    } else {
+        crate::util::links::SYNTH_PRIVACY_URL
+    }
+}
 
 const DATA_MANAGEMENT_TITLE: &str = "Manage your data";
 const DATA_MANAGEMENT_DESCRIPTION: &str = "At any time, you may choose to delete your Warp account permanently. \
@@ -1562,7 +1573,7 @@ impl SettingsWidget for AppAnalyticsWidget {
                 ui_builder
                     .link(
                         "Read more about Warp's use of data".into(),
-                        Some(TELEMETRY_DOCS_URL.into()),
+                        Some(telemetry_docs_url().into()),
                         None,
                         self.docs_link_mouse_state.clone(),
                     )
@@ -1957,7 +1968,7 @@ impl SettingsWidget for PrivacyPolicyWidget {
                         .ui_builder()
                         .link(
                             PRIVACY_POLICY_LINK_TEXT.into(),
-                            Some(PRIVACY_POLICY_URL.into()),
+                            Some(privacy_policy_url().into()),
                             None,
                             self.link_mouse_state.clone(),
                         )

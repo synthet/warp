@@ -8,6 +8,7 @@ use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
 use settings::Setting;
 use siphasher::sip::SipHasher;
+use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::icons::Icon;
 use warp_core::ui::theme::Fill;
@@ -197,6 +198,8 @@ enum ViewState {
     Loading,
     /// Showing the setup guide (this is the zero state when has_tasks is false)
     SetupGuide { has_items: bool },
+    /// No local runs exist and cloud-agent onboarding is unavailable.
+    LocalOnlyEmpty,
     /// We have tasks, but currently have a filter applied that matches none of them
     NoFilterMatches,
     /// We have tasks that should be shown to the user
@@ -402,8 +405,12 @@ impl AgentManagementView {
         }
 
         // Show setup guide if: no items (zero state) or user clicked button to toggle on the guide
-        if !has_items || self.is_viewing_setup_guide {
+        if (!has_items || self.is_viewing_setup_guide) && ChannelState::cloud_agents_enabled() {
             return ViewState::SetupGuide { has_items };
+        }
+
+        if !has_items {
+            return ViewState::LocalOnlyEmpty;
         }
 
         if self.items.is_empty() {
@@ -891,6 +898,9 @@ impl AgentManagementView {
 
     /// Shows the setup guide from a deep-link/action without toggling it off on repeated calls.
     pub(crate) fn show_setup_guide_from_link(&mut self, ctx: &mut ViewContext<Self>) {
+        if !ChannelState::cloud_agents_enabled() {
+            return;
+        }
         if !self.is_viewing_setup_guide {
             send_telemetry_from_ctx!(AgentManagementTelemetryEvent::OpenSetupGuide, ctx);
         }
@@ -1418,6 +1428,9 @@ impl AgentManagementView {
                 self.is_agent_type_selector_open = false;
                 match agent_type {
                     AgentType::Cloud => {
+                        if !ChannelState::cloud_agents_enabled() {
+                            return;
+                        }
                         send_telemetry_from_ctx!(
                             AgentManagementTelemetryEvent::SpawnNewCloudAgent,
                             ctx
@@ -1854,7 +1867,9 @@ impl AgentManagementView {
             ViewState::SetupGuide {
                 has_items: has_tasks,
             } => self.render_setup_guide_header(has_tasks, app),
-            ViewState::NoFilterMatches | ViewState::HasTasks => self.render_task_list_header(app),
+            ViewState::LocalOnlyEmpty | ViewState::NoFilterMatches | ViewState::HasTasks => {
+                self.render_task_list_header(app)
+            }
         }
     }
 
@@ -1898,10 +1913,13 @@ impl AgentManagementView {
     fn render_task_list_header(&self, app: &AppContext) -> Box<dyn Element> {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
+        let cloud_agents_enabled = ChannelState::cloud_agents_enabled();
+        let warp_cloud_enabled = ChannelState::warp_cloud_enabled();
 
-        let is_loading = AgentConversationsModel::handle(app)
-            .as_ref(app)
-            .is_loading();
+        let is_loading = cloud_agents_enabled
+            && AgentConversationsModel::handle(app)
+                .as_ref(app)
+                .is_loading();
 
         let is_on_team = UserWorkspaces::as_ref(app)
             .team_for_view_handle(&self.view_handle, app)
@@ -1947,9 +1965,11 @@ impl AgentManagementView {
             }
 
             header_top.add_child(Expanded::new(1., Empty::new().finish()).finish());
-            header_top.add_child(ChildView::new(setup_guide_button).finish());
+            if cloud_agents_enabled {
+                header_top.add_child(ChildView::new(setup_guide_button).finish());
+            }
 
-            if !cfg!(target_family = "wasm") {
+            if warp_cloud_enabled && !cfg!(target_family = "wasm") {
                 header_top.add_child(ChildView::new(new_agent_button).finish());
             }
 
@@ -1965,7 +1985,9 @@ impl AgentManagementView {
                 filters_wrap.add_child(ChildView::new(&self.harness_dropdown).finish());
             }
 
-            filters_wrap.add_child(ChildView::new(&self.environment_dropdown).finish());
+            if cloud_agents_enabled {
+                filters_wrap.add_child(ChildView::new(&self.environment_dropdown).finish());
+            }
 
             if self.filters.owners != OwnerFilter::PersonalOnly {
                 filters_wrap.add_child(ChildView::new(&self.creator_dropdown).finish());
@@ -2143,6 +2165,39 @@ impl AgentManagementView {
         .finish()
     }
 
+    fn render_local_only_empty_state(&self, app: &AppContext) -> Box<dyn Element> {
+        let appearance = Appearance::as_ref(app);
+        let theme = appearance.theme();
+
+        let title = Text::new_inline(
+            "No local agent runs yet",
+            appearance.ui_font_family(),
+            appearance.ui_font_size() + 2.,
+        )
+        .with_style(Properties::default().weight(Weight::Semibold))
+        .with_color(theme.active_ui_text_color().into())
+        .finish();
+
+        let description = Text::new(
+            "Start a supported CLI agent in a terminal to see its run here.".to_string(),
+            appearance.ui_font_family(),
+            appearance.ui_font_size(),
+        )
+        .with_color(theme.nonactive_ui_text_color().into())
+        .finish();
+
+        Align::new(
+            Flex::column()
+                .with_main_axis_size(MainAxisSize::Min)
+                .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_spacing(8.)
+                .with_child(title)
+                .with_child(description)
+                .finish(),
+        )
+        .finish()
+    }
+
     fn render_default_scroll_view(&self, app: &AppContext) -> Box<dyn Element> {
         let theme = Appearance::as_ref(app).theme();
         let axis_config = SingleAxisConfig::Manual {
@@ -2180,6 +2235,7 @@ impl View for AgentManagementView {
         let main_content = match self.get_view_state(app) {
             ViewState::Loading => self.render_loading_state(app),
             ViewState::SetupGuide { .. } => ChildView::new(&self.cloud_setup_guide_view).finish(),
+            ViewState::LocalOnlyEmpty => self.render_local_only_empty_state(app),
             ViewState::NoFilterMatches => self.render_no_results_view(app),
             ViewState::HasTasks => self.render_default_scroll_view(app),
         };
@@ -2213,7 +2269,7 @@ impl View for AgentManagementView {
             main_view
         };
 
-        if self.is_agent_type_selector_open {
+        if self.is_agent_type_selector_open && ChannelState::cloud_agents_enabled() {
             Stack::new()
                 .with_child(base_view)
                 .with_child(ChildView::new(&self.agent_type_selector).finish())
@@ -2361,6 +2417,22 @@ impl TypedActionView for AgentManagementView {
                 ctx.notify();
             }
             AgentManagementViewAction::ShowAgentTypeSelector => {
+                if !ChannelState::warp_cloud_enabled() {
+                    return;
+                }
+
+                if !ChannelState::cloud_agents_enabled() {
+                    send_telemetry_from_ctx!(
+                        AgentManagementTelemetryEvent::SpawnNewLocalAgent,
+                        ctx
+                    );
+                    ctx.dispatch_typed_action(&WorkspaceAction::NewTabInAgentMode {
+                        entrypoint: AgentModeEntrypoint::AgentManagementView,
+                        zero_state_prompt_suggestion_type: None,
+                    });
+                    return;
+                }
+
                 send_telemetry_from_ctx!(
                     AgentManagementTelemetryEvent::AgentTypeSelectorOpened,
                     ctx

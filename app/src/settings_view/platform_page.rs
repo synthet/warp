@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 use warp_graphql::object_permissions::OwnerType;
 use warp_graphql::queries::api_keys::ApiKeyProperties as GqlApiKeyProperties;
@@ -911,8 +912,7 @@ impl SettingsPageMeta for PlatformPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        // Synth Warp is local-first: Oz Cloud API keys require a Warp account.
-        false
+        ChannelState::cloud_agents_enabled()
     }
 
     fn on_page_selected(&mut self, _allow_steal_focus: bool, ctx: &mut ViewContext<Self>) {

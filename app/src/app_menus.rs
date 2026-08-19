@@ -184,7 +184,7 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
     menu_items.push(MenuItem::Separator);
     menu_items.push(link_menu_item(
         "Privacy Policy...",
-        links::PRIVACY_POLICY_URL.into(),
+        links::privacy_policy_url().into(),
     ));
 
     let debug_menu_items = debug_menu_items();

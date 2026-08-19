@@ -59,6 +59,28 @@ impl Channel {
         }
     }
 
+    /// Whether this channel may point users at Warp Inc.'s own community, support,
+    /// and commercial destinations (the upstream issue tracker, the Warp Slack,
+    /// `support@warp.dev`, contact-sales, `warp.dev/privacy`).
+    ///
+    /// False for `Oss`: Synth Warp is an independent fork that did not ship those
+    /// binaries and cannot service that traffic, so linking to them misdirects users
+    /// to a vendor who will not answer.
+    ///
+    /// This is deliberately *not* [`ChannelState::warp_cloud_enabled`], which asks
+    /// whether Warp-hosted backends may be contacted and therefore varies with
+    /// `server_root_url`. Pointing an OSS build at your own backend does not make you
+    /// an upstream Warp customer, so this answer must not depend on that URL.
+    pub fn shows_warp_inc_links(&self) -> bool {
+        match self {
+            Channel::Stable | Channel::Preview | Channel::Dev | Channel::Local => true,
+            // Integration keeps the upstream surface so GUI integration tests continue
+            // to exercise the same menus and actions as a first-party build.
+            Channel::Integration => true,
+            Channel::Oss => false,
+        }
+    }
+
     /// Returns the Warp Control CLI command name corresponding to this channel.
     pub fn warpctrl_command_name(&self) -> &'static str {
         match self {

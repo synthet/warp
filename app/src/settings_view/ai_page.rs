@@ -2913,14 +2913,21 @@ impl AISettingsPageView {
                 {
                     widgets.push(Box::new(VoiceWidget::default()));
                 }
-                widgets.push(Box::new(CloudHandoffWidget::default()));
+                if ChannelState::cloud_agents_enabled()
+                    && FeatureFlag::OzHandoff.is_enabled()
+                    && FeatureFlag::HandoffLocalCloud.is_enabled()
+                {
+                    widgets.push(Box::new(CloudHandoffWidget::default()));
+                }
                 widgets.extend(cli_agent_widgets());
                 widgets.push(Box::new(ApiKeysWidget::new(ctx)));
                 widgets.push(Box::new(AwsBedrockWidget::new(ctx)));
                 widgets.push(Box::new(GeminiEnterpriseWidget::new(ctx)));
                 widgets.push(Box::new(AgentAttributionWidget::default()));
                 widgets.push(Box::new(OtherAIWidget::default()));
-                if FeatureFlag::AgentModeComputerUse.is_enabled() {
+                if FeatureFlag::AgentModeComputerUse.is_enabled()
+                    && ChannelState::cloud_agents_enabled()
+                {
                     widgets.push(Box::new(CloudAgentComputerUseWidget::default()));
                 }
             }
@@ -2956,7 +2963,12 @@ impl AISettingsPageView {
                 if voice_supported {
                     widgets.push(Box::new(VoiceWidget::default()));
                 }
-                widgets.push(Box::new(CloudHandoffWidget::default()));
+                if ChannelState::cloud_agents_enabled()
+                    && FeatureFlag::OzHandoff.is_enabled()
+                    && FeatureFlag::HandoffLocalCloud.is_enabled()
+                {
+                    widgets.push(Box::new(CloudHandoffWidget::default()));
+                }
                 widgets.push(Box::new(ApiKeysWidget::new(ctx)));
                 widgets.push(Box::new(AwsBedrockWidget::new(ctx)));
                 widgets.push(Box::new(GeminiEnterpriseWidget::new(ctx)));
@@ -2965,7 +2977,9 @@ impl AISettingsPageView {
                 }
                 widgets.push(Box::new(AgentAttributionWidget::default()));
                 widgets.push(Box::new(OtherAIWidget::default()));
-                if FeatureFlag::AgentModeComputerUse.is_enabled() {
+                if FeatureFlag::AgentModeComputerUse.is_enabled()
+                    && ChannelState::cloud_agents_enabled()
+                {
                     widgets.push(Box::new(CloudAgentComputerUseWidget::default()));
                 }
             }
@@ -8212,7 +8226,9 @@ impl SettingsWidget for CloudHandoffWidget {
     }
 
     fn should_render(&self, _app: &AppContext) -> bool {
-        FeatureFlag::OzHandoff.is_enabled() && FeatureFlag::HandoffLocalCloud.is_enabled()
+        ChannelState::cloud_agents_enabled()
+            && FeatureFlag::OzHandoff.is_enabled()
+            && FeatureFlag::HandoffLocalCloud.is_enabled()
     }
 
     fn render(

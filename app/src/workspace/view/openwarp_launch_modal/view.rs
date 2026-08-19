@@ -3,6 +3,7 @@ use markdown_parser::{
 };
 use pathfinder_color::ColorU;
 use pathfinder_geometry::vector::vec2f;
+use warp_core::channel::ChannelState;
 use warp_core::ui::theme::Fill;
 use warp_core::ui::theme::phenomenon::PhenomenonStyle;
 use warpui::assets::asset_cache::AssetSource;
@@ -40,6 +41,7 @@ struct FeatureItem {
     description: &'static str,
     /// If set, the first occurrence of `text` in the description is rendered as a hyperlink.
     inline_link: Option<InlineLink>,
+    requires_cloud_agents: bool,
 }
 
 const FEATURE_ITEMS: &[FeatureItem] = &[
@@ -51,6 +53,7 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
             text: "here",
             url: CONTRIBUTING_URL,
         }),
+        requires_cloud_agents: false,
     },
     FeatureItem {
         icon: Icon::Oz,
@@ -60,12 +63,14 @@ const FEATURE_ITEMS: &[FeatureItem] = &[
             text: "Oz",
             url: OZ_URL,
         }),
+        requires_cloud_agents: true,
     },
     FeatureItem {
         icon: Icon::MessageChatSquare,
         title: "Introducing 'auto (open-weights)'",
         description: "We've added a new auto model that picks the best open weight model for a task, like Kimi or MiniMax.",
         inline_link: None,
+        requires_cloud_agents: false,
     },
 ];
 
@@ -336,7 +341,10 @@ impl OpenWarpLaunchModal {
         let mut features_col = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .with_spacing(12.);
-        for item in FEATURE_ITEMS {
+        for item in FEATURE_ITEMS
+            .iter()
+            .filter(|item| !item.requires_cloud_agents || ChannelState::cloud_agents_enabled())
+        {
             features_col.add_child(Self::render_feature_row(item, appearance));
         }
 

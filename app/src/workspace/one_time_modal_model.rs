@@ -372,6 +372,9 @@ impl OneTimeModalModel {
 
     #[cfg(debug_assertions)]
     pub fn force_open_oz_launch_modal(&mut self, ctx: &mut ModelContext<Self>) {
+        if !ChannelState::cloud_agents_enabled() {
+            return;
+        }
         self.set_oz_launch_modal_open(true, ctx);
     }
 
@@ -644,7 +647,7 @@ impl OneTimeModalModel {
 
     fn check_and_trigger_oz_launch_modal(&mut self, ctx: &mut ModelContext<Self>) -> bool {
         // Only show if the feature flag is enabled.
-        if !FeatureFlag::OzLaunchModal.is_enabled() {
+        if !ChannelState::cloud_agents_enabled() || !FeatureFlag::OzLaunchModal.is_enabled() {
             return false;
         }
 

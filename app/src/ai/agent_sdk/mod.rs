@@ -33,6 +33,7 @@ use warp_cli::secret::SecretCommand;
 use warp_cli::share::ShareRequest;
 use warp_cli::task::{MessageCommand, TaskCommand};
 use warp_cli::{CliCommand, GlobalOptions, OZ_HARNESS_ENV};
+use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 use warp_errors::report_error;
 use warp_graphql::object_permissions::OwnerType;
@@ -265,6 +266,11 @@ fn run_agent(
 ) -> anyhow::Result<()> {
     match command {
         AgentCommand::Run(args) => {
+            if args.harness == Harness::Oz && !ChannelState::warp_cloud_enabled() {
+                return Err(anyhow::anyhow!(
+                    "the built-in agent requires SYNTH_WARP_SERVER_ROOT_URL to point to a self-hosted backend"
+                ));
+            }
             if args.environment.is_some() && !FeatureFlag::CloudEnvironments.is_enabled() {
                 return Err(anyhow::anyhow!("unexpected argument '--environment' found"));
             }
@@ -310,6 +316,11 @@ fn run_agent(
             Ok(())
         }
         AgentCommand::RunCloud(args) => {
+            if !ChannelState::cloud_agents_enabled() {
+                return Err(anyhow::anyhow!(
+                    "cloud agents are unavailable in this build"
+                ));
+            }
             if args.environment.environment.is_some()
                 && !FeatureFlag::CloudEnvironments.is_enabled()
             {

@@ -742,6 +742,7 @@ pub fn init(app: &mut AppContext) {
         )
         .with_group(bindings::BindingGroup::WarpAi.as_str())
         .with_custom_action(CustomAction::NewAgentTab)
+        .with_enabled(ChannelState::warp_cloud_enabled)
         .with_context_predicate(
             id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED) & !id!("Workspace_PaneDragging"),
         ),
@@ -755,7 +756,9 @@ pub fn init(app: &mut AppContext) {
             id!("Workspace") & id!(flags::IS_ANY_AI_ENABLED) & !id!("Workspace_PaneDragging"),
         )
         .with_enabled(|| {
-            FeatureFlag::AgentView.is_enabled() && FeatureFlag::CloudMode.is_enabled()
+            ChannelState::cloud_agents_enabled()
+                && FeatureFlag::AgentView.is_enabled()
+                && FeatureFlag::CloudMode.is_enabled()
         }),
         EditableBinding::new(
             "workspace:toggle_left_panel",
@@ -1241,22 +1244,24 @@ pub fn init(app: &mut AppContext) {
     // Oz and Warp Control CLI install/uninstall actions (macOS only)
     #[cfg(target_os = "macos")]
     {
-        app.register_editable_bindings([
-            EditableBinding::new(
-                "workspace:install_cli",
-                "Install Oz CLI globally for use outside of Warp",
-                WorkspaceAction::InstallOz,
-            )
-            .with_group(bindings::BindingGroup::Settings.as_str())
-            .with_context_predicate(id!("Workspace")),
-            EditableBinding::new(
-                "workspace:uninstall_cli",
-                "Undo global Oz CLI installation (oz will still work within Warp)",
-                WorkspaceAction::UninstallOz,
-            )
-            .with_group(bindings::BindingGroup::Settings.as_str())
-            .with_context_predicate(id!("Workspace")),
-        ]);
+        if ChannelState::cloud_agents_enabled() {
+            app.register_editable_bindings([
+                EditableBinding::new(
+                    "workspace:install_cli",
+                    "Install Oz CLI globally for use outside of Warp",
+                    WorkspaceAction::InstallOz,
+                )
+                .with_group(bindings::BindingGroup::Settings.as_str())
+                .with_context_predicate(id!("Workspace")),
+                EditableBinding::new(
+                    "workspace:uninstall_cli",
+                    "Undo global Oz CLI installation (oz will still work within Warp)",
+                    WorkspaceAction::UninstallOz,
+                )
+                .with_group(bindings::BindingGroup::Settings.as_str())
+                .with_context_predicate(id!("Workspace")),
+            ]);
+        }
         if FeatureFlag::WarpControlCli.is_enabled() {
             app.register_editable_bindings([
                 EditableBinding::new(

@@ -1,5 +1,11 @@
-use super::{derive_http_origin_from_ws_url, is_hosted_warp_cloud_host, warp_cloud_enabled_for};
+use std::collections::HashSet;
+
+use super::{
+    cloud_agents_enabled_for, derive_http_origin_from_ws_url, filter_unsupported_features_for,
+    is_hosted_warp_cloud_host, warp_cloud_enabled_for,
+};
 use crate::channel::{Channel, is_disabled_root_url};
+use crate::features::FeatureFlag;
 
 /// Mirrors `WarpServerConfig::disabled`'s blackhole root.
 const DISABLED_ROOT: &str = "http://192.0.2.0:9";
@@ -71,6 +77,97 @@ fn warp_cloud_for_oss_requires_a_self_hosted_root() {
         Channel::Oss,
         "http://localhost:8080"
     ));
+}
+
+#[test]
+fn self_hosted_inference_does_not_enable_cloud_agents() {
+    assert!(!cloud_agents_enabled_for(
+        Channel::Oss,
+        "http://localhost:8080",
+        DISABLED_ROOT,
+    ));
+}
+
+#[test]
+fn cloud_agents_require_both_warp_cloud_and_oz() {
+    assert!(cloud_agents_enabled_for(
+        Channel::Stable,
+        "https://app.warp.dev",
+        "https://oz.warp.dev",
+    ));
+    assert!(!cloud_agents_enabled_for(
+        Channel::Integration,
+        "https://app.warp.dev",
+        "https://oz.warp.dev",
+    ));
+}
+
+#[test]
+fn oss_policy_removes_cloud_agents_but_keeps_local_and_remote_dev_tools() {
+    let mut flags = HashSet::from([
+        FeatureFlag::CloudMode,
+        FeatureFlag::OzHandoff,
+        FeatureFlag::SyncAmbientPlans,
+        FeatureFlag::NamedAgents,
+        FeatureFlag::CloudConversations,
+        FeatureFlag::AgentView,
+        FeatureFlag::AgentHarness,
+        FeatureFlag::RemoteCodebaseIndexing,
+        FeatureFlag::RemoteCodeReview,
+    ]);
+
+    filter_unsupported_features_for(&mut flags, Channel::Oss, false);
+
+    assert!(!flags.contains(&FeatureFlag::CloudMode));
+    assert!(!flags.contains(&FeatureFlag::OzHandoff));
+    assert!(!flags.contains(&FeatureFlag::SyncAmbientPlans));
+    assert!(!flags.contains(&FeatureFlag::NamedAgents));
+    assert!(!flags.contains(&FeatureFlag::CloudConversations));
+    assert!(flags.contains(&FeatureFlag::AgentView));
+    assert!(flags.contains(&FeatureFlag::AgentHarness));
+    assert!(flags.contains(&FeatureFlag::RemoteCodebaseIndexing));
+    assert!(flags.contains(&FeatureFlag::RemoteCodeReview));
+}
+
+#[test]
+fn oz_capable_channels_keep_cloud_agent_features() {
+    let mut flags = HashSet::from([
+        FeatureFlag::CloudMode,
+        FeatureFlag::OzHandoff,
+        FeatureFlag::CloudConversations,
+    ]);
+
+    filter_unsupported_features_for(&mut flags, Channel::Stable, true);
+
+    assert_eq!(flags.len(), 3);
+}
+
+#[test]
+fn oss_never_shows_warp_inc_links() {
+    assert!(!Channel::Oss.shows_warp_inc_links());
+    for channel in [
+        Channel::Stable,
+        Channel::Preview,
+        Channel::Dev,
+        Channel::Local,
+        Channel::Integration,
+    ] {
+        assert!(
+            channel.shows_warp_inc_links(),
+            "{channel} should keep the upstream link surface"
+        );
+    }
+}
+
+#[test]
+fn warp_inc_links_do_not_depend_on_the_server_root() {
+    // Unlike `warp_cloud_enabled_for`, self-hosting a backend must not re-enable
+    // Warp Inc.'s support/community destinations.
+    assert!(warp_cloud_enabled_for(
+        Channel::Oss,
+        "http://localhost:8080"
+    ));
+    assert!(!Channel::Oss.shows_warp_inc_links());
 }
 
 #[test]

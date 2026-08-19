@@ -685,7 +685,9 @@ fn send_feedback(_: &(), ctx: &mut AppContext) {
             });
         }
         _ => {
-            ctx.open_url(&crate::util::links::feedback_form_url());
+            if let Some(url) = crate::util::links::feedback_form_url() {
+                ctx.open_url(&url);
+            }
         }
     }
 }

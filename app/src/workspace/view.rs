@@ -2441,7 +2441,8 @@ impl Workspace {
     pub(crate) fn show_session_config_modal(&mut self, ctx: &mut ViewContext<Self>) {
         // Configure the modal to hide Oz when AI is disabled, or when Warp-hosted
         // (paid) cloud agents are not shipped at all, as in Synth Warp.
-        let show_oz = AISettings::as_ref(ctx).is_any_ai_enabled(ctx) && ChannelState::oz_enabled();
+        let show_oz =
+            AISettings::as_ref(ctx).is_any_ai_enabled(ctx) && ChannelState::cloud_agents_enabled();
         self.session_config_modal.view.update(ctx, |modal, ctx| {
             modal.body().update(ctx, |body, ctx| {
                 body.configure(show_oz);
@@ -4713,6 +4714,9 @@ impl Workspace {
 
     /// Add a new terminal tab and enter the agent view with a new conversation.
     fn add_terminal_tab_with_new_agent_view(&mut self, ctx: &mut ViewContext<Self>) {
+        if !ChannelState::warp_cloud_enabled() {
+            return;
+        }
         let was_left_panel_open = self.active_tab_pane_group().as_ref(ctx).left_panel_open;
         self.add_new_session_tab_internal_with_default_session_mode_behavior(
             NewSessionSource::Tab,
@@ -6649,11 +6653,13 @@ impl Workspace {
     }
 
     fn view_privacy_policy(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.open_url(links::PRIVACY_POLICY_URL);
+        ctx.open_url(links::privacy_policy_url());
     }
 
     fn send_feedback(&mut self, ctx: &mut ViewContext<Self>) {
-        ctx.open_url(&links::feedback_form_url());
+        if let Some(url) = links::feedback_form_url() {
+            ctx.open_url(&url);
+        }
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -6715,7 +6721,7 @@ impl Workspace {
             keybinding_name_to_display_string("app:reopen_closed_session", ctx);
 
         // 1. Agent (if AI enabled)
-        if is_any_ai_enabled {
+        if is_any_ai_enabled && ChannelState::warp_cloud_enabled() {
             let mut agent_item = MenuItemFields::new("Agent")
                 .with_on_select_action(WorkspaceAction::AddAgentTab)
                 .with_icon(icons::Icon::LayoutAlt01);
@@ -6783,6 +6789,7 @@ impl Workspace {
 
         // 3. Cloud Agent (if flags enabled)
         if is_any_ai_enabled
+            && ChannelState::cloud_agents_enabled()
             && FeatureFlag::AgentView.is_enabled()
             && FeatureFlag::CloudMode.is_enabled()
         {
@@ -12482,7 +12489,10 @@ impl Workspace {
     }
 
     fn add_ambient_agent_tab(&mut self, ctx: &mut ViewContext<Self>) {
-        if !FeatureFlag::AgentView.is_enabled() || !FeatureFlag::CloudMode.is_enabled() {
+        if !ChannelState::cloud_agents_enabled()
+            || !FeatureFlag::AgentView.is_enabled()
+            || !FeatureFlag::CloudMode.is_enabled()
+        {
             return;
         }
 

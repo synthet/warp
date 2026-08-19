@@ -28,6 +28,7 @@ use warp::tui_export::{
     prepare_local_oz_child_launch, prepare_remote_child_launch, register_agent_event_consumer,
     unregister_agent_event_consumer,
 };
+use warp_core::channel::ChannelState;
 use warpui::SingletonEntity;
 use warpui_core::{AppContext, Entity, EntityId, ModelContext, ModelHandle, ViewHandle};
 
@@ -381,6 +382,15 @@ impl TuiOrchestrationModel {
                 runner_id,
                 agent_identity_uid,
             } => {
+                if !ChannelState::cloud_agents_enabled() {
+                    self.fail_child_request(
+                        &request,
+                        "Cloud agents are unavailable in this build.".to_owned(),
+                        ctx,
+                    );
+                    return;
+                }
+
                 self.register_event_consumer(
                     parent_session_id,
                     request.parent_conversation_id,

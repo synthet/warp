@@ -20,6 +20,7 @@ use settings::{
 };
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+use warp_core::channel::ChannelState;
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
 use warp_errors::report_if_error;
@@ -2182,7 +2183,7 @@ impl AISettings {
         // Synth Warp does not gate AI on a Warp login: inference is BYOK, so the
         // credential that matters is the user's own provider key, not a warp.dev
         // account. Warp-hosted (paid) surfaces stay gated separately on
-        // `ChannelState::warp_cloud_enabled` / `ChannelState::oz_enabled`.
+        // `ChannelState::warp_cloud_enabled` / `ChannelState::cloud_agents_enabled`.
         *self.is_any_ai_enabled && !self.is_ai_disabled_due_to_remote_session_org_policy(app)
     }
 
@@ -2209,7 +2210,7 @@ impl AISettings {
             DefaultSessionMode::Terminal | DefaultSessionMode::TabConfig => mode,
             // Agent requires AI to be enabled.
             DefaultSessionMode::Agent => {
-                if self.is_any_ai_enabled(app) {
+                if self.is_any_ai_enabled(app) && ChannelState::warp_cloud_enabled() {
                     mode
                 } else {
                     DefaultSessionMode::Terminal
@@ -2219,7 +2220,7 @@ impl AISettings {
             // does not ship. Fall back so a stale stored value can't wedge the
             // user into a session mode that can never start.
             DefaultSessionMode::CloudAgent => {
-                if self.is_any_ai_enabled(app) && warp_core::channel::ChannelState::oz_enabled() {
+                if self.is_any_ai_enabled(app) && ChannelState::cloud_agents_enabled() {
                     mode
                 } else {
                     DefaultSessionMode::Terminal

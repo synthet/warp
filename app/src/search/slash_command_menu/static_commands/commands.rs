@@ -965,7 +965,6 @@ fn all_commands_for_all_surfaces() -> Vec<StaticCommand> {
         AUTO_APPROVE,
         COST,
         EXIT,
-        FEEDBACK.clone(),
         INDEX,
         INIT,
         API_KEYS,
@@ -998,6 +997,12 @@ fn all_commands_for_all_surfaces() -> Vec<StaticCommand> {
         VIEW_LOGS,
         VOICE,
     ];
+
+    // `/feedback` opens the upstream `warpdotdev/Warp` issue form, which the fork cannot
+    // service. See `links::feedback_form_url`.
+    if crate::util::links::warp_inc_links_enabled() {
+        commands.push(FEEDBACK.clone());
+    }
 
     if FeatureFlag::LocalDockerSandbox.is_enabled() {
         commands.push(CREATE_DOCKER_SANDBOX);

@@ -18,6 +18,7 @@ use itertools::Itertools;
 pub use query::query_conversation_entries;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use warp_cli::agent::Harness;
+use warp_core::channel::ChannelState;
 use warp_core::execution_mode::AppExecutionMode;
 use warp_core::features::FeatureFlag;
 use warp_core::ui::theme::WarpTheme;
@@ -796,6 +797,14 @@ impl AgentConversationsModel {
         event: &AuthManagerEvent,
         ctx: &mut ModelContext<Self>,
     ) {
+        if !ChannelState::cloud_agents_enabled() {
+            if self.initial_load_state.can_start_cloud_load() {
+                self.initial_load_state = InitialConversationLoadState::Loaded;
+                ctx.emit(AgentConversationsModelEvent::ConversationsLoaded);
+            }
+            return;
+        }
+
         // When auth completes, start the initial cloud sync if it has not started yet.
         // Only sync if we're not in CLI mode
         if matches!(event, AuthManagerEvent::AuthComplete)
@@ -902,6 +911,11 @@ impl AgentConversationsModel {
         timestamp: DateTime<Utc>,
         ctx: &mut ModelContext<Self>,
     ) {
+        if !ChannelState::cloud_agents_enabled() {
+            self.dirty_since = None;
+            return;
+        }
+
         let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client();
 
         // Subtract 1 second to give buffer for clock differences with server
@@ -962,6 +976,11 @@ impl AgentConversationsModel {
     /// Fetches tasks and cloud conversation metadata async. Cloud conversation metadata is merged with
     /// metadata stored in local db in the BlocklistAIHistoryModel
     fn fetch_ambient_agent_tasks_and_cloud_convo_metadata(&mut self, ctx: &mut ModelContext<Self>) {
+        if !ChannelState::cloud_agents_enabled() {
+            self.initial_load_state = InitialConversationLoadState::Loaded;
+            return;
+        }
+
         let Some(creator_uid) = AuthStateProvider::as_ref(ctx)
             .get()
             .user_id()
@@ -1160,6 +1179,10 @@ impl AgentConversationsModel {
 
     /// Returns true if we should be polling: online, not loading, and active window has the view open.
     fn should_be_polling(&self, ctx: &ModelContext<Self>) -> bool {
+        if !ChannelState::cloud_agents_enabled() {
+            return false;
+        }
+
         if !self.initial_load_state.can_poll() {
             return false;
         }
@@ -1757,6 +1780,10 @@ impl AgentConversationsModel {
 
     /// Consult fetch-state guards and spawn a fetch if allowed.
     fn async_fetch_task(&mut self, task_id: &AmbientAgentTaskId, ctx: &mut ModelContext<Self>) {
+        if !ChannelState::cloud_agents_enabled() {
+            return;
+        }
+
         match self.task_fetch_state.get(task_id) {
             Some(TaskFetchState::InFlight) => return,
             Some(TaskFetchState::PermanentlyFailed { at, .. }) => {
@@ -1970,6 +1997,10 @@ impl AgentConversationsModel {
         current_user_uid: &str,
         ctx: &mut ModelContext<Self>,
     ) {
+        if !ChannelState::cloud_agents_enabled() {
+            return;
+        }
+
         let ai_client = ServerApiProvider::handle(ctx).as_ref(ctx).get_ai_client();
         let task_filter = self.build_task_list_filter(filters, current_user_uid);
         let current_user_uid = current_user_uid.to_string();

@@ -23,6 +23,7 @@ use warp::tui_export::{
     UserWorkspaces, UserWorkspacesEvent, execute_handoff, handoff_dispatch_error,
     oz_model_snapshot, prepare_handoff, suggest_handoff_environment,
 };
+use warp_core::channel::ChannelState;
 use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _};
 
 /// Editable selector pages in their handoff configuration order.
@@ -119,6 +120,13 @@ impl TuiHandoffModel {
         argument: Option<String>,
         ctx: &mut AppContext,
     ) -> Result<ModelHandle<Self>, TuiHandoffPreparationFailure> {
+        if !ChannelState::cloud_agents_enabled() {
+            return Err(TuiHandoffPreparationFailure {
+                replacement_input: argument,
+                message: "Cloud handoff is unavailable in this build.".to_owned(),
+            });
+        }
+
         if !AISettings::as_ref(ctx).is_cloud_handoff_enabled(ctx) {
             return Err(TuiHandoffPreparationFailure {
                 replacement_input: None,

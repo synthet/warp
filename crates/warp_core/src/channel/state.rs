@@ -302,6 +302,32 @@ impl ChannelState {
         !is_disabled_root_url(state.config.oz_config.oz_root_url.as_ref())
     }
 
+    /// Whether this process may start Warp-hosted cloud agents.
+    ///
+    /// A self-hosted inference backend does not provide the Oz control plane,
+    /// and OSS builds never opt back into Warp-hosted cloud agents.
+    pub fn cloud_agents_enabled() -> bool {
+        let state = CHANNEL_STATE.lock();
+        cloud_agents_enabled_for(
+            state.channel,
+            state.config.server_config.server_root_url.as_ref(),
+            state.config.oz_config.oz_root_url.as_ref(),
+        )
+    }
+
+    pub fn filter_unsupported_features(flags: &mut HashSet<FeatureFlag>) {
+        let state = CHANNEL_STATE.lock();
+        filter_unsupported_features_for(
+            flags,
+            state.channel,
+            cloud_agents_enabled_for(
+                state.channel,
+                state.config.server_config.server_root_url.as_ref(),
+                state.config.oz_config.oz_root_url.as_ref(),
+            ),
+        );
+    }
+
     pub fn server_root_url() -> Cow<'static, str> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "test-util")] {
@@ -449,6 +475,68 @@ pub fn warp_cloud_enabled_for(channel: Channel, server_root_url: &str) -> bool {
     }
 }
 
+pub fn cloud_agents_enabled_for(
+    channel: Channel,
+    server_root_url: &str,
+    oz_root_url: &str,
+) -> bool {
+    channel != Channel::Oss
+        && warp_cloud_enabled_for(channel, server_root_url)
+        && !is_disabled_root_url(oz_root_url)
+}
+
+const CLOUD_AGENT_FEATURES: &[FeatureFlag] = &[
+    FeatureFlag::AmbientAgentsCommandLine,
+    FeatureFlag::AmbientAgentsImageUpload,
+    FeatureFlag::ScheduledAmbientAgents,
+    FeatureFlag::SyncAmbientPlans,
+    FeatureFlag::APIKeyManagement,
+    FeatureFlag::CreateEnvironmentSlashCommand,
+    FeatureFlag::CloudEnvironments,
+    FeatureFlag::CloudRunners,
+    FeatureFlag::CloudAgentRunners,
+    FeatureFlag::WarpManagedSecrets,
+    FeatureFlag::TeamApiKeys,
+    FeatureFlag::NamedAgents,
+    FeatureFlag::AmbientAgentsRTC,
+    FeatureFlag::CloudMode,
+    FeatureFlag::CloudModeFromLocalSession,
+    FeatureFlag::CloudModeImageContext,
+    FeatureFlag::OzPlatformSkills,
+    FeatureFlag::OzIdentityFederation,
+    FeatureFlag::OzChangelogUpdates,
+    FeatureFlag::OzLaunchModal,
+    FeatureFlag::OzHandoff,
+    FeatureFlag::HandoffLocalCloud,
+    FeatureFlag::CloudModeSetupV2,
+    FeatureFlag::CloudModeInputV2,
+    FeatureFlag::HandoffCloudCloud,
+];
+
+const OSS_CONTROL_PLANE_FEATURES: &[FeatureFlag] = &[
+    FeatureFlag::AgentSharedSessions,
+    FeatureFlag::CloudConversations,
+    FeatureFlag::HOARemoteControl,
+];
+
+pub fn filter_unsupported_features_for(
+    flags: &mut HashSet<FeatureFlag>,
+    channel: Channel,
+    cloud_agents_enabled: bool,
+) {
+    if !cloud_agents_enabled {
+        for flag in CLOUD_AGENT_FEATURES {
+            flags.remove(flag);
+        }
+    }
+
+    if channel == Channel::Oss {
+        for flag in OSS_CONTROL_PLANE_FEATURES {
+            flags.remove(flag);
+        }
+    }
+}
+
 /// Whether `url`'s host belongs to Warp's hosted cloud. See [`is_hosted_warp_cloud_host`].
 pub fn is_hosted_warp_production_url(url: &str) -> bool {
     Url::parse(url)
@@ -486,20 +574,6 @@ fn derive_http_origin_from_ws_url(ws_url: &str) -> Option<String> {
     Some(origin)
 }
 
-#[cfg(all(test, not(feature = "test-util")))]
-#[path = "state_tests.rs"]
-mod tests;
-
-#[cfg(test)]
-mod remote_export_tests {
-    use super::ChannelState;
-
-    #[test]
-    fn telemetry_remote_export_is_disabled() {
-        assert!(!ChannelState::telemetry_remote_export_enabled());
-    }
-}
-
 fn app_id_from_bundle() -> Option<AppId> {
     // On macOS, attempt to determine the app ID from the containing bundle,
     // falling back to the channel-keyed "default" ID if we cannot retrieve
@@ -524,4 +598,18 @@ fn app_id_from_bundle() -> Option<AppId> {
     }
 
     None
+}
+
+#[cfg(all(test, not(feature = "test-util")))]
+#[path = "state_tests.rs"]
+mod tests;
+
+#[cfg(test)]
+mod remote_export_tests {
+    use super::ChannelState;
+
+    #[test]
+    fn telemetry_remote_export_is_disabled() {
+        assert!(!ChannelState::telemetry_remote_export_enabled());
+    }
 }
