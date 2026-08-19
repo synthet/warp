@@ -25,6 +25,7 @@ use oneshot::{Canceled, Receiver};
 use repo_metadata::local_model::IndexedRepoState;
 use repo_metadata::{RepoMetadataModel, RepositoryIdentifier};
 use session_sharing_protocol::sharer::SessionRetentionReason;
+use tracing::Instrument as _;
 use uuid::Uuid;
 use warp_cli::agent::{Harness, OutputFormat};
 use warp_cli::mcp::MCPSpec;
@@ -105,6 +106,7 @@ use crate::terminal::view::ConversationRestorationInNewPaneType;
 pub(crate) mod attachments;
 #[cfg(feature = "local_fs")]
 pub(crate) mod cache_setup;
+mod checkpoint_coordinator;
 pub(crate) mod cloud_provider;
 pub(crate) mod environment;
 mod error_classification;
@@ -190,6 +192,37 @@ pub(crate) const OZ_MESSAGE_LISTENER_STATE_ROOT_ENV: &str = "OZ_MESSAGE_LISTENER
 const LEGACY_OZ_PARENT_LISTENER_MANAGED_EXTERNALLY_ENV: &str =
     "OZ_PARENT_LISTENER_MANAGED_EXTERNALLY";
 const LEGACY_OZ_PARENT_STATE_ROOT_ENV: &str = "OZ_PARENT_STATE_ROOT";
+
+/// Fixed namespace for [`ephemeral_mcp_installation_id`]. Arbitrary; never reused.
+const EPHEMERAL_MCP_INSTALLATION_NAMESPACE: Uuid = Uuid::from_bytes([
+    0xf9, 0x79, 0x1a, 0x88, 0xff, 0xb7, 0x41, 0x88, 0xa6, 0x39, 0xa7, 0x2d, 0xf2, 0x94, 0x22, 0x3f,
+]);
+
+/// Installation id for an ephemeral MCP server (well-known sentinel or non-local
+/// managed MCP UUID) resolved from a managed MCP client config.
+///
+/// With `task_id` (ambient/cloud runs), the id is deterministic: hashing run id +
+/// spec token + server name means a rebuilt sandbox re-resolves the same server to
+/// the same id. Ids can persist in the model's conversation history across a
+/// rebuild; a random id would go stale and fail as "MCP server not found".
+///
+/// Without `task_id` (local sessions; no rebuilds), ids stay random: hashing only
+/// the spec token would collide across concurrent conversations in the same
+/// process, since `TemplatableMCPServerManager` keys installations by this id
+/// process-wide.
+fn ephemeral_mcp_installation_id(
+    task_id: Option<AmbientAgentTaskId>,
+    spec_token: &str,
+    server_name: &str,
+) -> Uuid {
+    match task_id {
+        Some(task_id) => Uuid::new_v5(
+            &EPHEMERAL_MCP_INSTALLATION_NAMESPACE,
+            format!("{task_id}:{spec_token}:{server_name}").as_bytes(),
+        ),
+        None => Uuid::new_v4(),
+    }
+}
 
 /// IdleTimeoutSender is wrapper around a sender that signals when a run is done after
 /// an idle timeout. Used for both Oz runs and third-party harnesses.
@@ -357,7 +390,9 @@ fn idle_window_for_cli_session_status(
     idle_on_fail: Option<Duration>,
 ) -> Option<Duration> {
     match status {
-        CLIAgentSessionStatus::Success | CLIAgentSessionStatus::Blocked { .. } => idle_on_complete,
+        CLIAgentSessionStatus::Success
+        | CLIAgentSessionStatus::Blocked { .. }
+        | CLIAgentSessionStatus::Cancelled => idle_on_complete,
         CLIAgentSessionStatus::Failed { .. } => idle_on_fail,
         CLIAgentSessionStatus::InProgress => None,
     }
@@ -376,9 +411,9 @@ fn terminal_status_log_outcome(status: &SDKConversationOutputStatus) -> &'static
 /// [`terminal_status_log_outcome`] for a third-party CLI harness session.
 fn cli_session_status_log_outcome(status: &CLIAgentSessionStatus) -> &'static str {
     match status {
-        CLIAgentSessionStatus::Success | CLIAgentSessionStatus::Blocked { .. } => {
-            "non_error_completion"
-        }
+        CLIAgentSessionStatus::Success
+        | CLIAgentSessionStatus::Blocked { .. }
+        | CLIAgentSessionStatus::Cancelled => "non_error_completion",
         CLIAgentSessionStatus::Failed { .. } => "error",
         CLIAgentSessionStatus::InProgress => "in_progress",
     }
@@ -433,6 +468,8 @@ pub struct AgentDriverOptions {
     pub snapshot_upload_timeout: Option<Duration>,
     /// Declarations script timeout override.
     pub snapshot_script_timeout: Option<Duration>,
+    /// Periodic checkpoint cadence override. Only used when `FeatureFlag::PeriodicHandoffCheckpoints` is enabled.
+    pub checkpoint_interval: Option<Duration>,
     /// Skip the initial `StartFromAmbientRunPrompt` so the agent waits for a
     /// follow-up instead of hallucinating an empty turn. Sourced from the
     /// `--skip-initial-turn` CLI flag, which the worker emits when the
@@ -510,6 +547,9 @@ pub struct AgentDriver {
     snapshot_disabled: bool,
     snapshot_upload_timeout: Duration,
     snapshot_script_timeout: Duration,
+
+    /// Periodic workspace-handoff checkpoint coordinator; `None` unless both handoff flags are enabled and the run has a cloud task id.
+    checkpoint_coordinator: Option<checkpoint_coordinator::CheckpointCoordinatorHandle>,
 
     /// Conversation ID this driver is running. Set at construction for
     /// resumed runs and on `ConversationServerTokenAssigned` for fresh
@@ -795,6 +835,7 @@ impl AgentDriver {
             snapshot_disabled,
             snapshot_upload_timeout,
             snapshot_script_timeout,
+            checkpoint_interval,
             skip_initial_turn,
             strict_mcp_startup,
             mcp_startup_timeout,
@@ -903,6 +944,36 @@ impl AgentDriver {
             _ => None,
         };
 
+        // Spawn the periodic checkpoint coordinator under the same gates as the
+        // declarations writer above, plus the dedicated rollout flag. `None` keeps
+        // `run_snapshot_upload` on the legacy one-shot upload path unchanged.
+        let checkpoint_coordinator = match task_id {
+            Some(id)
+                if FeatureFlag::OzHandoff.is_enabled()
+                    && FeatureFlag::PeriodicHandoffCheckpoints.is_enabled()
+                    && !snapshot_disabled_value =>
+            {
+                let client = ServerApiProvider::as_ref(ctx).get_harness_support_client();
+                Some(checkpoint_coordinator::CheckpointCoordinatorHandle::new(
+                    client,
+                    id,
+                    working_dir.clone(),
+                    // Shared with the history subscription so every attempt can drain
+                    // queued `file` appends before the declarations script runs, exactly
+                    // as `run_snapshot_upload` does on the legacy path.
+                    snapshot_file_writer.clone(),
+                    ctx.spawner(),
+                    checkpoint_interval
+                        .unwrap_or(checkpoint_coordinator::DEFAULT_CHECKPOINT_INTERVAL),
+                    snapshot_script_timeout
+                        .unwrap_or(snapshot::DEFAULT_DECLARATIONS_SCRIPT_TIMEOUT),
+                    snapshot_upload_timeout.unwrap_or(snapshot::DEFAULT_SNAPSHOT_UPLOAD_TIMEOUT),
+                    ctx.background_executor(),
+                ))
+            }
+            _ => None,
+        };
+
         Ok(Self {
             terminal_driver,
             working_dir,
@@ -925,6 +996,7 @@ impl AgentDriver {
                 .unwrap_or(snapshot::DEFAULT_SNAPSHOT_UPLOAD_TIMEOUT),
             snapshot_script_timeout: snapshot_script_timeout
                 .unwrap_or(snapshot::DEFAULT_DECLARATIONS_SCRIPT_TIMEOUT),
+            checkpoint_coordinator,
             run_conversation_id,
             parent_run_id: parent_run_id_for_self,
             third_party_harness_model_config,
@@ -971,6 +1043,7 @@ impl AgentDriver {
             snapshot_disabled: false,
             snapshot_upload_timeout: snapshot::DEFAULT_SNAPSHOT_UPLOAD_TIMEOUT,
             snapshot_script_timeout: snapshot::DEFAULT_DECLARATIONS_SCRIPT_TIMEOUT,
+            checkpoint_coordinator: None,
             run_conversation_id: None,
             parent_run_id: None,
             third_party_harness_model_config: None,
@@ -1338,24 +1411,31 @@ impl AgentDriver {
         managed_mcp_client: Arc<dyn ManagedMcpClient>,
         foreground: &ModelSpawner<Self>,
     ) -> Result<ResolvedMcpSpecs, AgentDriverError> {
-        let local_installed_uuids = foreground
-            .spawn(|_, ctx| {
-                TemplatableMCPServerManager::as_ref(ctx)
+        let (local_installed_uuids, task_id) = foreground
+            .spawn(|me, ctx| {
+                let local_installed_uuids = TemplatableMCPServerManager::as_ref(ctx)
                     .get_installed_templatable_servers()
                     .keys()
                     .copied()
-                    .collect::<HashSet<_>>()
+                    .collect::<HashSet<_>>();
+                (local_installed_uuids, me.task_id)
             })
             .await?;
 
-        Self::resolve_mcp_specs_with_local_uuids(specs, &local_installed_uuids, managed_mcp_client)
-            .await
+        Self::resolve_mcp_specs_with_local_uuids(
+            specs,
+            &local_installed_uuids,
+            managed_mcp_client,
+            task_id,
+        )
+        .await
     }
 
     async fn resolve_mcp_specs_with_local_uuids(
         specs: &[MCPSpec],
         local_installed_uuids: &HashSet<Uuid>,
         managed_mcp_client: Arc<dyn ManagedMcpClient>,
+        task_id: Option<AmbientAgentTaskId>,
     ) -> Result<ResolvedMcpSpecs, AgentDriverError> {
         let mut resolved = ResolvedMcpSpecs::default();
 
@@ -1374,6 +1454,8 @@ impl AgentDriver {
                         })?;
                     let installations = Self::installations_from_managed_client_config_json(
                         &client_config.mcp_config_json,
+                        task_id,
+                        &uuid.to_string(),
                     )
                     .map_err(|err| {
                         AgentDriverError::ManagedMcpResolutionFailed {
@@ -1409,6 +1491,8 @@ impl AgentDriver {
                     };
                     match Self::installations_from_managed_client_config_json(
                         &client_config.mcp_config_json,
+                        task_id,
+                        id,
                     ) {
                         Ok(installations) => {
                             resolved.ephemeral_installations.extend(installations);
@@ -1482,6 +1566,8 @@ impl AgentDriver {
 
     fn installations_from_managed_client_config_json(
         json_str: &str,
+        task_id: Option<AmbientAgentTaskId>,
+        spec_token: &str,
     ) -> Result<Vec<TemplatableMCPServerInstallation>, AgentDriverError> {
         let normalized_json = normalize_mcp_json(json_str)
             .map_err(|e| AgentDriverError::MCPJsonParseError(e.to_string()))?;
@@ -1525,8 +1611,13 @@ impl AgentDriver {
                         });
                 }
 
+                let installation_id = ephemeral_mcp_installation_id(
+                    task_id,
+                    spec_token,
+                    &templatable_mcp_server.name,
+                );
                 Ok(TemplatableMCPServerInstallation::new(
-                    uuid::Uuid::new_v4(),
+                    installation_id,
                     templatable_mcp_server,
                     variable_values,
                 ))
@@ -2379,7 +2470,15 @@ impl AgentDriver {
             safe: ("Running agent driver"),
             full: ("Running agent driver for query `{:?}`", task.prompt)
         );
-        let setup_events = foreground
+
+        let setup_span = tracing::info_span!("agent_run_setup", tags.cloud_agent = true);
+        let (
+            setup_events,
+            task_id_for_refresh,
+            ai_client_for_refresh,
+            oidc_strategy_for_refresh,
+        ) = async {
+            let setup_events = foreground
             .spawn(|me, ctx| {
                 let ai_client = ServerApiProvider::as_ref(ctx).get_ai_client().clone();
                 match me.task_id {
@@ -2594,10 +2693,14 @@ impl AgentDriver {
         let additional_source_repos = foreground
             .spawn(|me, _| me.additional_source_repos.clone())
             .await?;
-        let setup_commands = environment_opt
+        let mut setup_commands = environment_opt
             .as_ref()
             .map(|environment| environment.setup_commands.clone())
             .unwrap_or_default();
+        // The Factory definition checkout is run-scoped: the dispatch decides
+        // whether this run gets one by attaching the clone variables,
+        // independent of which environment the run executes in.
+        environment::prepend_factory_definition_clone(&mut setup_commands);
         let source_repos = environment::merge_repos_deduped(
             environment_opt
                 .as_ref()
@@ -2606,7 +2709,7 @@ impl AgentDriver {
             additional_source_repos,
         )?;
 
-        if environment_opt.is_some() || !source_repos.is_empty() {
+        if environment_opt.is_some() || !source_repos.is_empty() || !setup_commands.is_empty() {
             log::info!("Loading environment...");
             environment_skill_repos = source_repos.clone();
 
@@ -2762,6 +2865,16 @@ impl AgentDriver {
                 (task_id, ai_client, oidc_strategy)
             })
             .await?;
+
+            Ok::<_, AgentDriverError>((
+                setup_events,
+                task_id_for_refresh,
+                ai_client_for_refresh,
+                oidc_strategy_for_refresh,
+            ))
+        }
+        .instrument(setup_span)
+        .await?;
 
         // Run the harness with a prompt, racing it against optional background refresh
         // loops for git credentials and Bedrock OIDC credentials via
@@ -3943,6 +4056,8 @@ impl AgentDriver {
 
         // Submit the AI query.
         if !self.skip_initial_turn {
+            tracing::info!("Submitting initial AI query");
+
             self.terminal_driver.update(ctx, |td, ctx| {
                 td.with_terminal_view(ctx, |terminal, ctx| match task_prompt {
                     AgentRunPrompt::Local(prompt_str) => {
@@ -4059,7 +4174,8 @@ impl AgentDriver {
                     match status {
                         CLIAgentSessionStatus::Success
                         | CLIAgentSessionStatus::Failed { .. }
-                        | CLIAgentSessionStatus::Blocked { .. } => {
+                        | CLIAgentSessionStatus::Blocked { .. }
+                        | CLIAgentSessionStatus::Cancelled => {
                             let idle_window = idle_window_for_cli_session_status(
                                 status,
                                 me.idle_on_complete,
@@ -4271,13 +4387,20 @@ impl AgentDriver {
 
         // Snapshot upload is only meaningful for cloud task runs, so short-circuit before
         // pulling the rest of the context onto this task.
-        let Ok((Some(task_id), snapshot_disabled, upload_timeout, script_timeout)) = spawner
+        let Ok((
+            Some(task_id),
+            snapshot_disabled,
+            upload_timeout,
+            script_timeout,
+            checkpoint_coordinator,
+        )) = spawner
             .spawn(|me, _| {
                 (
                     me.task_id,
                     me.snapshot_disabled,
                     me.snapshot_upload_timeout,
                     me.snapshot_script_timeout,
+                    me.checkpoint_coordinator.clone(),
                 )
             })
             .await
@@ -4286,6 +4409,19 @@ impl AgentDriver {
         };
         if snapshot_disabled {
             log::info!("Skipping snapshot upload because --no-snapshot was specified");
+            return;
+        }
+
+        // An active coordinator replaces the legacy upload below. Budget must come from
+        // `finalize_budget`: the coordinator's floor is `script_timeout + upload_timeout`,
+        // so a smaller budget silently skips the final attempt.
+        if let Some(coordinator) = checkpoint_coordinator {
+            coordinator
+                .finalize(checkpoint_coordinator::finalize_budget(
+                    script_timeout,
+                    upload_timeout,
+                ))
+                .await;
             return;
         }
 
