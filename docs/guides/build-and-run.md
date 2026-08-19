@@ -35,6 +35,10 @@ Required to link `x86_64-pc-windows-msvc`:
 - `protoc`, CMake
 - Git for Windows `usr\bin` (`patch.exe`); put MSVC `link.exe` ahead of Git’s `link.exe`
 
+## Claude Code in Warp (Windows)
+
+The bash `warp@claude-code-warp` plugin hooks do not run on Windows. Install PowerShell hooks instead: [claude-code-warp-windows-hooks.md](claude-code-warp-windows-hooks.md).
+
 ## Windows resume compile
 
 SoT: [`script/windows/build.ps1`](../../script/windows/build.ps1) (wrappers: `.\script\build`, `.\script\build.cmd`).

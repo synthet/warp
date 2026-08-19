@@ -13,5 +13,6 @@ okf_version: 0.1
 - [build-and-run.md](build-and-run.md) — bootstrap, Windows toolchain, run GUI/TUI, `warp-oss` resume compile
 - [windows-local-deploy.md](windows-local-deploy.md) — overlay OSS onto `C:\Program Files\Warp` with `deploy.ps1`
 - [oss-windows-runtime-warnings.md](oss-windows-runtime-warnings.md) — expected `warp-oss.exe` `[WARN]` lines when logged out on Windows
+- [claude-code-warp-windows-hooks.md](claude-code-warp-windows-hooks.md) — PowerShell Claude Code notification hooks (do not use the bash plugin on Windows)
 
 See also: [DEVELOPMENT.md](../DEVELOPMENT.md), [TROUBLESHOOTING.md](../TROUBLESHOOTING.md), [AGENTS.md](../../AGENTS.md).

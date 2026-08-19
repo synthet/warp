@@ -5,6 +5,8 @@ use super::{
     check_installed, check_platform_plugin_installed, claude_code_marketplace_has_local_override,
     installed_platform_plugin_version, installed_version,
 };
+#[cfg(windows)]
+use super::windows_user_hooks_installed;
 
 /// A version strictly below `version`, so below-minimum tests track the
 /// constant instead of a hardcoded literal. Assumes `version` > "0.0.0".
@@ -21,6 +23,18 @@ fn version_below(version: &str) -> String {
         .map(|p| p.to_string())
         .collect::<Vec<_>>()
         .join(".")
+}
+
+#[cfg(windows)]
+#[test]
+fn can_auto_install_is_false_on_windows() {
+    assert!(!ClaudeCodePluginManager::new(None, None, None).can_auto_install());
+}
+
+#[cfg(not(windows))]
+#[test]
+fn can_auto_install_is_true_off_windows() {
+    assert!(ClaudeCodePluginManager::new(None, None, None).can_auto_install());
 }
 
 #[test]
@@ -331,6 +345,7 @@ fn not_installed_when_plugins_key_missing() {
 
 /// Tests `ClaudeCodePluginManager::is_installed` end-to-end by pointing
 /// `CLAUDE_CONFIG_DIR` at a temp directory with a valid installed_plugins.json.
+#[cfg(not(windows))]
 #[test]
 #[serial_test::serial]
 fn is_installed_via_trait_with_claude_config_dir_env() {
@@ -356,6 +371,109 @@ fn is_installed_via_trait_with_claude_config_dir_env() {
     unsafe { std::env::remove_var("CLAUDE_CONFIG_DIR") };
 
     assert!(result);
+}
+
+#[cfg(windows)]
+fn write_windows_hook_fixtures(claude_dir: &std::path::Path) {
+    let hooks_dir = claude_dir.join("hooks").join("warp");
+    fs::create_dir_all(&hooks_dir).unwrap();
+    for script in [
+        "WarpCommon.ps1",
+        "on-session-start.ps1",
+        "on-stop.ps1",
+        "on-stop-failure.ps1",
+        "on-notification.ps1",
+        "on-permission-request.ps1",
+        "on-prompt-submit.ps1",
+        "on-post-tool-use.ps1",
+    ] {
+        fs::write(hooks_dir.join(script), "# stub\n").unwrap();
+    }
+    let settings = serde_json::json!({
+        "hooks": {
+            "PostToolUse": [{
+                "hooks": [{
+                    "type": "command",
+                    "command": "pwsh -NoProfile -File \"C:/Users/example/.claude/hooks/warp/on-post-tool-use.ps1\""
+                }]
+            }]
+        }
+    });
+    fs::write(
+        claude_dir.join("settings.json"),
+        serde_json::to_string(&settings).unwrap(),
+    )
+    .unwrap();
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_user_hooks_installed_when_scripts_and_settings_present() {
+    let dir = tempfile::tempdir().unwrap();
+    write_windows_hook_fixtures(dir.path());
+    assert!(windows_user_hooks_installed(dir.path()));
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_user_hooks_installed_false_when_settings_missing_hooks_reference() {
+    let dir = tempfile::tempdir().unwrap();
+    let hooks_dir = dir.path().join("hooks").join("warp");
+    fs::create_dir_all(&hooks_dir).unwrap();
+    for script in [
+        "WarpCommon.ps1",
+        "on-session-start.ps1",
+        "on-stop.ps1",
+        "on-stop-failure.ps1",
+        "on-notification.ps1",
+        "on-permission-request.ps1",
+        "on-prompt-submit.ps1",
+        "on-post-tool-use.ps1",
+    ] {
+        fs::write(hooks_dir.join(script), "# stub\n").unwrap();
+    }
+    fs::write(dir.path().join("settings.json"), "{}\n").unwrap();
+    assert!(!windows_user_hooks_installed(dir.path()));
+}
+
+#[cfg(windows)]
+#[test]
+#[serial_test::serial]
+fn is_installed_via_trait_when_windows_hooks_present() {
+    let dir = tempfile::tempdir().unwrap();
+    write_windows_hook_fixtures(dir.path());
+
+    unsafe { std::env::set_var("CLAUDE_CONFIG_DIR", dir.path()) };
+    let result = ClaudeCodePluginManager::new(None, None, None).is_installed();
+    unsafe { std::env::remove_var("CLAUDE_CONFIG_DIR") };
+
+    assert!(result);
+}
+
+#[cfg(windows)]
+#[test]
+#[serial_test::serial]
+fn is_installed_via_trait_false_when_only_bash_plugin_on_windows() {
+    let dir = tempfile::tempdir().unwrap();
+    let plugins_dir = dir.path().join("plugins");
+    fs::create_dir_all(&plugins_dir).unwrap();
+
+    let json = serde_json::json!({
+        "plugins": {
+            "warp@claude-code-warp": [{"version": "2.2.0"}]
+        }
+    });
+    fs::write(
+        plugins_dir.join("installed_plugins.json"),
+        serde_json::to_string(&json).unwrap(),
+    )
+    .unwrap();
+
+    unsafe { std::env::set_var("CLAUDE_CONFIG_DIR", dir.path()) };
+    let result = ClaudeCodePluginManager::new(None, None, None).is_installed();
+    unsafe { std::env::remove_var("CLAUDE_CONFIG_DIR") };
+
+    assert!(!result);
 }
 
 #[test]

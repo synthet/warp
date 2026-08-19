@@ -1,8 +1,5 @@
 # Project Memory
 
-Curated, human-reviewed memory for AI coding sessions. Populated via the
-log → dream → promote loop (see [CURSOR_USAGE.md](CURSOR_USAGE.md)). Do not edit
-by hand during a session.
 
 ## Stable Project Facts
 
@@ -18,7 +15,18 @@ by hand during a session.
 
 ## Recurring Issues
 
-- (none yet)
+- On Windows executing .sh hook scripts without a bash prefix triggers Windows file association (.sh -> Warp) opening Warp tabs. Prefixing commands with bash in plugin hooks fixes this. (updated: 2026-08-16)
+  id: mem-0d93aa1bc593
+  summary: On Windows executing .sh hook scripts without a bash prefix triggers Windows
+    file association (.sh -> Warp) opening Warp tabs. Prefixing commands with bash in
+    plugin hooks fixes this.
+  source_hint: 2026-08-16T042953Z.yaml
+  confidence: high
+  verified_at: '2026-08-16'
+  verification_status: verified
+  stale_after: ''
+  related_paths: []
+  related_tasks: []
 
 ## Successful Patterns
 

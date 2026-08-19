@@ -59,13 +59,21 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
     }
 
     fn can_auto_install(&self) -> bool {
-        true
+        // Official plugin hooks are bash scripts. On Windows a bare `.sh` path goes
+        // through ShellExecute (the `.sh` file association), which opens Git Bash /
+        // Warp / an editor instead of running the hook.
+        !cfg!(windows)
     }
 
     fn is_installed(&self) -> bool {
         let Ok(claude_dir) = claude_home_dir() else {
             return false;
         };
+        #[cfg(windows)]
+        {
+            return windows_user_hooks_installed(&claude_dir);
+        }
+        #[cfg(not(windows))]
         check_installed(&claude_dir)
     }
 
@@ -153,21 +161,42 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
     }
 
     fn install_instructions(&self) -> &'static PluginInstructions {
-        &INSTALL_INSTRUCTIONS
+        #[cfg(windows)]
+        {
+            return &WINDOWS_INSTALL_INSTRUCTIONS;
+        }
+        #[cfg(not(windows))]
+        {
+            &INSTALL_INSTRUCTIONS
+        }
     }
 
     fn update_instructions(&self) -> &'static PluginInstructions {
-        &UPDATE_INSTRUCTIONS
+        #[cfg(windows)]
+        {
+            return &WINDOWS_UPDATE_INSTRUCTIONS;
+        }
+        #[cfg(not(windows))]
+        {
+            &UPDATE_INSTRUCTIONS
+        }
     }
 
     fn needs_update(&self) -> bool {
-        let Ok(claude_dir) = claude_home_dir() else {
+        #[cfg(windows)]
+        {
             return false;
-        };
-        match installed_version(&claude_dir) {
-            Some(v) => compare_versions(&v, MINIMUM_PLUGIN_VERSION).is_lt(),
-            // No version field means very old plugin.
-            None => check_installed(&claude_dir),
+        }
+        #[cfg(not(windows))]
+        {
+            let Ok(claude_dir) = claude_home_dir() else {
+                return false;
+            };
+            match installed_version(&claude_dir) {
+                Some(v) => compare_versions(&v, MINIMUM_PLUGIN_VERSION).is_lt(),
+                // No version field means very old plugin.
+                None => check_installed(&claude_dir),
+            }
         }
     }
 
@@ -209,6 +238,7 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
     }
 }
 
+#[cfg(not(windows))]
 static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
     title: "Install Warp Plugin for Claude Code",
     subtitle: "Ensure that jq is installed on your machine. Then, run these commands.",
@@ -233,6 +263,7 @@ static INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plu
     ],
 });
 
+#[cfg(not(windows))]
 static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| PluginInstructions {
     title: "Update Warp Plugin for Claude Code",
     subtitle: "Run the following commands.",
@@ -258,6 +289,70 @@ static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plug
     ],
     post_install_notes: &["Restart Claude Code to activate the update."],
 });
+
+#[cfg(windows)]
+static WINDOWS_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> =
+    LazyLock::new(|| PluginInstructions {
+        title: "Install Warp notifications for Claude Code (Windows)",
+        subtitle: "Do not install warp@claude-code-warp on Windows — its bash hooks ShellExecute .sh files via the file association instead of running them.",
+        steps: &[PluginInstructionStep {
+            description: "From your Synth Warp checkout, install the PowerShell hooks",
+            command: ".\\scripts\\install_claude_warp_hooks_windows.ps1",
+            executable: true,
+            link: None,
+        }],
+        post_install_notes: &[
+            "Restart Claude Code after the installer finishes.",
+            "If warp@claude-code-warp is installed, run: claude plugin uninstall warp@claude-code-warp",
+            "See docs/guides/claude-code-warp-windows-hooks.md for verification steps.",
+        ],
+    });
+
+#[cfg(windows)]
+static WINDOWS_UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> =
+    LazyLock::new(|| PluginInstructions {
+        title: "Update Warp notifications for Claude Code (Windows)",
+        subtitle: "Re-run the installer from your Synth Warp checkout to refresh the PowerShell hooks.",
+        steps: &[PluginInstructionStep {
+            description: "Refresh hook scripts and settings.json",
+            command: ".\\scripts\\install_claude_warp_hooks_windows.ps1",
+            executable: true,
+            link: None,
+        }],
+        post_install_notes: &["Restart Claude Code to pick up the updated hooks."],
+    });
+
+/// PowerShell hook scripts installed by scripts/install_claude_warp_hooks_windows.ps1.
+#[cfg(windows)]
+const WINDOWS_HOOK_SCRIPTS: &[&str] = &[
+    "WarpCommon.ps1",
+    "on-session-start.ps1",
+    "on-stop.ps1",
+    "on-stop-failure.ps1",
+    "on-notification.ps1",
+    "on-permission-request.ps1",
+    "on-prompt-submit.ps1",
+    "on-post-tool-use.ps1",
+];
+
+/// Returns true when user-level PowerShell hooks are installed for Claude Code.
+#[cfg(windows)]
+pub(super) fn windows_user_hooks_installed(claude_dir: &Path) -> bool {
+    let hooks_dir = claude_dir.join("hooks").join("warp");
+    if !hooks_dir.join("WarpCommon.ps1").is_file() {
+        return false;
+    }
+    for script in WINDOWS_HOOK_SCRIPTS {
+        if !hooks_dir.join(script).is_file() {
+            return false;
+        }
+    }
+    let settings_path = claude_dir.join("settings.json");
+    let Ok(contents) = fs::read_to_string(settings_path) else {
+        return false;
+    };
+    contents.contains("hooks/warp/") || contents.contains(r"hooks\warp\")
+}
 
 fn check_installed(claude_dir: &Path) -> bool {
     check_plugin_installed(claude_dir, PLUGIN_KEY)

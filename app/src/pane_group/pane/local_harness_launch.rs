@@ -40,7 +40,7 @@ async fn ensure_local_claude_child_plugins(manager: &dyn CliAgentPluginManager) 
     // installing/updating the notification plugin re-adds the public
     // claude-code-warp marketplace, which clobbers a developer's local
     // claude-code-warp-internal override used for oz-harness-support testing.
-    if !manager.has_local_marketplace_override() {
+    if manager.can_auto_install() && !manager.has_local_marketplace_override() {
         let plugin_result = if manager.needs_update() {
             manager.update().await
         } else if !manager.is_installed() {
