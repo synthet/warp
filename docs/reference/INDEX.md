@@ -11,5 +11,6 @@ okf_version: 0.1
 # Reference
 
 - [agent-asset-inventory.md](../agent-asset-inventory.md) — generated command/skill/subagent index (do not edit by hand)
+- [app-icons.md](app-icons.md) — catalog of every app icon asset, its consumers, and how to change them
 
 See also: [ai-workflow/README.md](../ai-workflow/README.md).

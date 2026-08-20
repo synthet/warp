@@ -91,3 +91,7 @@ node_modules/
 dist/
 graphify-out/
 Thumbs.db
+
+# Local scratch: cargo check logs and dated agent session dumps at the repo root
+/cargo-check-synth.log
+/20??-??-??-*.txt
