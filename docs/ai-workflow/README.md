@@ -76,16 +76,18 @@ Validate after changes: `python scripts/validate_cli_skills.py`.
 ## The SDLC loop
 
 ```
-/spec  →  /clarify  →  /plan  →  /tasks  →  /analyze  →  /implement  →  /test-and-fix  →  /pr-ready  →  (optional) /subagent-review  →  /release-notes
+/draft  →  /spec  →  /clarify  →  /plan  →  /tasks  →  /analyze  →  /implement  →  /test-and-fix  →  /pr-ready  →  (optional) /subagent-review  →  /release-notes
 ```
 
 ### Phase gates
 
 Each phase produces an artifact that gates the next one. Do not skip a gate silently — if a phase
-is unnecessary (trivial fix), say so explicitly. The `/spec` → `/plan` → `/tasks` split follows Spec Kit-style spec-driven development: define product outcomes first, choose implementation strategy second, and only then create executable task slices.
+is unnecessary (trivial fix), say so explicitly — `/draft` is where that call gets made and written
+down, before any artifact exists. The `/spec` → `/plan` → `/tasks` split follows Spec Kit-style spec-driven development: define product outcomes first, choose implementation strategy second, and only then create executable task slices.
 
 | Phase | Artifact produced | Gate to pass before the next phase |
 |-------|-------------------|-------------------------------------|
+| `/draft` | Restated outcome, item class, and the artifact set that class earns (`specs/<REF>/PRODUCT.md`, `TECH.md`, or neither) | Class is justified; artifact set matches it; Trivial items exit the loop here |
 | `/spec` | Spec with EARS `AC-n` acceptance criteria | User approves; no criterion is AMBIGUOUS |
 | `/clarify` | Prioritized decisions plus spec patch notes | Material ambiguity is answered, defaulted, or carried as an explicit risk |
 | `/plan` | Implementation plan (files, approach, tests, rollback) | User approves the plan; skipped `/tasks` gate is justified only for trivial/single-step work |

@@ -23,6 +23,7 @@ This inventory lists the canonical Claude-authored assets that are mirrored to C
 | `/clarify` | `.claude/commands/clarify.md` | /clarify — Resolve material ambiguities before planning |
 | `/compile-skill` | `.claude/commands/compile-skill.md` | /compile-skill — Lower a stable skill into a deterministic harness |
 | `/decompose` | `.claude/commands/decompose.md` | /decompose — Break a large task into parallelizable subtasks |
+| `/draft` | `.claude/commands/draft.md` | /draft — Turn a work item into the written artifact it needs |
 | `/dream-memory` | `.claude/commands/dream-memory.md` | /dream-memory — Propose consolidated project memory |
 | `/implement` | `.claude/commands/implement.md` | /implement — Execute an approved plan |
 | `/log-session` | `.claude/commands/log-session.md` | /log-session — Log agent session to raw memory |
