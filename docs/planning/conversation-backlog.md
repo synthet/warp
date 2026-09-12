@@ -98,9 +98,12 @@ Audit result: most of the surface named above was already dead code, so the live
 
 **Verify:** `cargo test -p warp_core --lib channel` (14 pass); `cargo test -p warp --lib --features gui links` (4 new `util::links::tests` pass); `-- privacy_page slash_command static_commands` (128 pass).
 
-### 7. TUI local-only auth tests were left in progress — Verify
+### 7. TUI local-only auth tests were left in progress — Done
 
-GUI CTAs are done. Confirm TUI login-phase tests still pass (`cargo nextest run -p warp_tui` focused names).
+GUI CTAs are done. Confirmed 2026-09-12: TUI login-phase tests pass. `cargo test -p warp_tui --lib
+login` (nextest not installed here) → **11 passed, 0 failed** — `ui::tests` failed/waiting-login +
+`signed_out_welcome`, `root_view::tests::start_device_login_action_*`, and `zero_state::tests`
+`login_line_*`.
 
 ## P2 — In-process LocalBackend
 
