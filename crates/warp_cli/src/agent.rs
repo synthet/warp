@@ -1,5 +1,6 @@
 use std::fmt;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use clap::builder::PossibleValue;
 use clap::{Args, Subcommand, ValueEnum};
@@ -11,7 +12,7 @@ use crate::environment::EnvironmentCreateArgs;
 use crate::json_filter::JsonOutput;
 use crate::mcp::MCPSpec;
 use crate::model::ModelArgs;
-use crate::scope::ObjectScope;
+use crate::scope::{ObjectScope, TeamSelection};
 use crate::share::ShareArgs;
 use crate::skill::SkillSpec;
 
@@ -37,6 +38,94 @@ impl fmt::Display for OutputFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = self.to_possible_value().expect("no values are skipped");
         f.write_str(value.get_name())
+    }
+}
+
+/// Source-control provider for a repository checkout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RepositoryForge {
+    #[serde(rename = "GITHUB")]
+    GitHub,
+    #[serde(rename = "GITLAB")]
+    GitLab,
+    #[serde(rename = "AZURE_DEVOPS")]
+    AzureDevOps,
+}
+/// Server-supplied repository HEAD used to prepare an agent run.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RepositoryHeadRef {
+    CommitSha(String),
+    Branch(String),
+}
+
+impl RepositoryHeadRef {
+    pub fn value(&self) -> &str {
+        match self {
+            Self::CommitSha(value) | Self::Branch(value) => value,
+        }
+    }
+}
+
+/// Server-supplied override for an environment repository's initial HEAD.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepositoryHeadOverride {
+    pub code_forge: RepositoryForge,
+    pub repo_owner: String,
+    pub repo_name: String,
+    pub head: RepositoryHeadRef,
+}
+
+impl RepositoryHeadOverride {
+    pub fn identity(&self) -> (RepositoryForge, &str, &str) {
+        (
+            self.code_forge,
+            self.repo_owner.as_str(),
+            self.repo_name.as_str(),
+        )
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.repo_owner.is_empty() {
+            return Err("repo_owner must not be empty".to_string());
+        }
+        if self.repo_name.is_empty() {
+            return Err("repo_name must not be empty".to_string());
+        }
+        match &self.head {
+            RepositoryHeadRef::CommitSha(commit_sha) => {
+                if commit_sha.len() != 40
+                    || !commit_sha
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+                {
+                    return Err(
+                        "commit SHA must be an exact 40-character lowercase hexadecimal SHA"
+                            .to_string(),
+                    );
+                }
+            }
+            RepositoryHeadRef::Branch(branch) => {
+                if branch.is_empty() || branch.trim() != branch {
+                    return Err(
+                        "branch must not be empty or contain surrounding whitespace".to_string()
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl FromStr for RepositoryHeadOverride {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let head_override = serde_json::from_str::<Self>(value)
+            .map_err(|error| format!("invalid repository head override JSON: {error}"))?;
+        head_override.validate()?;
+        Ok(head_override)
     }
 }
 
@@ -331,6 +420,8 @@ impl AgentCommand {
 pub struct RunAgentArgs {
     #[command(flatten)]
     pub prompt_arg: PromptArg,
+    #[command(flatten)]
+    pub team_selection: TeamSelection,
 
     #[command(flatten)]
     pub model: ModelArgs,
@@ -493,6 +584,20 @@ pub struct RunAgentArgs {
 
     #[arg(long = "configure-git-credentials-with-github", hide = true, requires_all = ["task_id"])]
     pub configure_git_credentials_with_github: bool,
+
+    /// Repository HEAD override supplied by the server for this task.
+    #[arg(
+        long = "repository-head-override-json",
+        value_name = "JSON",
+        action = clap::ArgAction::Append,
+        requires = "task_id",
+        hide = true
+    )]
+    pub repository_head_overrides: Vec<RepositoryHeadOverride>,
+
+    /// Remove the origin remote from environment repositories after setup.
+    #[arg(long = "remove-repository-origins", requires = "task_id", hide = true)]
+    pub remove_repository_origins: bool,
 }
 
 impl RunAgentArgs {
@@ -698,6 +803,8 @@ pub enum AgentSortByArg {
 /// Arguments for listing named agents.
 #[derive(Debug, Clone, Args)]
 pub struct AgentListArgs {
+    #[command(flatten)]
+    pub team_selection: TeamSelection,
     /// Sort field. Only supported for pretty, text, and ndjson output.
     #[arg(long = "sort-by", value_enum, value_name = "FIELD")]
     pub sort_by: Option<AgentSortByArg>,
@@ -725,6 +832,8 @@ pub struct AgentGetArgs {
 /// Arguments for creating a named agent.
 #[derive(Debug, Clone, Args)]
 pub struct AgentCreateArgs {
+    #[command(flatten)]
+    pub team_selection: TeamSelection,
     /// Name of the agent.
     #[arg(long = "name", short = 'n')]
     pub name: String,
@@ -870,6 +979,8 @@ pub struct AgentDeleteArgs {
 /// Arguments for listing available agent skills.
 #[derive(Debug, Clone, Args)]
 pub struct ListAgentSkillsArgs {
+    #[command(flatten)]
+    pub team_selection: TeamSelection,
     /// List skills from a specific GitHub repository.
     ///
     /// Format: `owner/repo` or `https://github.com/owner/repo`

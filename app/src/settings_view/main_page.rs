@@ -26,8 +26,8 @@ use warpui::{
 };
 
 use super::settings_page::{
-    AdditionalInfo, HEADER_PADDING, LocalOnlyIconState, MatchData, PageType, SettingsPageMeta,
-    SettingsPageViewHandle, SettingsWidget, ToggleState, render_body_item,
+    AdditionalInfo, HEADER_PADDING, LocalOnlyIconState, MatchData, PageTitle, PageType,
+    SettingsPageMeta, SettingsPageViewHandle, SettingsWidget, ToggleState, render_body_item,
     render_customer_type_badge,
 };
 use super::{
@@ -277,7 +277,8 @@ impl MainSettingsPageView {
             widgets.push(Box::new(VersionInfoWidget::default()));
         }
 
-        let page = PageType::new_uncategorized(widgets, Some("Account"));
+        // No LogoutWidget: this fork's local use needs no Warp account to sign out of.
+        let page = PageType::new_uncategorized(widgets, Some(PageTitle::new("Account")));
 
         MainSettingsPageView {
             self_handle: ctx.handle(),

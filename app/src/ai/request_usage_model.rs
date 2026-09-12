@@ -19,7 +19,7 @@ use crate::ai::credit_availability::{AICreditAvailability, AICreditDenialReason}
 use crate::auth::AuthStateProvider;
 use crate::server::server_api::ai::AIClient;
 use crate::settings::AISettings;
-use crate::workspaces::user_workspaces::UserWorkspaces;
+use crate::workspaces::user_workspaces::{TeamScope, UserWorkspaces};
 use crate::workspaces::workspace::WorkspaceUid;
 
 /// Threshold of ambient-only credits at which we surface upgrade/CTA UI.
@@ -496,15 +496,20 @@ impl AIRequestUsageModel {
 
     /// Returns `true` if the user can start an interactive AI request.
     /// Prefers the server decision when present; otherwise uses the pre-fetch fallback.
-    pub fn has_any_ai_remaining(&self, _ctx: &AppContext) -> bool {
+    pub fn has_any_ai_remaining<S: TeamScope + ?Sized>(
+        &self,
+        _scope: &S,
+        _ctx: &AppContext,
+    ) -> bool {
         // Synth Warp is commercial-free: never block local AI use on plan quotas.
         true
     }
 
     /// Trusts `available`; only `OutOfCredits` may be refined by local BYO credentials.
     #[allow(dead_code)]
-    fn server_availability_permits_ai(
+    fn server_availability_permits_ai<S: TeamScope + ?Sized>(
         availability: AICreditAvailability,
+        scope: &S,
         ctx: &AppContext,
     ) -> bool {
         if availability.available {
@@ -513,28 +518,59 @@ impl AIRequestUsageModel {
         matches!(
             availability.denial_reason,
             AICreditDenialReason::OutOfCredits
-        ) && Self::has_usable_byo_inference_path(ctx)
+        ) && Self::has_usable_byo_inference_path(scope, ctx)
     }
 
-    /// Whether a local BYO path is usable: stored API key/endpoint/Grok when
-    /// BYOK is allowed, or loaded AWS credentials for an enabled Bedrock host.
+    /// Whether a local BYO path is usable under `scope`'s team policy.
     #[allow(dead_code)]
-    fn has_usable_byo_inference_path(ctx: &AppContext) -> bool {
-        let user_workspaces = UserWorkspaces::as_ref(ctx);
-        let api_keys = ApiKeyManager::as_ref(ctx);
-        if user_workspaces.is_byo_api_key_enabled(ctx) && api_keys.has_any_key() {
+    fn has_usable_byo_inference_path<S: TeamScope + ?Sized>(scope: &S, ctx: &AppContext) -> bool {
+        if Self::has_usable_member_byo_inference_path(scope, ctx) {
             return true;
         }
-        user_workspaces.is_aws_bedrock_credentials_enabled(ctx)
+        let user_workspaces = UserWorkspaces::as_ref(ctx);
+        let api_keys = ApiKeyManager::as_ref(ctx);
+        user_workspaces.is_aws_bedrock_credentials_enabled(scope, ctx)
             && matches!(
                 api_keys.aws_credentials_state(),
                 AwsCredentialsState::Loaded { .. }
             )
     }
 
+    fn has_usable_member_byo_inference_path<S: TeamScope + ?Sized>(
+        scope: &S,
+        ctx: &AppContext,
+    ) -> bool {
+        let user_workspaces = UserWorkspaces::as_ref(ctx);
+        let api_keys = ApiKeyManager::as_ref(ctx);
+        let has_provider_key =
+            api_keys.keys().provider_key_count() > 0 || api_keys.has_grok_subscription();
+        if user_workspaces.is_byo_api_key_enabled(ctx)
+            && user_workspaces.are_member_byo_keys_allowed(scope)
+            && has_provider_key
+        {
+            return true;
+        }
+        let has_custom_endpoint_key = api_keys
+            .keys()
+            .custom_endpoints
+            .iter()
+            .any(|endpoint| !endpoint.api_key.trim().is_empty());
+        if user_workspaces.is_byo_endpoint_enabled(ctx)
+            && user_workspaces.are_member_byo_endpoints_allowed(scope)
+            && has_custom_endpoint_key
+        {
+            return true;
+        }
+        false
+    }
+
     /// Prefetch fallback used only before any successful server availability decision this session.
     #[allow(dead_code)]
-    fn has_any_ai_remaining_before_server_decision(&self, ctx: &AppContext) -> bool {
+    fn has_any_ai_remaining_before_server_decision<S: TeamScope + ?Sized>(
+        &self,
+        scope: &S,
+        ctx: &AppContext,
+    ) -> bool {
         let current_workspace = UserWorkspaces::as_ref(ctx).current_workspace();
 
         let has_base_plan_ai_requests = self.has_base_plan_requests_remaining();
@@ -558,8 +594,7 @@ impl AIRequestUsageModel {
 
         // If you have provided your own API key or connected a Grok
         // subscription, it doesn't matter if you are out of warp-provided requests.
-        let has_byo_credentials = UserWorkspaces::as_ref(ctx).is_byo_api_key_enabled(ctx)
-            && ApiKeyManager::as_ref(ctx).has_any_key();
+        let has_byo_credentials = Self::has_usable_member_byo_inference_path(scope, ctx);
 
         has_base_plan_ai_requests
             || (user_bonus_credits || workspace_and_team_bonus_credits)
@@ -690,8 +725,9 @@ impl AIRequestUsageModel {
 
     /// Computes the current banner state based on live conditions.
     #[allow(dead_code)]
-    pub fn compute_buy_addon_credits_banner_display_state(
+    pub fn compute_buy_addon_credits_banner_display_state<S: TeamScope + ?Sized>(
         &self,
+        _scope: &S,
         _ctx: &AppContext,
     ) -> BuyCreditsBannerDisplayState {
         // Synth Warp is commercial-free: never show buy-credits banners.
