@@ -128,6 +128,19 @@ Cursor plan name: `LocalBackend in-process`. From the secure-storage `NotFound` 
 
 Inventory remaining `send_graphql_request` call sites (referral, workspace/billing, team, object/Drive, TUI onboarding, AI, …). Phase 1 stubs Disable traits with `anyhow!("disabled in Synth Warp")` so OSS never hits the sinkhole for wired traits. Full leftover `rg send_graphql_request` is a follow-up.
 
+**2026-09-12 — inventory done, guard scoped:** full inventory in
+[graphql-call-site-inventory.md](graphql-call-site-inventory.md). All **111** application-level
+invocation sites (102 in `app/src/server/server_api/`, 7 in `warp_server_client` auth, 2 in
+`ai/agent_sdk`) funnel through the single chokepoint
+`crates/warp_server_client/src/graphql_helpers.rs::send_graphql_request`, which returns
+`anyhow::Result` — so one guard `if !ChannelState::warp_cloud_enabled() { bail!("disabled in Synth
+Warp") }` covers everything with no `GraphQLError` enum change, and preserves self-host. Confirmed
+**zero** GraphQL-layer stubs exist today; OSS is protected only by caller-level gating, and the
+transport (`crates/graphql`) has no disabled-root short-circuit. Guard **not yet applied** because
+the chokepoint's 6 unit tests in `graphql_helpers_tests.rs` run under the default `Oss` + disabled
+root and assert it sends; landing the guard requires a scoped test-state override (the global
+`CHANNEL_STATE` mutation hazard from item #21), so it needs a deliberate change, not a drive-by.
+
 ### 11. Later LocalBackend phases (not Phase 1) — Open
 
 - **1b:** real `ObjectClient` / `BlockClient` on SQLite (local Drive). Copy patterns from [fake_object_client.rs](../../app/src/server/cloud_objects/fake_object_client.rs)
