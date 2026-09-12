@@ -324,23 +324,19 @@ impl UserWorkspaces {
     ///
     /// Without the managed BYOK/BYOE policy there is no team-level restriction, so this returns
     /// true and the normal BYO entitlement applies.
-    pub fn are_member_byo_keys_allowed<S: TeamScope + ?Sized>(&self, scope: &S) -> bool {
-        !self.is_managed_byok_byoe_enabled()
-            || self
-                .team_byo_for_scope(scope)
-                .is_some_and(|team_byo| team_byo.first_party_enabled && team_byo.allow_user_keys)
+    /// Synth Warp is local-first: a member's own provider API keys are always allowed,
+    /// so the managed BYOK/BYOE team policy never restricts them.
+    pub fn are_member_byo_keys_allowed<S: TeamScope + ?Sized>(&self, _scope: &S) -> bool {
+        true
     }
 
     /// [`Self::are_member_byo_keys_allowed`] for member-configured custom endpoints. Its
     /// entitlement half is [`Self::is_byo_endpoint_enabled`].
     pub(crate) fn are_member_byo_endpoints_allowed<S: TeamScope + ?Sized>(
         &self,
-        scope: &S,
+        _scope: &S,
     ) -> bool {
-        !self.is_managed_byok_byoe_enabled()
-            || self
-                .team_byo_for_scope(scope)
-                .is_some_and(|team_byo| team_byo.endpoints_enabled && team_byo.allow_user_endpoints)
+        true
     }
 
     /// Whether `scope`'s team provides a managed endpoint serving `llm_id`.

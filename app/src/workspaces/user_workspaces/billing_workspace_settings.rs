@@ -32,13 +32,11 @@ impl UserWorkspaces {
             .or_else(|| self.current_workspace_billing_metadata())
     }
 
-    pub fn is_custom_llm_enabled_for_team(&self, team: Option<&Team>) -> bool {
-        team.map(Team::is_custom_llm_enabled)
-            .or_else(|| {
-                self.current_workspace()
-                    .map(Workspace::is_custom_llm_enabled)
-            })
-            .unwrap_or(false)
+    /// Synth Warp is local-first: custom LLMs are always permitted, so no team or
+    /// workspace policy can switch them off. Upstream's signature is kept so the
+    /// scoped call sites are unchanged.
+    pub fn is_custom_llm_enabled_for_team(&self, _team: Option<&Team>) -> bool {
+        true
     }
 
     /// The add-on credits purchase policy for the current viewer context: the
@@ -151,20 +149,12 @@ impl UserWorkspaces {
                 })
     }
 
-    /// Whether BYO API key is enabled for the current user, based on the active policies.
-    /// Note that the value may be incorrect if called before the team's billing metadata has been fetched.
-    /// For solo users (no workspace), this is controlled by the `SoloUserByok` feature flag.
-    /// Anonymous or logged-out users are not allowed to use BYO API keys.
-    pub fn is_byo_api_key_enabled(&self, app: &AppContext) -> bool {
-        if AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
-        {
-            return false;
-        }
-        self.current_workspace()
-            .map(|workspace| workspace.billing_metadata.is_byo_api_key_enabled())
-            .unwrap_or(FeatureFlag::SoloUserByok.is_enabled())
+    /// Whether BYO API key is enabled for the current user.
+    /// Synth Warp is local-first: always allow. Upstream gated this on team policy,
+    /// the `SoloUserByok` flag, and a non-anonymous account; the fork drops all
+    /// three, since a user's own key is the primary inference path here.
+    pub fn is_byo_api_key_enabled(&self, _app: &AppContext) -> bool {
+        true
     }
 
     /// Whether custom inference endpoints are enabled for the current user.

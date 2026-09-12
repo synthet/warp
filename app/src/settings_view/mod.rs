@@ -359,7 +359,7 @@ impl Display for SettingsSection {
 impl SettingsSection {
     /// Returns true if this section is a subpage under the "Cloud platform" umbrella.
     pub fn is_cloud_platform_subpage(&self) -> bool {
-        matches!(self, Self::CloudEnvironments | Self::OzCloudAPIKeys)
+        matches!(self, Self::CloudEnvironments | Self::WarpCloudAgentAPIKeys)
     }
 
     /// Warp-cloud account surfaces omitted from Synth Warp's local-only Settings.
@@ -371,7 +371,7 @@ impl SettingsSection {
                 | Self::Teams
                 | Self::WarpDrive
                 | Self::CloudEnvironments
-                | Self::OzCloudAPIKeys
+                | Self::WarpCloudAgentAPIKeys
         )
     }
 
