@@ -46,6 +46,7 @@ See [`.agent/SAFETY.md`](.agent/SAFETY.md) and [`docs/ai-workflow/README.md`](do
 
 | Date | Symptom | Root cause | Fix / guard |
 |------|---------|------------|-------------|
+| 2026-09-12 | A five-line docs change opened warpdotdev/warp#15974 upstream, proposing the whole fork (737 files, +45,610/−5,324, 28 commits) to Warp's maintainers | From a fork, `gh pr create` defaults `--base` to the **parent** repo; the long-lived branch was also reused after its first PR merged. A misconfigured `upstream` remote (pointing at `synthet/warp`) hid the mistake. | [Git remotes & PR targets](#git-remotes--pr-targets); [`.claude/rules/fork-remotes.md`](.claude/rules/fork-remotes.md); `gh repo set-default synthet/warp` |
 | 2026-08-17 | Claude Code Warp plugin `.sh` hooks open Git Bash / Warp / an editor on Windows | `warp@claude-code-warp` hooks are bash; a bare `.sh` path ShellExecutes via the `.sh` file association. Warp auto-installs the plugin for Claude sessions, which re-enables it after a local disable. | Skip Claude notification-plugin auto-install on Windows (`can_auto_install`); install PowerShell hooks via [docs/guides/claude-code-warp-windows-hooks.md](docs/guides/claude-code-warp-windows-hooks.md). |
 | 2026-08-15 | Windows `warp-oss` compile: `NativeCommandError` / hung waiter / `false` in `enabled_features()` | Piping cargo `2>&1`; `Start-Process -NoNewWindow -Wait` after link; leftover `false` in a `FeatureFlag` array | [guides/build-and-run.md](docs/guides/build-and-run.md); [architecture/synth-fork.md](docs/architecture/synth-fork.md) |
 | 2026-08-15 | Privacy "Visit the data management page" opens `http://192.0.2.0:9/data_management` (`ERR_UNSAFE_PORT`) | OSS `WarpServerConfig::disabled()` uses TEST-NET-1:9 as a backstop; Chromium blocks port 9; Privacy still interpolated `server_root_url` | Hide DataManagementWidget / skip URL when `!warp_cloud_enabled()` |
@@ -61,6 +62,38 @@ Do not invent a parallel queue in `.agent/backlog/items.md`. Provider docs remai
 
 
 This file provides guidance when working with code in this repository.
+
+## Git remotes & PR targets
+
+**This repo is the `synthet/warp` fork. `warpdotdev/warp` is a read-only upstream source.**
+
+| Repo | Role | Direction |
+|------|------|-----------|
+| `synthet/warp` | ours — branches, PRs, merges, pushes, issues, releases | read + write |
+| `warpdotdev/warp` | upstream source | **read only** — fetch/merge *in*, never push or PR *out* |
+
+- **Never open a PR against `warpdotdev/warp`**, push a branch there, or file issues/comments on it.
+  Reading an upstream PR or file to review it is fine; the resulting change lands in `synthet/warp`.
+- From a fork, `gh pr create` defaults `--base` to the **parent** repo. Always be explicit:
+
+  ```bash
+  gh repo set-default synthet/warp                 # once per checkout
+  gh pr create --repo synthet/warp --base master   # correct
+  gh pr create                                     # WRONG — bases on warpdotdev/warp
+  ```
+
+- Sync upstream **into** the fork by URL, so `.git/config` stays untouched:
+
+  ```bash
+  git fetch https://github.com/warpdotdev/warp.git master
+  git merge FETCH_HEAD
+  ```
+
+  Don't trust a named `upstream` remote without checking `git remote -v` first — in this checkout
+  `upstream` points at `synthet/warp`, so `upstream/master` is a synonym for `origin/master`, not
+  the source repo.
+
+Full rule: [`.claude/rules/fork-remotes.md`](.claude/rules/fork-remotes.md).
 
 ## Development Commands
 
