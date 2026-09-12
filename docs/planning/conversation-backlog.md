@@ -124,7 +124,7 @@ Cursor plan name: `LocalBackend in-process`. From the secure-storage `NotFound` 
 - Mint from Windows username if missing
 - Demote `Unable to read user from secure storage: NotFound` from INFO to debug
 
-### 10. Quiet leftover GraphQL to `192.0.2.0:9` — Open
+### 10. Quiet leftover GraphQL to `192.0.2.0:9` — Done
 
 Inventory remaining `send_graphql_request` call sites (referral, workspace/billing, team, object/Drive, TUI onboarding, AI, …). Phase 1 stubs Disable traits with `anyhow!("disabled in Synth Warp")` so OSS never hits the sinkhole for wired traits. Full leftover `rg send_graphql_request` is a follow-up.
 
@@ -136,10 +136,14 @@ invocation sites (102 in `app/src/server/server_api/`, 7 in `warp_server_client`
 `anyhow::Result` — so one guard `if !ChannelState::warp_cloud_enabled() { bail!("disabled in Synth
 Warp") }` covers everything with no `GraphQLError` enum change, and preserves self-host. Confirmed
 **zero** GraphQL-layer stubs exist today; OSS is protected only by caller-level gating, and the
-transport (`crates/graphql`) has no disabled-root short-circuit. Guard **not yet applied** because
-the chokepoint's 6 unit tests in `graphql_helpers_tests.rs` run under the default `Oss` + disabled
-root and assert it sends; landing the guard requires a scoped test-state override (the global
-`CHANNEL_STATE` mutation hazard from item #21), so it needs a deliberate change, not a drive-by.
+transport (`crates/graphql`) has no disabled-root short-circuit. **Guard applied** at that chokepoint:
+`if is_disabled_root_url(ChannelState::server_root_url()) { bail!("disabled in Synth Warp") }`.
+Gating on the transport-facing `server_root_url()` (not `warp_cloud_enabled()`, which reads the
+config root) needed **zero test changes** — under `test-util` that accessor returns the mockito
+localhost URL, so the guard is skipped in tests and the item-#21 `CHANNEL_STATE`-mutation hazard is
+avoided. Verified: `cargo test -p warp_server_client --lib` 49 passed / 0 failed, clippy + fmt clean.
+Residual (not blocking): a future caller reaching the low-level `crates/graphql` transport directly
+would bypass the app-level guard; a transport guard there would need a new `GraphQLError` variant.
 
 ### 11. Later LocalBackend phases (not Phase 1) — Open
 

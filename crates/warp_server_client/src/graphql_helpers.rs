@@ -23,6 +23,15 @@ where
     O: Operation<QF> + Send + 'a,
 {
     Box::pin(async move {
+        // Synth Warp: never dial the disabled blackhole root (192.0.2.0:9). On OSS the
+        // server is stubbed out, so short-circuit here instead of building and sending a
+        // request that can only time out against the sinkhole. Self-hosting (a real
+        // `SYNTH_WARP_SERVER_ROOT_URL`) sets a non-disabled root and passes through.
+        if warp_core::channel::is_disabled_root_url(
+            warp_core::channel::ChannelState::server_root_url().as_ref(),
+        ) {
+            anyhow::bail!("disabled in Synth Warp: GraphQL server is offline on this build");
+        }
         let operation_name = operation.operation_name().map(Cow::into_owned);
         let options = base_client.graphql_request_options(timeout).await?;
         let response = match operation

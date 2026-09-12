@@ -60,35 +60,45 @@ Lines 194, 279, 329, 390, 422, 448, 457. User settings / account / token operati
 
 Lines 150, 350 (`server_api.send_graphql_request`). Cloud-agent environment image fetches.
 
-## Guard status
+## Guard status — implemented 2026-09-12
 
-**None** of the 111 sites has a GraphQL-layer `Disable`-trait stub. Item #10's "Phase 1 stubs Disable
-traits with `anyhow!(\"disabled in Synth Warp\")`" is **not yet implemented**.
-
-## Recommendation
-
-Add one guard at the chokepoint `graphql_helpers::send_graphql_request`, before the request is built:
+One guard now sits at the chokepoint `graphql_helpers::send_graphql_request`, before the request is
+built, covering all 111 sites:
 
 ```rust
-if !warp_core::channel::ChannelState::warp_cloud_enabled() {
-    anyhow::bail!("disabled in Synth Warp: GraphQL is offline on this build");
+if warp_core::channel::is_disabled_root_url(
+    warp_core::channel::ChannelState::server_root_url().as_ref(),
+) {
+    anyhow::bail!("disabled in Synth Warp: GraphQL server is offline on this build");
 }
 ```
 
-`warp_cloud_enabled()` is precisely the right predicate: `false` for the OSS blackhole root **and**
-for any hosted-warp-production root (which the fork must never re-enable), but `true` when a user
-points the client at their own backend via `SYNTH_WARP_SERVER_ROOT_URL` — so self-hosting still
-works. This covers all 111 sites, needs no `GraphQLError` change, and is the defense-in-depth guard
-`docs/architecture/synth-fork.md` calls for.
+### Why this predicate
 
-**Landing constraint (must be handled in the same change):** the 6 unit tests in
-`crates/warp_server_client/src/graphql_helpers_tests.rs` drive `send_graphql_request` under the
-default `Oss` + disabled root with a `FakeGraphqlOperation`, asserting it proceeds to send. The guard
-would short-circuit them. They must be updated to run under a cloud-enabled state — but flipping the
-global `CHANNEL_STATE` singleton in a test is the same process-wide-state hazard documented in
-backlog item #21, so the fix needs a scoped test-state override (or a `#[cfg(test)]` seam), not a
-bare mutation that leaks across parallel tests. This is why the guard is left as a recommendation
-rather than applied here.
+The guard checks `is_disabled_root_url(server_root_url())` — the **same** accessor the transport
+(`crates/graphql/src/client.rs`) uses to build the endpoint, so it tests the actual outgoing target.
+It is `true` only for the `192.0.2.0:9` blackhole, and a self-hoster who sets a real
+`SYNTH_WARP_SERVER_ROOT_URL` passes through. No `GraphQLError` enum change (the chokepoint returns
+`anyhow`).
+
+This turned out to need **zero test changes**, avoiding the item-#21 `CHANNEL_STATE`-mutation hazard
+entirely: `warp_server_client`'s dev-deps build `warp_core` with `test-util`, under which
+`server_root_url()` returns the mockito localhost URL (not the blackhole), so the guard is skipped in
+tests. (An earlier sketch gated on `warp_cloud_enabled()`, which reads the config root directly and
+*would* have tripped the 6 `graphql_helpers_tests.rs` tests — switching to the transport-facing
+`server_root_url()` both fixed that and made the check more precise.)
+
+### Verified
+
+`cargo test -p warp_server_client --lib` → 49 passed, 0 failed (incl. the 6 `graphql_helpers` tests);
+`cargo clippy -p warp_server_client --lib` clean; `cargo fmt -- --check` clean.
+
+### Residual
+
+The guard is at the app-level chokepoint, which every current call path funnels through. A
+hypothetical *future* caller that reaches the low-level `crates/graphql` transport directly (not via
+`graphql_helpers`) would bypass it; a transport-level guard there would need a new `GraphQLError`
+variant and updates to ~5 exhaustive matches. Not needed today — left as a note.
 
 ## Refresh commands
 
