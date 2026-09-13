@@ -23,6 +23,7 @@
 - The active default Claude settings are intentionally **read-only**: `.claude/settings.json` allows `Bash(git status)`, `Bash(git diff:*)`, `Bash(git log:*)`, and `WebSearch` only.
 - Local repository writes are opt-in. Use `.claude/settings.write.example.json` as a template when a maintainer explicitly wants local staging/committing (`git add`, `git commit`), and prefer enabling the smallest needed subset for the current task.
 - Remote writes are not the same as local writes. `gh pr`, `gh issue`, and `gh project` mutate GitHub state, may trigger notifications/automation, and require explicit task intent plus verification of the target owner/repo/project.
+- **The only write target is `synthet/warp`.** `warpdotdev/warp` is a read-only upstream source: never push, PR, comment, or file issues there. From a fork `gh pr create` defaults `--base` to the parent repo, so pass `--repo synthet/warp --base master` explicitly. See [`.claude/rules/fork-remotes.md`](../.claude/rules/fork-remotes.md).
 - External export requires separate explicit approval before sending source files, prompts, logs, artifacts, review bundles, or other project data to third-party services/providers. Local-write approval does not imply export approval.
 - Seeded projects inherit the safer read-only default because the scaffold ships `.claude/settings.json` without write-capable commands.
 

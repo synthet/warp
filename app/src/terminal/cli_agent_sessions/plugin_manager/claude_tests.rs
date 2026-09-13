@@ -1,12 +1,12 @@
 use std::fs;
 
+#[cfg(windows)]
+use super::windows_user_hooks_installed;
 use super::{
     ClaudeCodePluginManager, CliAgentPluginManager, MINIMUM_PLATFORM_PLUGIN_VERSION,
     check_installed, check_platform_plugin_installed, claude_code_marketplace_has_local_override,
     installed_platform_plugin_version, installed_version,
 };
-#[cfg(windows)]
-use super::windows_user_hooks_installed;
 
 /// A version strictly below `version`, so below-minimum tests track the
 /// constant instead of a hardcoded literal. Assumes `version` > "0.0.0".

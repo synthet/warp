@@ -2,6 +2,8 @@ mod docker;
 pub mod parse_url_paths;
 pub mod web_intent_parser;
 
+pub(crate) mod browser_url_resolution;
+
 #[cfg(target_family = "wasm")]
 pub mod browser_url_handler;
 
@@ -1390,6 +1392,7 @@ fn open_file(window_id: Option<WindowId>, path: PathBuf, ctx: &mut AppContext) {
                 open_new_with_workspace_source(
                     NewWorkspaceSource::Session {
                         options: Box::default(),
+                        initial_team_uid: None,
                     },
                     ctx,
                 )
@@ -1484,6 +1487,7 @@ fn open_file_editor(
             open_new_with_workspace_source(
                 NewWorkspaceSource::Session {
                     options: Box::default(),
+                    initial_team_uid: None,
                 },
                 ctx,
             )
@@ -1676,8 +1680,9 @@ fn dispatch_action_in_new_or_existing_window<T: 'static>(
 
 fn settings_section_for_simple_subpage(subpage: &str) -> Option<SettingsSection> {
     match subpage {
+        // Billing is stripped in this fork: the subpage resolves to nothing.
         "billing_and_usage" => None,
-        "platform" => Some(SettingsSection::OzCloudAPIKeys),
+        "platform" => Some(SettingsSection::WarpCloudAgentAPIKeys),
         "appearance" => Some(SettingsSection::Appearance),
         "warp_agent" => Some(SettingsSection::WarpAgent),
         _ => None,

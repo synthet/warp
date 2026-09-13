@@ -8,8 +8,14 @@
 
 | Project | Repository | Role |
 |---------|------------|------|
-| Synth Warp (this) | https://github.com/synthet/warp | Local-first Warp client fork |
+| Synth Warp (this) | https://github.com/synthet/warp | **Ours** — every branch, PR, merge, and push |
+| Warp (upstream) | https://github.com/warpdotdev/warp | **Read-only source** — fetch and merge *in*, never push or PR *out* |
 | synthet-code-framework | sibling `../synthet-code-framework` | Agent scaffold this repo adopted |
+
+**Never open a PR against `warpdotdev/warp` or mutate it in any way.** From a fork, `gh pr create`
+defaults `--base` to the parent repo, so always pass `--repo synthet/warp --base master`. Sync
+upstream into the fork with `git fetch https://github.com/warpdotdev/warp.git master` — fetching by
+URL keeps `.git/config` untouched. Full rule: [`.claude/rules/fork-remotes.md`](.claude/rules/fork-remotes.md).
 
 ## Backlog & queue
 
@@ -69,6 +75,7 @@ Fast subset: `cargo nextest run -p <crate>`. Full suite: `./script/presubmit`.
 - **Default read-only mode:** the scaffolded `.claude/settings.json` only allows read-oriented inspection (`git status`, `git diff:*`, `git log:*`) plus `WebSearch`.
 - **Local writes are opt-in:** to let an agent stage or commit local changes, copy or merge `.claude/settings.write.example.json` into the active Claude settings for that workspace, preferably enabling only the entries needed for the current task.
 - **Remote writes are separate:** GitHub mutations through `gh pr:*`, `gh issue:*`, or `gh project:*` affect shared remote state and may notify people; enable them only after explicit task intent and target verification.
+- **Remote writes target `synthet/warp` only:** never push, PR, comment, or file issues against `warpdotdev/warp` — it is a read-only upstream source. Name the target repo explicitly before every mutation.
 - **External export approval:** exporting code, prompts, logs, or generated artifacts to external services/providers requires explicit approval and a secrets check, even when local writes are already allowed.
 
 ## Development Guidelines
@@ -78,6 +85,7 @@ Follow [`AGENTS.md`](AGENTS.md) for Warp-specific style, comments, terminal-mode
 - **Minimal diffs** — prefer targeted edits over rewrites; no drive-by refactors.
 - **Secrets** go in `secrets.json` / `.env` (git-ignored), never in committed config.
 - **Never modify `.git/config`**.
+- **Never merge or PR to `warpdotdev/warp`** — always the `synthet/warp` fork.
 
 ## Documentation
 
