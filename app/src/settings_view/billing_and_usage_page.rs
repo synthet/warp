@@ -46,7 +46,7 @@ use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::{AuthManager, AuthStateProvider, UserUid};
 use crate::menu::{Event as MenuEvent, Menu, MenuItem, MenuItemFields};
 use crate::modal::{Modal, ModalEvent, ModalViewState};
-use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
+use crate::pricing::PricingInfoModel;
 use crate::server::ids::ServerId;
 use crate::server::telemetry::TelemetryEvent;
 use crate::settings::ai::{AISettings, AISettingsChangedEvent};
@@ -302,15 +302,6 @@ impl BillingAndUsagePageView {
 
         ctx.subscribe_to_model(&AIRequestUsageModel::handle(ctx), |_, _, _, ctx| {
             ctx.notify()
-        });
-
-        ctx.subscribe_to_model(&PricingInfoModel::handle(ctx), |me, _handle, event, ctx| {
-            #[allow(irrefutable_let_patterns)]
-            if let PricingInfoModelEvent::PricingInfoUpdated = event {
-                me.update_addon_credits_options(ctx);
-                me.refresh_addon_credits_settings(ctx);
-                ctx.notify();
-            }
         });
 
         let usage_history_model = ctx.add_model(UsageHistoryModel::new);
@@ -705,6 +696,11 @@ impl BillingAndUsagePageView {
     }
 
     fn update_addon_credits_options(&mut self, ctx: &mut ViewContext<Self>) {
+        // Test harnesses (e.g. the workspace-view mock) don't register the pricing
+        // singleton; skip the update rather than panic when it's absent.
+        if !ctx.has_singleton_model::<PricingInfoModel>() {
+            return;
+        }
         self.addon_credits_options = PricingInfoModel::as_ref(ctx)
             .addon_credits_options()
             .map(|opts| opts.to_vec())

@@ -351,8 +351,6 @@ struct TeamsWidgetMouseHandles {
     approve_domains_button: MouseStateHandle,
     reset_invite_links_button: MouseStateHandle,
     invite_by_link_toggle_state: SwitchStateHandle,
-    upgrade_link: MouseStateHandle,
-    stripe_billing_portal_link: MouseStateHandle,
     manage_plan_link: MouseStateHandle,
     enterprise_contact_us_link: MouseStateHandle,
     discoverable_team_toggle_state: SwitchStateHandle,
@@ -360,7 +358,6 @@ struct TeamsWidgetMouseHandles {
     admin_panel_button: MouseStateHandle,
     grow_team_warning_cta_button: MouseStateHandle,
     team_members_count_tooltip: MouseStateHandle,
-    outgrow_upgrade_link: MouseStateHandle,
     workspace_admin_panel_link: HighlightedHyperlink,
     browse_teams_button: MouseStateHandle,
 }
@@ -2579,19 +2576,6 @@ impl TeamsWidget {
             .finish()
     }
 
-    fn outgrow_upgrade_line_copy(
-        billing_metadata: &BillingMetadata,
-    ) -> (&'static str, &'static str) {
-        if billing_metadata.customer_type == CustomerType::Business {
-            (
-                "Upgrade to Enterprise",
-                " for an unlimited team member limit.",
-            )
-        } else {
-            ("Upgrade to Business", " for a higher team member limit.")
-        }
-    }
-
     fn render_team_member_cost_info(
         &self,
         team_metadata: &Team,
@@ -2954,37 +2938,6 @@ impl TeamsWidget {
             .build()
             .on_click(move |ctx, _, _| {
                 ctx.dispatch_typed_action(TeamsPageAction::ContactSupport);
-            })
-            .finish()
-    }
-
-    fn render_manage_billing_button(
-        &self,
-        team_uid: ServerId,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
-        appearance
-            .ui_builder()
-            .button(
-                ButtonVariant::Link,
-                self.mouse_state_handles.stripe_billing_portal_link.clone(),
-            )
-            .with_text_and_icon_label(
-                TextAndIcon::new(
-                    TextAndIconAlignment::IconFirst,
-                    "Manage billing",
-                    Icon::CoinsStacked.to_warpui_icon(appearance.theme().accent()),
-                    MainAxisSize::Min,
-                    MainAxisAlignment::Center,
-                    vec2f(14., 14.),
-                )
-                .with_inner_padding(4.),
-            )
-            .build()
-            .on_click(move |ctx, _, _| {
-                ctx.dispatch_typed_action(TeamsPageAction::GenerateStripeBillingPortalLink {
-                    team_uid,
-                });
             })
             .finish()
     }
@@ -4813,43 +4766,6 @@ impl TeamsWidget {
         } else {
             element.finish()
         }
-    }
-
-    fn render_compare_plans_button(
-        &self,
-        text: &str,
-        mouse_state_handle: MouseStateHandle,
-        team_uid: ServerId,
-        appearance: &Appearance,
-        style: Option<UiComponentStyles>,
-    ) -> Box<dyn Element> {
-        let icon_color = appearance.theme().accent();
-
-        let mut button = appearance
-            .ui_builder()
-            .button(ButtonVariant::Link, mouse_state_handle)
-            .with_text_and_icon_label(
-                TextAndIcon::new(
-                    TextAndIconAlignment::IconFirst,
-                    text.to_string(),
-                    Icon::CoinsStacked.to_warpui_icon(icon_color),
-                    MainAxisSize::Min,
-                    MainAxisAlignment::Center,
-                    vec2f(14., 14.),
-                )
-                .with_inner_padding(4.),
-            );
-
-        if let Some(style) = style {
-            button = button.with_style(style);
-        }
-
-        button
-            .build()
-            .on_click(move |ctx, _, _| {
-                ctx.dispatch_typed_action(TeamsPageAction::GenerateUpgradeLink { team_uid });
-            })
-            .finish()
     }
 
     fn render_button(

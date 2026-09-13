@@ -43,7 +43,6 @@ use crate::view_components::dropdown::DropdownAction;
 use crate::view_components::{
     Dropdown, DropdownItem, FilterableDropdown, SubmittableTextInput, SubmittableTextInputEvent,
 };
-use crate::workspace::WorkspaceAction;
 use crate::workspaces::user_workspaces::{
     ResolvedTeamScope, TeamContext, TeamScope, UserWorkspacesEvent,
 };

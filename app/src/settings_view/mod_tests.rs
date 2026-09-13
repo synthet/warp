@@ -35,7 +35,7 @@ fn warp_cloud_account_sections_are_hidden_in_local_only_build() {
     assert!(SettingsSection::Teams.is_hidden_in_local_only_build());
     assert!(SettingsSection::WarpDrive.is_hidden_in_local_only_build());
     assert!(SettingsSection::CloudEnvironments.is_hidden_in_local_only_build());
-    assert!(SettingsSection::OzCloudAPIKeys.is_hidden_in_local_only_build());
+    assert!(SettingsSection::WarpCloudAgentAPIKeys.is_hidden_in_local_only_build());
     assert!(!SettingsSection::Account.is_hidden_in_local_only_build());
     assert!(!SettingsSection::Appearance.is_hidden_in_local_only_build());
 }

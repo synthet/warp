@@ -65,6 +65,9 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
         !cfg!(windows)
     }
 
+    // On Windows every caller compiles out of the `#[cfg(not(windows))]` arms below,
+    // so the `return` in the Windows arm is required, not needless.
+    #[cfg_attr(windows, allow(clippy::needless_return))]
     fn is_installed(&self) -> bool {
         let Ok(claude_dir) = claude_home_dir() else {
             return false;
@@ -160,6 +163,7 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
         "Warp plugin updated. Please run /reload-plugins to activate."
     }
 
+    #[cfg_attr(windows, allow(clippy::needless_return))]
     fn install_instructions(&self) -> &'static PluginInstructions {
         #[cfg(windows)]
         {
@@ -171,6 +175,7 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
         }
     }
 
+    #[cfg_attr(windows, allow(clippy::needless_return))]
     fn update_instructions(&self) -> &'static PluginInstructions {
         #[cfg(windows)]
         {
@@ -182,6 +187,7 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
         }
     }
 
+    #[cfg_attr(windows, allow(clippy::needless_return))]
     fn needs_update(&self) -> bool {
         #[cfg(windows)]
         {
@@ -291,8 +297,8 @@ static UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| Plug
 });
 
 #[cfg(windows)]
-static WINDOWS_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> =
-    LazyLock::new(|| PluginInstructions {
+static WINDOWS_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
+    PluginInstructions {
         title: "Install Warp notifications for Claude Code (Windows)",
         subtitle: "Do not install warp@claude-code-warp on Windows — its bash hooks ShellExecute .sh files via the file association instead of running them.",
         steps: &[PluginInstructionStep {
@@ -306,11 +312,12 @@ static WINDOWS_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> =
             "If warp@claude-code-warp is installed, run: claude plugin uninstall warp@claude-code-warp",
             "See docs/guides/claude-code-warp-windows-hooks.md for verification steps.",
         ],
-    });
+    }
+});
 
 #[cfg(windows)]
-static WINDOWS_UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> =
-    LazyLock::new(|| PluginInstructions {
+static WINDOWS_UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> = LazyLock::new(|| {
+    PluginInstructions {
         title: "Update Warp notifications for Claude Code (Windows)",
         subtitle: "Re-run the installer from your Synth Warp checkout to refresh the PowerShell hooks.",
         steps: &[PluginInstructionStep {
@@ -320,7 +327,8 @@ static WINDOWS_UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> =
             link: None,
         }],
         post_install_notes: &["Restart Claude Code to pick up the updated hooks."],
-    });
+    }
+});
 
 /// PowerShell hook scripts installed by scripts/install_claude_warp_hooks_windows.ps1.
 #[cfg(windows)]
@@ -354,6 +362,9 @@ pub(super) fn windows_user_hooks_installed(claude_dir: &Path) -> bool {
     contents.contains("hooks/warp/") || contents.contains(r"hooks\warp\")
 }
 
+// Only the `#[cfg(not(windows))]` install/update paths call this; on Windows they
+// compile out, leaving it used solely by tests.
+#[cfg_attr(windows, allow(dead_code))]
 fn check_installed(claude_dir: &Path) -> bool {
     check_plugin_installed(claude_dir, PLUGIN_KEY)
 }

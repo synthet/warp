@@ -32,13 +32,12 @@ use warp_editor::editor::NavigationKey;
 use warp_errors::report_if_error;
 use warpui::elements::{
     Border, ChildAnchor, ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment,
-    Empty, Expanded, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable,
-    HyperlinkUrl, MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning,
-    ParentAnchor, ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack, Text,
+    Empty, Expanded, Flex, FormattedTextElement, HighlightedHyperlink, Hoverable, HyperlinkUrl,
+    MainAxisAlignment, MainAxisSize, MouseStateHandle, OffsetPositioning, ParentAnchor,
+    ParentElement, ParentOffsetBounds, Radius, Shrinkable, Stack, Text,
 };
 use warpui::fonts::{Properties, Weight};
 use warpui::keymap::{ContextPredicate, Keystroke};
-use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::switch::{SwitchStateHandle, TooltipConfig};
 use warpui::{
@@ -4738,7 +4737,6 @@ struct ApiKeysWidget {
     grok_disconnect_button: ViewHandle<ActionButton>,
 
     can_use_warp_credits_for_fallback: SwitchStateHandle,
-    upgrade_highlight_index: HighlightedHyperlink,
 
     description_learn_more_index: HighlightedHyperlink,
 }
@@ -4962,7 +4960,6 @@ impl ApiKeysWidget {
             grok_disconnect_button,
 
             can_use_warp_credits_for_fallback: Default::default(),
-            upgrade_highlight_index: Default::default(),
 
             description_learn_more_index: Default::default(),
         }

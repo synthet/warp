@@ -304,15 +304,6 @@ impl BillingAndUsagePageV2View {
             ctx.notify()
         });
 
-        ctx.subscribe_to_model(
-            &PricingInfoModel::handle(ctx),
-            |me, _handle, _event, ctx| {
-                me.update_addon_credits_options(ctx);
-                me.refresh_addon_credits_settings(ctx);
-                ctx.notify();
-            },
-        );
-
         let usage_history_model = ctx.add_model(UsageHistoryModel::new);
         ctx.subscribe_to_model(&usage_history_model, |_, _, _, ctx| {
             ctx.notify();
@@ -569,6 +560,11 @@ impl BillingAndUsagePageV2View {
     }
 
     fn update_addon_credits_options(&mut self, ctx: &mut ViewContext<Self>) {
+        // Test harnesses (e.g. the workspace-view mock) don't register the pricing
+        // singleton; skip the update rather than panic when it's absent.
+        if !ctx.has_singleton_model::<PricingInfoModel>() {
+            return;
+        }
         self.addon_credits.options = PricingInfoModel::as_ref(ctx)
             .addon_credits_options()
             .map(|options| options.to_vec())

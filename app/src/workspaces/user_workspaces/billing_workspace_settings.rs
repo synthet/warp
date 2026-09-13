@@ -3,16 +3,13 @@
 //! [`crate::workspaces::user_workspaces::team_workspace_settings`] for the workspace-vs-team
 //! two-layer model and the team-scoped policies that layer on top.
 
-use warp_core::features::FeatureFlag;
 use warpui::{AppContext, SingletonEntity};
 
 use super::UserWorkspaces;
 use crate::auth::AuthStateProvider;
 use crate::channel::ChannelState;
 use crate::workspaces::team::Team;
-use crate::workspaces::workspace::{
-    BillingMetadata, CustomerType, PurchaseAddOnCreditsPolicy, Workspace,
-};
+use crate::workspaces::workspace::{BillingMetadata, CustomerType, PurchaseAddOnCreditsPolicy};
 
 impl UserWorkspaces {
     pub fn current_workspace_billing_metadata(&self) -> Option<&BillingMetadata> {

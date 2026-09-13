@@ -47,7 +47,6 @@ use crate::ai::onboarding::{
 use crate::ai::request_usage_model::AIRequestUsageModelEvent;
 use crate::app_state::{AppState, PaneUuid, WindowSnapshot};
 use crate::appearance::Appearance;
-use crate::pricing::{PricingInfoModel, PricingInfoModelEvent};
 use crate::auth::auth_manager::{AuthManager, AuthManagerEvent};
 use crate::auth::auth_override_warning_modal::{
     AuthOverrideWarningModal, AuthOverrideWarningModalEvent, AuthOverrideWarningModalVariant,
@@ -1929,11 +1928,11 @@ impl RootView {
                 if #[cfg(target_family = "wasm")] {
                     AuthOnboardingState::WebImport(AuthOnboardingTarget::Workspace(workspace_args.into()))
                 } else {
-                    // Account-first onboarding and the current settings-modes flow both run before
-                    // login for users who have not completed onboarding locally.
+                    // Account-first onboarding runs before login for users who have not
+                    // completed onboarding locally. (Upstream removed the settings-modes
+                    // flow and its `OpenWarpNewSettingsModes` flag, so only this remains.)
                     let pre_login_onboarding_enabled =
-                        FeatureFlag::AccountFirstOnboarding.is_enabled()
-                            || FeatureFlag::OpenWarpNewSettingsModes.is_enabled();
+                        FeatureFlag::AccountFirstOnboarding.is_enabled();
                     let has_completed_local_onboarding = pre_login_onboarding_enabled
                         && has_completed_local_onboarding(ctx);
                     let should_show_pre_login_onboarding = pre_login_onboarding_enabled
@@ -2207,18 +2206,6 @@ impl RootView {
             view.set_pricing_promotion_message(onboarding_pricing_promotion_message(ctx), ctx);
             view
         });
-        // Keep the offer slide's promotion in sync with server pricing.
-        let onboarding_view_for_pricing = onboarding_view.clone();
-        ctx.subscribe_to_model(
-            &PricingInfoModel::handle(ctx),
-            move |_, _pricing, event, ctx| {
-                let PricingInfoModelEvent::PricingInfoUpdated = event;
-                let promotion_message = onboarding_pricing_promotion_message(ctx);
-                onboarding_view_for_pricing.update(ctx, |onboarding_view, ctx| {
-                    onboarding_view.set_pricing_promotion_message(promotion_message, ctx);
-                });
-            },
-        );
 
         let onboarding_view_clone = onboarding_view.clone();
         ctx.subscribe_to_model(

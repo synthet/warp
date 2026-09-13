@@ -15,13 +15,10 @@ use crate::server::server_api::ai::MockAIClient;
 use crate::server::server_api::team::MockTeamClient;
 use crate::server::server_api::workspace::MockWorkspaceClient;
 use crate::workspaces::team::{Team, TeamVisibility};
-use crate::workspaces::user_workspaces::{
-    TeamContextForOperation, TeamlessScopeForTest, UserWorkspaces,
-};
+use crate::workspaces::user_workspaces::{TeamlessScopeForTest, UserWorkspaces};
 use crate::workspaces::workspace::{
     AiOverages, ByoApiKeyPolicy, CustomerType, EnterpriseCreditsAutoReloadPolicy,
-    EnterprisePayAsYouGoPolicy, HostEnablementSetting, LlmHostSettings, ManagedByokByoePolicy,
-    PurchaseAddOnCreditsPolicy, TeamByoSettings, Workspace, WorkspaceUid,
+    EnterprisePayAsYouGoPolicy, PurchaseAddOnCreditsPolicy, Workspace, WorkspaceUid,
 };
 
 fn create_test_workspace() -> (WorkspaceUid, Workspace) {
@@ -31,6 +28,9 @@ fn create_test_workspace() -> (WorkspaceUid, Workspace) {
     (uid, workspace)
 }
 
+// Stranded when the upstream per-team Bedrock test was dropped (it asserts AI is
+// blocked, which this fork never does). Kept for future team-scoped tests.
+#[allow(dead_code)]
 fn create_test_team(uid: i64) -> Team {
     Team {
         uid: uid.into(),
@@ -1114,56 +1114,6 @@ fn test_reset_server_availability_clears_the_stored_decision() {
     });
 }
 
-#[test]
-fn test_out_of_credits_with_loaded_bedrock_credentials_respects_each_teams_policy() {
-    App::test((), |mut app| async move {
-        let (_uid, mut workspace) = create_test_workspace();
-        let mut enabled_team = create_test_team(1);
-        enabled_team.settings.llm_settings.enabled = true;
-        enabled_team.settings.llm_settings.host_configs.insert(
-            crate::ai::llms::LLMModelHost::AwsBedrock,
-            LlmHostSettings {
-                enabled: true,
-                enablement_setting: HostEnablementSetting::Enforce,
-                ..Default::default()
-            },
-        );
-        let disabled_team = create_test_team(2);
-        workspace.teams = vec![enabled_team.clone(), disabled_team.clone()];
-        add_user_workspaces_with_workspace(&mut app, workspace);
-        let request_usage_model = add_request_usage_model(&mut app);
-
-        ApiKeyManager::handle(&app).update(&mut app, |manager, ctx| {
-            manager.set_aws_credentials_state(
-                AwsCredentialsState::Loaded {
-                    credentials: AwsCredentials::new(
-                        "access".to_string(),
-                        "secret".to_string(),
-                        None,
-                        None,
-                    ),
-                    loaded_at: SystemTime::now(),
-                },
-                ctx,
-            );
-        });
-        request_usage_model.update(&mut app, |model, ctx| {
-            model.apply_server_availability(
-                Ok(AICreditAvailability::unavailable(
-                    AICreditDenialReason::OutOfCredits,
-                )),
-                ctx,
-            );
-        });
-
-        request_usage_model.read(&app, |model, ctx| {
-            let enabled_scope = TeamContextForOperation::new_for_test(enabled_team.uid);
-            let disabled_scope = TeamContextForOperation::new_for_test(disabled_team.uid);
-            assert!(model.has_any_ai_remaining(&enabled_scope, ctx));
-            assert!(!model.has_any_ai_remaining(&disabled_scope, ctx));
-        });
-    });
-}
 #[test]
 fn test_server_managed_availability_trusted_without_local_keys() {
     App::test((), |mut app| async move {

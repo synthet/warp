@@ -1,7 +1,8 @@
+use serial_test::serial;
+
 use super::*;
 use crate::terminal::model::secrets::regexes::FIREBASE_AUTH_DOMAIN;
 use crate::terminal::shell::ShellType;
-use serial_test::serial;
 
 #[test]
 #[serial]
