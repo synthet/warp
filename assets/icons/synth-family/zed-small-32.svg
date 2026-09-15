@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
   <title id="title">Zed — 24/32 px simplification</title>
-  <desc id="description">Labyrinth reduced to one ring plus the diagonal. Bars snap to a 32-unit grid so they land on whole pixels at 32 px.</desc>
+  <desc id="description">Same bracketed Z as the master, with bars widened to 96 units so they land on whole pixels at 32 px.</desc>
   <g id="foundation">
     <rect x="64" y="64" width="896" height="896" rx="184" fill="#101014"/>
   </g>
   <g id="glyph" fill="#A9B7C6">
-      <path d="M 192,192 H 832 V 256 H 256 V 544 H 192 Z"/>
-      <path d="M 832,480 V 832 H 192 V 768 H 768 V 480 Z"/>
-      <path d="M 752,208 L 816,272 L 272,816 L 208,752 Z"/>
+      <path d="M 224,224 H 800 V 320 H 320 V 544 H 224 Z"/>
+      <path d="M 800,480 V 800 H 224 V 704 H 704 V 480 Z"/>
+      <path d="M 720,224 L 800,304 L 304,800 L 224,720 Z"/>
   </g>
 </svg>
