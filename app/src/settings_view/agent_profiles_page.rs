@@ -15,6 +15,7 @@ use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
 use regex::Regex;
 use settings::{Setting, ToggleableSetting};
 use strum::IntoEnumIterator;
+use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 use warp_errors::{report_error, report_if_error};
 use warpui::elements::{
@@ -2059,6 +2060,17 @@ impl SettingsWidget for UsageWidget {
 
     fn search_terms(&self) -> &str {
         "a.i. ai usage limit plan"
+    }
+
+    /// Synth Warp is commercial-free: this renders a Warp credit balance and
+    /// upgrade / compare-plans / contact-sales CTAs for a billing relationship
+    /// this build does not have.
+    ///
+    /// `build_page` only reaches this widget when `UsageBasedPricing` is off, so
+    /// today it is already unreachable; the gate keeps it that way if the flag
+    /// ever flips.
+    fn should_render(&self, _app: &AppContext) -> bool {
+        ChannelState::warp_hosted_ai_enabled()
     }
 
     fn render(

@@ -2336,8 +2336,17 @@ impl AISettings {
             && AppExecutionMode::as_ref(app).allows_active_ai()
     }
 
+    /// Whether the Warp-hosted "Active AI" side-features may run at all.
+    ///
+    /// Synth Warp is local-first: each of these is Warp-hosted inference the
+    /// shipped build cannot reach, so they stay off regardless of the stored
+    /// value. See [`Channel::offers_warp_hosted_ai`].
+    fn is_active_ai_offered(&self, app: &warpui::AppContext) -> bool {
+        ChannelState::warp_hosted_ai_enabled() && self.is_active_ai_enabled(app)
+    }
+
     pub fn is_prompt_suggestions_enabled(&self, app: &warpui::AppContext) -> bool {
-        self.is_active_ai_enabled(app) && *self.prompt_suggestions_enabled_internal
+        self.is_active_ai_offered(app) && *self.prompt_suggestions_enabled_internal
     }
 
     pub fn is_rule_suggestions_enabled(&self, app: &warpui::AppContext) -> bool {
@@ -2345,28 +2354,31 @@ impl AISettings {
     }
 
     pub fn is_code_suggestions_enabled(&self, app: &warpui::AppContext) -> bool {
-        self.is_active_ai_enabled(app) && *self.code_suggestions_enabled_internal
+        self.is_active_ai_offered(app) && *self.code_suggestions_enabled_internal
     }
 
     pub fn is_natural_language_autosuggestions_enabled(&self, app: &warpui::AppContext) -> bool {
-        self.is_active_ai_enabled(app) && *self.natural_language_autosuggestions_enabled_internal
+        self.is_active_ai_offered(app) && *self.natural_language_autosuggestions_enabled_internal
     }
 
     pub fn is_shared_block_title_generation_enabled(&self, app: &warpui::AppContext) -> bool {
-        self.is_active_ai_enabled(app) && *self.shared_block_title_generation_enabled_internal
+        self.is_active_ai_offered(app) && *self.shared_block_title_generation_enabled_internal
     }
 
     pub fn is_git_operations_autogen_enabled(&self, app: &warpui::AppContext) -> bool {
-        self.is_active_ai_enabled(app) && *self.git_operations_autogen_enabled_internal
+        self.is_active_ai_offered(app) && *self.git_operations_autogen_enabled_internal
     }
 
     pub fn is_intelligent_autosuggestions_enabled(&self, app: &warpui::AppContext) -> bool {
-        self.is_active_ai_enabled(app) && *self.intelligent_autosuggestions_enabled_internal
+        self.is_active_ai_offered(app) && *self.intelligent_autosuggestions_enabled_internal
     }
 
     pub fn is_voice_input_enabled(&self, app: &warpui::AppContext) -> bool {
         // Voice input is conditionally-compiled because it requires additional dependencies on some platforms.
-        cfg!(feature = "voice_input")
+        // Synth Warp is commercial-free: transcription is done by Wispr Flow, a vendor
+        // Warp brokers on the user's behalf, so it stays off here.
+        ChannelState::warp_hosted_ai_enabled()
+            && cfg!(feature = "voice_input")
             && self.is_any_ai_enabled(app)
             && *self.voice_input_enabled_internal
     }

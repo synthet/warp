@@ -81,6 +81,29 @@ impl Channel {
         }
     }
 
+    /// Whether this channel offers Warp Inc.'s hosted AI: the built-in Warp Agent
+    /// (`Harness::Oz`), its Active AI side-features, Warp credits, cloud handoff, and
+    /// the vendor integrations Warp brokers on the user's behalf (Wispr Flow voice,
+    /// SuperGrok, AWS Bedrock, Gemini Enterprise).
+    ///
+    /// False for `Oss`: Synth Warp ships no inference backend and has no billing
+    /// relationship with Warp Inc., so those settings advertise capability the build
+    /// cannot deliver.
+    ///
+    /// Like [`Self::shows_warp_inc_links`], this is deliberately *not*
+    /// [`ChannelState::warp_cloud_enabled`], which varies with `server_root_url`:
+    /// pointing an OSS build at your own MAA-compatible backend does not make you a
+    /// Warp AI customer.
+    pub fn offers_warp_hosted_ai(&self) -> bool {
+        match self {
+            Channel::Stable | Channel::Preview | Channel::Dev | Channel::Local => true,
+            // Integration keeps the upstream surface so GUI integration tests continue
+            // to exercise the same settings pages as a first-party build.
+            Channel::Integration => true,
+            Channel::Oss => false,
+        }
+    }
+
     /// Returns the Warp Control CLI command name corresponding to this channel.
     pub fn warpctrl_command_name(&self) -> &'static str {
         match self {

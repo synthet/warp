@@ -315,6 +315,13 @@ impl ChannelState {
         )
     }
 
+    /// Whether Warp Inc.'s hosted AI surfaces may be offered by this build.
+    /// See [`Channel::offers_warp_hosted_ai`] — unlike [`Self::warp_cloud_enabled`],
+    /// this does not vary with `server_root_url`.
+    pub fn warp_hosted_ai_enabled() -> bool {
+        CHANNEL_STATE.lock().channel.offers_warp_hosted_ai()
+    }
+
     pub fn filter_unsupported_features(flags: &mut HashSet<FeatureFlag>) {
         let state = CHANNEL_STATE.lock();
         filter_unsupported_features_for(
@@ -513,6 +520,22 @@ const CLOUD_AGENT_FEATURES: &[FeatureFlag] = &[
     FeatureFlag::HandoffCloudCloud,
 ];
 
+/// Warp Inc.'s hosted AI features, stripped from OSS builds. See
+/// [`Channel::offers_warp_hosted_ai`]: Synth Warp ships no inference backend and
+/// no billing relationship, so these code paths can never succeed here.
+///
+/// `GitOperationsInCodeReview` is deliberately absent — it also gates local
+/// code-review git UI, so its hosted-AI widget is hidden on the settings page
+/// instead. `UsageBasedPricing` is absent because removing it would *re-enable*
+/// the Warp-credit usage widget on the Profiles page.
+const WARP_HOSTED_AI_FEATURES: &[FeatureFlag] = &[
+    FeatureFlag::SuperGrok,
+    FeatureFlag::GeminiEnterprise,
+    FeatureFlag::AgentModeComputerUse,
+    FeatureFlag::BackgroundComputerUse,
+    FeatureFlag::SharedBlockTitleGeneration,
+];
+
 const OSS_CONTROL_PLANE_FEATURES: &[FeatureFlag] = &[
     FeatureFlag::AgentSharedSessions,
     FeatureFlag::CloudConversations,
@@ -532,6 +555,9 @@ pub fn filter_unsupported_features_for(
 
     if channel == Channel::Oss {
         for flag in OSS_CONTROL_PLANE_FEATURES {
+            flags.remove(flag);
+        }
+        for flag in WARP_HOSTED_AI_FEATURES {
             flags.remove(flag);
         }
     }
