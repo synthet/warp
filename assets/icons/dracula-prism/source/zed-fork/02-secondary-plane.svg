@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="zed-cyan" x1="280" y1="784" x2="760" y2="536" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8BE9FD"/>
+      <stop offset="1" stop-color="#8BE9FD" stop-opacity="0.78"/>
+    </linearGradient>
+    <filter id="cyan-shadow" x="192" y="496" width="648" height="360" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#282A36" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <path id="secondary-plane" d="M488 544H792V608L608 792H240L472 560Q479 552 488 544Z" fill="url(#zed-cyan)" filter="url(#cyan-shadow)"/>
+  <path d="M488 544H792" fill="none" stroke="#F8F8F2" stroke-opacity="0.22" stroke-width="10" stroke-linecap="round"/>
+</svg>

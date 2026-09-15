@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <mask id="prompt-cut"><rect width="1024" height="1024" fill="white"/><path d="M284 544Q284 524 300 536L392 612Q408 624 392 638L300 716Q284 728 284 706Z" fill="black"/></mask>
+  </defs>
+  <path d="M240 664C304 416 408 408 488 576C552 710 606 716 656 624C704 536 720 336 792 392" fill="none" stroke="#F8F8F2" stroke-width="176" stroke-linecap="round" stroke-linejoin="round" mask="url(#prompt-cut)"/>
+</svg>

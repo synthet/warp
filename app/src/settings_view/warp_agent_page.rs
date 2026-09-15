@@ -109,6 +109,12 @@ use crate::workspaces::user_workspaces::{ResolvedTeamScope, TeamContext, UserWor
 use crate::workspaces::workspace::{AdminEnablementSetting, CustomerType};
 use crate::{TelemetryEvent, UserWorkspaces, send_telemetry_from_ctx};
 
+/// Synth Warp is local-first: this page no longer configures Warp Inc.'s hosted
+/// agent, only the conversation UI that every harness — including the third-party
+/// CLI agents — runs in. The section's [`SettingsSection::slug`] keeps the old
+/// "Warp Agent" spelling, which is a compatibility contract.
+const PAGE_TITLE: &str = "Agent";
+
 const AI_SETTINGS_DROPDOWN_WIDTH: f32 = 250.;
 const AI_SETTINGS_DROPDOWN_MAX_HEIGHT: f32 = 250.;
 
@@ -2068,7 +2074,7 @@ impl WarpAgentPageView {
 
         let mut categories: Vec<Category<Self>> = Vec::new();
 
-        if ai_settings
+        let any_active_ai_supported = ai_settings
             .intelligent_autosuggestions_enabled_internal
             .is_supported_on_current_platform()
             || ai_settings
@@ -2085,8 +2091,11 @@ impl WarpAgentPageView {
             || (FeatureFlag::GitOperationsInCodeReview.is_enabled()
                 && ai_settings
                     .git_operations_autogen_enabled_internal
-                    .is_supported_on_current_platform())
-        {
+                    .is_supported_on_current_platform());
+
+        // Synth Warp is local-first: every Active AI feature routes through
+        // Warp-hosted inference, so the whole category is omitted here.
+        if ChannelState::warp_hosted_ai_enabled() && any_active_ai_supported {
             let active_ai_widgets: Vec<Box<dyn SettingsWidget<View = Self>>> = vec![
                 Box::new(NextCommandWidget::default()),
                 Box::new(PromptSuggestionsWidget::default()),
@@ -2117,7 +2126,10 @@ impl WarpAgentPageView {
             ],
         ));
 
-        let voice_supported = cfg!(feature = "voice_input")
+        // Synth Warp is commercial-free: voice input is transcribed by Wispr Flow,
+        // a vendor Warp brokers on the user's behalf, so it is omitted here.
+        let voice_supported = ChannelState::warp_hosted_ai_enabled()
+            && cfg!(feature = "voice_input")
             && ai_settings
                 .voice_input_enabled_internal
                 .is_supported_on_current_platform();
@@ -2128,14 +2140,18 @@ impl WarpAgentPageView {
             ));
         }
 
-        categories.push(Category::new(
-            "Cloud Handoff",
-            vec![
-                Box::new(CloudHandoffWidget::default()),
-                Box::new(AutoHandoffOnSleepWidget::default()),
-                Box::new(AmpersandHandoffWidget::default()),
-            ],
-        ));
+        // Synth Warp is local-first: handoff moves a conversation to a Warp-hosted
+        // cloud agent, which this build never starts.
+        if ChannelState::warp_hosted_ai_enabled() {
+            categories.push(Category::new(
+                "Cloud Handoff",
+                vec![
+                    Box::new(CloudHandoffWidget::default()),
+                    Box::new(AutoHandoffOnSleepWidget::default()),
+                    Box::new(AmpersandHandoffWidget::default()),
+                ],
+            ));
+        }
 
         let page_view_handle = ctx.handle();
         categories.push(Category::with_header(
@@ -2155,15 +2171,19 @@ impl WarpAgentPageView {
             vec![Box::new(ApiKeysWidget::new(ctx))],
         ));
 
-        categories.push(Category::new(
-            "AWS Bedrock",
-            vec![Box::new(AwsBedrockWidget::new(ctx))],
-        ));
+        // Synth Warp is commercial-free: both relay the user's vendor credentials
+        // through Warp's backend and are gated on a Warp team admin enabling them.
+        if ChannelState::warp_hosted_ai_enabled() {
+            categories.push(Category::new(
+                "AWS Bedrock",
+                vec![Box::new(AwsBedrockWidget::new(ctx))],
+            ));
 
-        categories.push(Category::new(
-            "Gemini Enterprise",
-            vec![Box::new(GeminiEnterpriseWidget::new(ctx))],
-        ));
+            categories.push(Category::new(
+                "Gemini Enterprise",
+                vec![Box::new(GeminiEnterpriseWidget::new(ctx))],
+            ));
+        }
 
         if FeatureFlag::CustomModelRouters.is_enabled() {
             #[allow(clippy::vec_init_then_push)]
@@ -2206,7 +2226,7 @@ impl WarpAgentPageView {
         let global_ai_sign_up_button = MouseStateHandle::default();
         PageType::new_categorized(
             categories,
-            Some(PageTitle::new("Warp Agent").with_trailing_element(
+            Some(PageTitle::new(PAGE_TITLE).with_trailing_element(
                 move |_view, appearance, app| {
                     render_global_ai_toggle(
                         &global_ai_switch_state,
@@ -3030,30 +3050,43 @@ fn render_global_ai_toggle(
     row.finish()
 }
 
+/// Whether the Warp-hosted "Active AI" side-features may be offered at all.
+///
+/// Synth Warp is local-first: each of these runs on Warp-hosted inference the
+/// shipped build cannot reach, so every `is_*_toggleable` helper below leads with
+/// this check. See [`Channel::offers_warp_hosted_ai`].
+fn is_active_ai_offered() -> bool {
+    ChannelState::warp_hosted_ai_enabled()
+}
+
 fn is_next_command_toggleable(app: &AppContext) -> bool {
-    UserWorkspaces::as_ref(app).is_next_command_enabled()
+    is_active_ai_offered()
+        && UserWorkspaces::as_ref(app).is_next_command_enabled()
         && AISettings::as_ref(app)
             .intelligent_autosuggestions_enabled_internal
             .is_supported_on_current_platform()
 }
 
 fn is_prompt_suggestions_toggleable(app: &AppContext) -> bool {
-    UserWorkspaces::as_ref(app).is_prompt_suggestions_toggleable()
+    is_active_ai_offered()
+        && UserWorkspaces::as_ref(app).is_prompt_suggestions_toggleable()
         && AISettings::as_ref(app)
             .prompt_suggestions_enabled_internal
             .is_supported_on_current_platform()
 }
 
 fn is_suggested_code_banners_toggleable(app: &AppContext) -> bool {
-    (is_prompt_suggestions_toggleable(app)
-        || UserWorkspaces::as_ref(app).is_code_suggestions_toggleable())
+    is_active_ai_offered()
+        && (is_prompt_suggestions_toggleable(app)
+            || UserWorkspaces::as_ref(app).is_code_suggestions_toggleable())
         && AISettings::as_ref(app)
             .code_suggestions_enabled_internal
             .is_supported_on_current_platform()
 }
 
 fn is_natural_language_autosuggestions_toggleable(app: &AppContext) -> bool {
-    FeatureFlag::PredictAMQueries.is_enabled()
+    is_active_ai_offered()
+        && FeatureFlag::PredictAMQueries.is_enabled()
         && AISettings::as_ref(app)
             .natural_language_autosuggestions_enabled_internal
             .is_supported_on_current_platform()
@@ -3064,7 +3097,8 @@ fn is_shared_block_title_generation_toggleable(
     view_handle: &WeakViewHandle<WarpAgentPageView>,
     app: &AppContext,
 ) -> bool {
-    FeatureFlag::SharedBlockTitleGeneration.is_enabled()
+    is_active_ai_offered()
+        && FeatureFlag::SharedBlockTitleGeneration.is_enabled()
         && AISettings::as_ref(app)
             .shared_block_title_generation_enabled_internal
             .is_supported_on_current_platform()
@@ -3077,7 +3111,8 @@ fn is_shared_block_title_generation_toggleable(
 }
 
 fn is_git_operations_autogen_toggleable(app: &AppContext) -> bool {
-    FeatureFlag::GitOperationsInCodeReview.is_enabled()
+    is_active_ai_offered()
+        && FeatureFlag::GitOperationsInCodeReview.is_enabled()
         && AISettings::as_ref(app)
             .git_operations_autogen_enabled_internal
             .is_supported_on_current_platform()
@@ -3909,7 +3944,11 @@ impl SettingsWidget for VoiceWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        cfg!(feature = "voice_input") && UserWorkspaces::as_ref(app).is_voice_enabled()
+        // Synth Warp is commercial-free: transcription is done by Wispr Flow, a
+        // vendor Warp brokers on the user's behalf.
+        ChannelState::warp_hosted_ai_enabled()
+            && cfg!(feature = "voice_input")
+            && UserWorkspaces::as_ref(app).is_voice_enabled()
     }
 
     fn render(
@@ -5581,7 +5620,9 @@ impl SettingsWidget for ApiKeysWidget {
         }
 
         // Warp credit fallback applies to member-provided API keys, not custom endpoints.
-        if is_byo_enabled && show_provider_keys {
+        // Synth Warp is commercial-free: Warp credits are a paid warp.dev balance this
+        // build has no way to spend, so the fallback toggle is omitted.
+        if ChannelState::warp_hosted_ai_enabled() && is_byo_enabled && show_provider_keys {
             column.add_child(
                 Container::new(self.render_warp_credit_fallback_toggle(view, app))
                     .with_margin_top(16.)

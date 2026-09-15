@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use markdown_parser::{FormattedText, FormattedTextFragment, FormattedTextLine};
+use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 use warp_core::settings::ToggleableSetting as _;
 use warpui::elements::{
@@ -50,10 +51,17 @@ impl KnowledgePageView {
             if FeatureFlag::SuggestedRules.is_enabled() {
                 widgets.push(Box::new(SuggestedRulesWidget::default()));
             }
-            widgets.extend([
-                Box::new(ManageRulesWidget::default()) as Box<dyn SettingsWidget<View = Self>>,
-                Box::new(WarpDriveContextWidget::default()),
-            ]);
+            // Synth Warp is local-first: both of these are Warp Drive surfaces.
+            // "Manage rules" opens the Drive rule collection and Drive-as-context
+            // offers hosted Drive contents to the agent; this build never syncs a
+            // Drive, and its settings page is already hidden, so both would be
+            // dangling entry points.
+            if ChannelState::warp_cloud_enabled() {
+                widgets.extend([
+                    Box::new(ManageRulesWidget::default()) as Box<dyn SettingsWidget<View = Self>>,
+                    Box::new(WarpDriveContextWidget::default()),
+                ]);
+            }
         }
         PageType::new_uncategorized(widgets, Some(PageTitle::new(PAGE_TITLE)))
     }
@@ -368,3 +376,7 @@ impl SettingsWidget for WarpDriveContextWidget {
             .finish()
     }
 }
+
+#[cfg(test)]
+#[path = "knowledge_page_tests.rs"]
+mod tests;

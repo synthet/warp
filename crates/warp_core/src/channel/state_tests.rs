@@ -143,6 +143,75 @@ fn oz_capable_channels_keep_cloud_agent_features() {
 }
 
 #[test]
+fn oss_policy_removes_warp_hosted_ai_features() {
+    let mut flags = HashSet::from([
+        FeatureFlag::SuperGrok,
+        FeatureFlag::GeminiEnterprise,
+        FeatureFlag::AgentModeComputerUse,
+        FeatureFlag::BackgroundComputerUse,
+        FeatureFlag::SharedBlockTitleGeneration,
+        // Kept: also gates local code-review git UI.
+        FeatureFlag::GitOperationsInCodeReview,
+        // Kept: routers are local files, not hosted inference.
+        FeatureFlag::CustomModelRouters,
+        // Kept: removing it would re-enable the Warp credit usage widget.
+        FeatureFlag::UsageBasedPricing,
+    ]);
+
+    filter_unsupported_features_for(&mut flags, Channel::Oss, false);
+
+    assert!(!flags.contains(&FeatureFlag::SuperGrok));
+    assert!(!flags.contains(&FeatureFlag::GeminiEnterprise));
+    assert!(!flags.contains(&FeatureFlag::AgentModeComputerUse));
+    assert!(!flags.contains(&FeatureFlag::BackgroundComputerUse));
+    assert!(!flags.contains(&FeatureFlag::SharedBlockTitleGeneration));
+    assert!(flags.contains(&FeatureFlag::GitOperationsInCodeReview));
+    assert!(flags.contains(&FeatureFlag::CustomModelRouters));
+    assert!(flags.contains(&FeatureFlag::UsageBasedPricing));
+}
+
+#[test]
+fn warp_hosted_ai_channels_keep_their_features() {
+    let mut flags = HashSet::from([
+        FeatureFlag::SuperGrok,
+        FeatureFlag::GeminiEnterprise,
+        FeatureFlag::SharedBlockTitleGeneration,
+    ]);
+
+    filter_unsupported_features_for(&mut flags, Channel::Stable, true);
+
+    assert_eq!(flags.len(), 3);
+}
+
+#[test]
+fn oss_never_offers_warp_hosted_ai() {
+    assert!(!Channel::Oss.offers_warp_hosted_ai());
+    for channel in [
+        Channel::Stable,
+        Channel::Preview,
+        Channel::Dev,
+        Channel::Local,
+        Channel::Integration,
+    ] {
+        assert!(
+            channel.offers_warp_hosted_ai(),
+            "{channel} should keep the hosted AI surface"
+        );
+    }
+}
+
+#[test]
+fn warp_hosted_ai_does_not_depend_on_the_server_root() {
+    // Self-hosting an MAA-compatible backend re-enables `warp_cloud_enabled`, but
+    // it does not make the user a Warp AI customer.
+    assert!(warp_cloud_enabled_for(
+        Channel::Oss,
+        "http://localhost:8080"
+    ));
+    assert!(!Channel::Oss.offers_warp_hosted_ai());
+}
+
+#[test]
 fn oss_never_shows_warp_inc_links() {
     assert!(!Channel::Oss.shows_warp_inc_links());
     for channel in [

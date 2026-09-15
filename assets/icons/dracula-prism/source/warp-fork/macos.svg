@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="112" x2="896" y2="928" gradientUnits="userSpaceOnUse"><stop stop-color="#44475A"/><stop offset=".38" stop-color="#282A36"/><stop offset="1" stop-color="#282A36"/></linearGradient>
+    <linearGradient id="edge" x1="96" y1="96" x2="928" y2="928" gradientUnits="userSpaceOnUse"><stop stop-color="#BD93F9"/><stop offset=".5" stop-color="#FF79C6"/><stop offset="1" stop-color="#6272A4"/></linearGradient>
+    <linearGradient id="pink" x1="224" y1="680" x2="656" y2="488" gradientUnits="userSpaceOnUse"><stop stop-color="#FF79C6" stop-opacity=".76"/><stop offset=".45" stop-color="#FF79C6"/><stop offset="1" stop-color="#FF79C6"/></linearGradient>
+    <linearGradient id="purple" x1="616" y1="680" x2="824" y2="304" gradientUnits="userSpaceOnUse"><stop stop-color="#BD93F9" stop-opacity=".72"/><stop offset=".54" stop-color="#BD93F9"/><stop offset="1" stop-color="#BD93F9"/></linearGradient>
+    <filter id="plate-shadow" x="24" y="28" width="976" height="984" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#282A36" flood-opacity=".5"/></filter>
+    <filter id="ribbon-shadow" x="112" y="248" width="800" height="648" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#282A36" flood-opacity=".48"/></filter>
+  </defs>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="url(#bg)" stroke="url(#edge)" stroke-width="12" filter="url(#plate-shadow)"/>
+  <path d="M176 136H760C840 136 888 180 912 248" fill="none" stroke="#F8F8F2" stroke-opacity=".16" stroke-width="12" stroke-linecap="round"/>
+  <g filter="url(#ribbon-shadow)">
+    <path d="M624 624C676 536 708 336 792 392" fill="none" stroke="url(#purple)" stroke-width="176" stroke-linecap="round"/>
+    <path d="M240 664C304 416 408 408 488 576C552 710 606 716 656 624" fill="none" stroke="url(#pink)" stroke-width="176" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <path d="M284 544Q284 524 300 536L392 612Q408 624 392 638L300 716Q284 728 284 706Z" fill="#F8F8F2"/>
+</svg>

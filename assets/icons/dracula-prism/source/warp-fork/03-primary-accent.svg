@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="warp-pink" x1="224" y1="680" x2="656" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF79C6" stop-opacity="0.76"/>
+      <stop offset="0.45" stop-color="#FF79C6"/>
+      <stop offset="1" stop-color="#FF79C6"/>
+    </linearGradient>
+    <filter id="front-shadow" x="112" y="328" width="656" height="568" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#282A36" flood-opacity="0.48"/>
+    </filter>
+  </defs>
+  <path id="primary-accent" d="M240 664C304 416 408 408 488 576C552 710 606 716 656 624" fill="none" stroke="url(#warp-pink)" stroke-width="176" stroke-linecap="round" stroke-linejoin="round" filter="url(#front-shadow)"/>
+  <path d="M240 620C304 430 402 438 472 584" fill="none" stroke="#F8F8F2" stroke-opacity="0.15" stroke-width="10" stroke-linecap="round"/>
+</svg>

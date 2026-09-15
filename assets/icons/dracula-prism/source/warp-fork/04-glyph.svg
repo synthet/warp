@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="glyph-shadow" x="248" y="500" width="176" height="224" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#282A36" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+  <path id="glyph" d="M284 544Q284 524 300 536L392 612Q408 624 392 638L300 716Q284 728 284 706Z" fill="#F8F8F2" filter="url(#glyph-shadow)"/>
+</svg>

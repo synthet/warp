@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="zed-purple" x1="264" y1="640" x2="760" y2="224" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BD93F9" stop-opacity="0.72"/>
+      <stop offset="0.45" stop-color="#BD93F9"/>
+      <stop offset="1" stop-color="#BD93F9"/>
+    </linearGradient>
+    <linearGradient id="zed-fold" x1="264" y1="416" x2="464" y2="624" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BD93F9" stop-opacity="0.78"/>
+      <stop offset="1" stop-color="#44475A"/>
+    </linearGradient>
+    <filter id="purple-shadow" x="208" y="176" width="648" height="584" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#282A36" flood-opacity="0.48"/>
+    </filter>
+  </defs>
+  <path id="primary-accent" d="M248 416L424 240H792L552 480V552L464 464L288 640Q264 664 264 630V448Q264 432 280 416Z" fill="url(#zed-purple)" filter="url(#purple-shadow)"/>
+  <path d="M248 416H464L288 640Q264 664 264 630V448Q264 432 280 416Z" fill="url(#zed-fold)"/>
+  <path d="M280 416L424 272H760" fill="none" stroke="#F8F8F2" stroke-opacity="0.2" stroke-width="10" stroke-linecap="round"/>
+</svg>

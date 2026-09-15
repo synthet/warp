@@ -342,7 +342,10 @@ impl Display for SettingsSection {
             SettingsSection::SharedBlocks => write!(f, "Shared blocks"),
             SettingsSection::Scripting => write!(f, "Scripting"),
             SettingsSection::WarpDrive => write!(f, "Warp Drive"),
-            SettingsSection::WarpAgent => write!(f, "Warp Agent"),
+            // Synth Warp is local-first: the page no longer configures Warp Inc.'s
+            // hosted agent, only the conversation UI every harness shares. The
+            // `slug` below keeps the old spelling, which is a compatibility contract.
+            SettingsSection::WarpAgent => write!(f, "Agent"),
             SettingsSection::AgentProfiles => write!(f, "Profiles"),
             SettingsSection::AgentMCPServers => write!(f, "MCP servers"),
             SettingsSection::Knowledge => write!(f, "Knowledge"),
