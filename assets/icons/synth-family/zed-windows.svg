@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Zed — Windows icon</title>
+  <desc id="description">Synth fork icon family. Flat near-black plate, silver glyph, transparent surround. All visible artwork is vector geometry.</desc>
+  <g id="foundation">
+    <rect x="64" y="64" width="896" height="896" rx="184" fill="#101014"/>
+  </g>
+  <g id="glyph" fill="#A9B7C6">
+      <path d="M 240,240 H 784 V 320 H 320 V 560 H 240 Z"/>
+      <path d="M 784,464 V 784 H 240 V 704 H 704 V 464 Z"/>
+      <path d="M 712,240 L 784,312 L 312,784 L 240,712 Z"/>
+  </g>
+</svg>

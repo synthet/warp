@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Warp — Windows icon</title>
+  <desc id="description">Synth fork icon family. Flat near-black plate, silver glyph, transparent surround. All visible artwork is vector geometry.</desc>
+  <g id="foundation">
+    <rect x="64" y="64" width="896" height="896" rx="184" fill="#101014"/>
+  </g>
+  <g id="glyph" fill="#A9B7C6">
+      <path d="M 274,376 H 481 Q 493,376 490,388 L 421,710 Q 419,720 409,720 H 274 Q 222,720 222,668 V 430 Q 222,376 274,376 Z"/>
+      <path d="M 558,300 H 734 Q 806,300 806,370 V 598 Q 806,654 750,654 H 468 Q 458,654 461,642 L 540,312 Q 543,300 558,300 Z"/>
+  </g>
+</svg>
