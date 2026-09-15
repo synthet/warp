@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="zed-foundation" x1="128" y1="112" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#44475A"/>
+      <stop offset="0.38" stop-color="#282A36"/>
+      <stop offset="1" stop-color="#282A36"/>
+    </linearGradient>
+    <linearGradient id="zed-edge" x1="96" y1="96" x2="928" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8BE9FD"/>
+      <stop offset="0.5" stop-color="#BD93F9"/>
+      <stop offset="1" stop-color="#6272A4"/>
+    </linearGradient>
+    <filter id="foundation-shadow" x="24" y="28" width="976" height="984" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#282A36" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <rect id="foundation" x="72" y="72" width="880" height="880" rx="208" fill="url(#zed-foundation)" stroke="url(#zed-edge)" stroke-width="12" filter="url(#foundation-shadow)"/>
+  <path d="M176 136H760C840 136 888 180 912 248" fill="none" stroke="#F8F8F2" stroke-opacity="0.16" stroke-width="12" stroke-linecap="round"/>
+</svg>

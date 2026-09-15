@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="112" x2="896" y2="928" gradientUnits="userSpaceOnUse"><stop stop-color="#44475A"/><stop offset=".38" stop-color="#282A36"/><stop offset="1" stop-color="#282A36"/></linearGradient>
+    <linearGradient id="edge" x1="96" y1="96" x2="928" y2="928" gradientUnits="userSpaceOnUse"><stop stop-color="#8BE9FD"/><stop offset=".5" stop-color="#BD93F9"/><stop offset="1" stop-color="#6272A4"/></linearGradient>
+    <linearGradient id="purple" x1="264" y1="640" x2="760" y2="224" gradientUnits="userSpaceOnUse"><stop stop-color="#BD93F9" stop-opacity=".72"/><stop offset=".45" stop-color="#BD93F9"/><stop offset="1" stop-color="#BD93F9"/></linearGradient>
+    <linearGradient id="fold" x1="264" y1="416" x2="464" y2="624" gradientUnits="userSpaceOnUse"><stop stop-color="#BD93F9" stop-opacity=".78"/><stop offset="1" stop-color="#44475A"/></linearGradient>
+    <linearGradient id="cyan" x1="280" y1="784" x2="760" y2="536" gradientUnits="userSpaceOnUse"><stop stop-color="#8BE9FD"/><stop offset="1" stop-color="#8BE9FD" stop-opacity=".78"/></linearGradient>
+    <filter id="plate-shadow" x="24" y="28" width="976" height="984" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#282A36" flood-opacity=".5"/></filter>
+    <filter id="plane-shadow" x="192" y="176" width="664" height="680" filterUnits="userSpaceOnUse"><feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#282A36" flood-opacity=".45"/></filter>
+  </defs>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="url(#bg)" stroke="url(#edge)" stroke-width="12" filter="url(#plate-shadow)"/>
+  <path d="M176 136H760C840 136 888 180 912 248" fill="none" stroke="#F8F8F2" stroke-opacity=".16" stroke-width="12" stroke-linecap="round"/>
+  <g filter="url(#plane-shadow)">
+    <path d="M488 544H792V608L608 792H240L472 560Q479 552 488 544Z" fill="url(#cyan)"/>
+    <path d="M248 416L424 240H792L552 480V552L464 464L288 640Q264 664 264 630V448Q264 432 280 416Z" fill="url(#purple)"/>
+    <path d="M248 416H464L288 640Q264 664 264 630V448Q264 432 280 416Z" fill="url(#fold)"/>
+  </g>
+  <rect x="456" y="424" width="112" height="220" rx="40" fill="#282A36"/>
+  <rect x="484" y="452" width="56" height="164" rx="20" fill="#F8F8F2"/>
+</svg>

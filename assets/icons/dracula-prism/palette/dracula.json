@@ -1,0 +1,10 @@
+{
+  "background": "#282A36",
+  "raised": "#44475A",
+  "muted": "#6272A4",
+  "foreground": "#F8F8F2",
+  "zedPrimary": "#BD93F9",
+  "zedSecondary": "#8BE9FD",
+  "warpPrimary": "#FF79C6",
+  "warpSecondary": "#BD93F9"
+}

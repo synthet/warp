@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="sheet-bg" x1="0" y1="0" x2="1600" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#282A36"/>
+      <stop offset="1" stop-color="#282A36"/>
+    </linearGradient>
+    <filter id="sheet-shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#282A36" flood-opacity="0.45"/>
+    </filter>
+    <linearGradient id="zed-plate" x1="128" y1="112" x2="896" y2="928" gradientUnits="userSpaceOnUse"><stop stop-color="#44475A"/><stop offset=".38" stop-color="#282A36"/><stop offset="1" stop-color="#282A36"/></linearGradient>
+    <linearGradient id="zed-edge" x1="96" y1="96" x2="928" y2="928" gradientUnits="userSpaceOnUse"><stop stop-color="#8BE9FD"/><stop offset=".5" stop-color="#BD93F9"/><stop offset="1" stop-color="#6272A4"/></linearGradient>
+    <linearGradient id="warp-edge" x1="96" y1="96" x2="928" y2="928" gradientUnits="userSpaceOnUse"><stop stop-color="#BD93F9"/><stop offset=".5" stop-color="#FF79C6"/><stop offset="1" stop-color="#6272A4"/></linearGradient>
+    <linearGradient id="zed-purple" x1="264" y1="640" x2="760" y2="224" gradientUnits="userSpaceOnUse"><stop stop-color="#BD93F9" stop-opacity=".72"/><stop offset=".45" stop-color="#BD93F9"/><stop offset="1" stop-color="#BD93F9"/></linearGradient>
+    <linearGradient id="zed-cyan" x1="280" y1="784" x2="760" y2="536" gradientUnits="userSpaceOnUse"><stop stop-color="#8BE9FD"/><stop offset="1" stop-color="#8BE9FD" stop-opacity=".78"/></linearGradient>
+    <linearGradient id="warp-pink" x1="224" y1="680" x2="656" y2="488" gradientUnits="userSpaceOnUse"><stop stop-color="#FF79C6" stop-opacity=".76"/><stop offset=".45" stop-color="#FF79C6"/><stop offset="1" stop-color="#FF79C6"/></linearGradient>
+    <linearGradient id="warp-purple" x1="616" y1="680" x2="824" y2="304" gradientUnits="userSpaceOnUse"><stop stop-color="#BD93F9" stop-opacity=".72"/><stop offset=".54" stop-color="#BD93F9"/><stop offset="1" stop-color="#BD93F9"/></linearGradient>
+    <symbol id="zed-macos" viewBox="0 0 1024 1024">
+      <rect x="72" y="72" width="880" height="880" rx="208" fill="url(#zed-plate)" stroke="url(#zed-edge)" stroke-width="12"/>
+      <path d="M488 544H792V608L608 792H240L472 560Q479 552 488 544Z" fill="url(#zed-cyan)"/>
+      <path d="M248 416L424 240H792L552 480V552L464 464L288 640Q264 664 264 630V448Q264 432 280 416Z" fill="url(#zed-purple)"/>
+      <path d="M248 416H464L288 640Q264 664 264 630V448Q264 432 280 416Z" fill="#BD93F9" fill-opacity=".7"/>
+      <rect x="456" y="424" width="112" height="220" rx="40" fill="#282A36"/><rect x="484" y="452" width="56" height="164" rx="20" fill="#F8F8F2"/>
+    </symbol>
+    <symbol id="zed-windows" viewBox="0 0 1024 1024">
+      <rect x="96" y="96" width="832" height="832" rx="176" fill="#282A36" stroke="#BD93F9" stroke-width="10"/>
+      <path d="M480 536H808V608L608 808H224L464 552Q471 544 480 536Z" fill="#8BE9FD"/>
+      <path d="M224 408L408 224H808L552 480V568L456 472L272 656Q248 680 248 646V440Q248 424 264 408Z" fill="#BD93F9"/>
+      <path d="M224 408H464L272 656Q248 680 248 646V440Q248 424 264 408Z" fill="#BD93F9" fill-opacity=".7"/>
+      <rect x="448" y="408" width="128" height="248" rx="42" fill="#282A36"/><rect x="480" y="440" width="64" height="184" rx="20" fill="#F8F8F2"/>
+    </symbol>
+    <symbol id="warp-macos" viewBox="0 0 1024 1024">
+      <rect x="72" y="72" width="880" height="880" rx="208" fill="url(#zed-plate)" stroke="url(#warp-edge)" stroke-width="12"/>
+      <path d="M624 624C676 536 708 336 792 392" fill="none" stroke="url(#warp-purple)" stroke-width="176" stroke-linecap="round"/>
+      <path d="M240 664C304 416 408 408 488 576C552 710 606 716 656 624" fill="none" stroke="url(#warp-pink)" stroke-width="176" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M284 544Q284 524 300 536L392 612Q408 624 392 638L300 716Q284 728 284 706Z" fill="#F8F8F2"/>
+    </symbol>
+    <symbol id="warp-windows" viewBox="0 0 1024 1024">
+      <rect x="96" y="96" width="832" height="832" rx="176" fill="#282A36" stroke="#FF79C6" stroke-width="10"/>
+      <path d="M616 624C676 520 712 320 808 392" fill="none" stroke="#BD93F9" stroke-width="184" stroke-linecap="round"/>
+      <path d="M224 672C296 400 408 400 496 576C560 704 616 720 664 624" fill="none" stroke="#FF79C6" stroke-width="184" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M264 536Q264 516 280 528L392 612Q408 624 392 638L280 728Q264 740 264 718Z" fill="#F8F8F2"/>
+    </symbol>
+    <symbol id="zed-32" viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="7" fill="#282A36" stroke="#BD93F9"/><path d="M15 17H26V20L20 26H7L14 18Z" fill="#8BE9FD"/><path d="M7 12L13 6H26L18 14V18L15 15L8 22V13Z" fill="#BD93F9"/><rect x="14" y="12" width="4" height="9" rx="1.5" fill="#F8F8F2" stroke="#282A36"/></symbol>
+    <symbol id="zed-16" viewBox="0 0 16 16"><rect x=".5" y=".5" width="15" height="15" rx="3.5" fill="#282A36" stroke="#BD93F9"/><path d="M3 6L6 3H13L9 7V9L7.5 7.5L4 11V6.5Z" fill="#BD93F9"/><rect x="7" y="6" width="2" height="5" rx=".75" fill="#F8F8F2"/></symbol>
+    <symbol id="warp-32" viewBox="0 0 32 32"><rect x="1" y="1" width="30" height="30" rx="7" fill="#282A36" stroke="#FF79C6"/><path d="M19 20C22 17 23 9 27 12" fill="none" stroke="#BD93F9" stroke-width="5.5" stroke-linecap="round"/><path d="M6 21C9 11 13 11 16 18C18 23 20 23 22 20" fill="none" stroke="#FF79C6" stroke-width="5.5" stroke-linecap="round"/><path d="M7 17L11 20L7 23Z" fill="#F8F8F2"/></symbol>
+    <symbol id="warp-16" viewBox="0 0 16 16"><rect x=".5" y=".5" width="15" height="15" rx="3.5" fill="#282A36" stroke="#FF79C6"/><path d="M3 11C4.5 6 6.5 6 8 9C9.5 12 11 12 12.5 8" fill="none" stroke="#FF79C6" stroke-width="3" stroke-linecap="round"/><path d="M3.5 8.5L5.5 10L3.5 11.5Z" fill="#F8F8F2"/></symbol>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#sheet-bg)"/>
+  <text x="48" y="64" fill="#F8F8F2" font-family="sans-serif" font-size="40" font-weight="700">Dracula Prism</text>
+  <text x="48" y="100" fill="#6272A4" font-family="sans-serif" font-size="22">Original fork icons for Zed and Warp</text>
+  <text x="1552" y="58" text-anchor="end" fill="#6272A4" font-family="sans-serif" font-size="14" letter-spacing="3">FOCUSED · OPEN · DEVELOPER-FIRST</text>
+  <path d="M48 132H1552" stroke="#44475A"/>
+
+  <g filter="url(#sheet-shadow)">
+    <use x="52" y="156" width="330" height="330" href="#zed-macos" xlink:href="#zed-macos"/>
+    <use x="440" y="156" width="330" height="330" href="#zed-windows" xlink:href="#zed-windows"/>
+    <use x="828" y="156" width="330" height="330" href="#warp-macos" xlink:href="#warp-macos"/>
+    <use x="1216" y="156" width="330" height="330" href="#warp-windows" xlink:href="#warp-windows"/>
+  </g>
+  <g fill="#F8F8F2" font-family="sans-serif" font-size="22" font-weight="600" text-anchor="middle">
+    <text x="217" y="510">Zed — macOS</text>
+    <text x="605" y="510">Zed — Windows</text>
+    <text x="993" y="510">Warp — macOS</text>
+    <text x="1381" y="510">Warp — Windows</text>
+  </g>
+
+  <path d="M48 544H1552" stroke="#44475A"/>
+  <text x="48" y="584" fill="#F8F8F2" font-family="sans-serif" font-size="20" font-weight="600">Hand-simplified small sizes</text>
+  <g>
+    <use x="52" y="612" width="96" height="96" href="#zed-32" xlink:href="#zed-32"/>
+    <use x="180" y="636" width="48" height="48" href="#zed-16" xlink:href="#zed-16"/>
+    <use x="292" y="612" width="96" height="96" href="#warp-32" xlink:href="#warp-32"/>
+    <use x="420" y="636" width="48" height="48" href="#warp-16" xlink:href="#warp-16"/>
+  </g>
+  <g fill="#6272A4" font-family="sans-serif" font-size="16" text-anchor="middle">
+    <text x="100" y="732">Zed · 32 px</text><text x="204" y="732">16 px</text>
+    <text x="340" y="732">Warp · 32 px</text><text x="444" y="732">16 px</text>
+  </g>
+
+  <text x="568" y="584" fill="#F8F8F2" font-family="sans-serif" font-size="20" font-weight="600">Dracula palette</text>
+  <g>
+    <rect x="568" y="616" width="72" height="72" rx="14" fill="#282A36" stroke="#6272A4"/>
+    <rect x="656" y="616" width="72" height="72" rx="14" fill="#44475A"/>
+    <rect x="744" y="616" width="72" height="72" rx="14" fill="#6272A4"/>
+    <rect x="832" y="616" width="72" height="72" rx="14" fill="#F8F8F2"/>
+    <rect x="920" y="616" width="72" height="72" rx="14" fill="#BD93F9"/>
+    <rect x="1008" y="616" width="72" height="72" rx="14" fill="#8BE9FD"/>
+    <rect x="1096" y="616" width="72" height="72" rx="14" fill="#FF79C6"/>
+  </g>
+  <g fill="#6272A4" font-family="monospace" font-size="12" text-anchor="middle">
+    <text x="604" y="710">#282A36</text><text x="692" y="710">#44475A</text><text x="780" y="710">#6272A4</text>
+    <text x="868" y="710">#F8F8F2</text><text x="956" y="710">#BD93F9</text><text x="1044" y="710">#8BE9FD</text><text x="1132" y="710">#FF79C6</text>
+  </g>
+
+  <text x="1232" y="584" fill="#F8F8F2" font-family="sans-serif" font-size="20" font-weight="600">Dock / Taskbar context</text>
+  <rect x="1232" y="612" width="320" height="112" rx="30" fill="#282A36" stroke="#44475A"/>
+  <use x="1248" y="624" width="88" height="88" href="#zed-macos" xlink:href="#zed-macos"/>
+  <use x="1332" y="624" width="88" height="88" href="#warp-macos" xlink:href="#warp-macos"/>
+  <rect x="1432" y="638" width="60" height="60" rx="15" fill="#44475A"/><circle cx="1462" cy="668" r="15" fill="#6272A4"/>
+  <rect x="1500" y="638" width="40" height="60" rx="12" fill="#44475A"/>
+
+  <path d="M48 772H1552" stroke="#44475A"/>
+  <g font-family="sans-serif">
+    <text x="48" y="816" fill="#F8F8F2" font-size="20" font-weight="600">Family grammar</text>
+    <text x="48" y="850" fill="#F8F8F2" fill-opacity=".72" font-size="17">Dark foundation · near-white semantic notch · one dominant accent · one supporting plane</text>
+    <text x="48" y="880" fill="#F8F8F2" fill-opacity=".72" font-size="17">Zed is angular and editor-like. Warp is directional and flowing. Both remain distinct without color.</text>
+    <text x="48" y="932" fill="#6272A4" font-size="14">1024-unit vector masters · explicit 32 px / 16 px variants · original silhouettes · no upstream marks</text>
+    <text x="1552" y="932" text-anchor="end" fill="#6272A4" font-size="14">Dracula Prism icon system</text>
+  </g>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="warp-purple" x1="616" y1="680" x2="824" y2="304" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BD93F9" stop-opacity="0.72"/>
+      <stop offset="0.54" stop-color="#BD93F9"/>
+      <stop offset="1" stop-color="#BD93F9"/>
+    </linearGradient>
+    <filter id="rear-shadow" x="528" y="248" width="384" height="552" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#282A36" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <path id="secondary-plane" d="M624 624C676 536 708 336 792 392" fill="none" stroke="url(#warp-purple)" stroke-width="176" stroke-linecap="round" filter="url(#rear-shadow)"/>
+  <path d="M646 584C692 492 720 340 792 392" fill="none" stroke="#F8F8F2" stroke-opacity="0.14" stroke-width="10" stroke-linecap="round"/>
+</svg>

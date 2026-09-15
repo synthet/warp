@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="glyph-shadow" x="424" y="404" width="176" height="272" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#282A36" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+  <rect id="glyph-frame" x="456" y="424" width="112" height="220" rx="40" fill="#282A36" filter="url(#glyph-shadow)"/>
+  <rect id="glyph" x="484" y="452" width="56" height="164" rx="20" fill="#F8F8F2"/>
+</svg>
