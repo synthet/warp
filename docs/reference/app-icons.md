@@ -20,6 +20,11 @@ There are **three independent icon systems** — changing one does not change th
 | [macOS adaptive bundles](#2-macos-adaptive-icon-bundles) | `AppIcon.icon/` | macOS 26+ | Build channel (compile time) |
 | [Dock icon variants](#3-macos-dock-icon-variants) | `DockTilePlugin/Resources/*.png` | macOS only | User setting (runtime) |
 
+> **Source of truth.** The `local`, `oss`, and `warp-oss` rasters are generated — do not hand-edit
+> them. Vector masters are mirrored at [`assets/icons/synth-family/`](../../assets/icons/synth-family/README.md)
+> and rendered by `script/apply_branding_icons.py` in the sibling Zed checkout:
+> `uv run --with pillow python script/apply_branding_icons.py` (add `--check` to validate only).
+>
 > **Glyph note.** `local`, `oss`, and `warp-oss` carry the Synth fork glyph; the rest are inherited
 > Warp brand assets, and some still have the design guideline grid baked into the raster (visible as
 > circles and diagonals on `dev` and `preview`) — see [Known issues](#known-issues).
@@ -43,12 +48,13 @@ There are **three independent icon systems** — changing one does not change th
 | `stable` | `stable` | `dev.warp.Warp` | 16, 32, 48, 64, 128, 256, 512 | 6 entries (adds 128) |
 | `preview` | `preview` | `dev.warp.WarpPreview` | 16, 32, 48, 64, 128, 256, 512 | 5 entries |
 | `dev` | `dev` | `dev.warp.WarpDev` | 16, 32, 48, 64, 128, 256, 512 | 5 entries |
-| `local` | `warp` | `dev.warp.WarpLocal` | 16, 32, 48, 64, 128, 256, 512 | 5 entries |
-| `oss` | — | `dev.warp.WarpOss` | 16, 32, 48, 64, 128, 256, 512 | 5 entries |
-| `warp-oss` | `warp-oss` | — | 16, 32, 48, 64, 128, 256, 512 | 5 entries |
+| `local` | `warp` | `dev.warp.WarpLocal` | 16, 32, 48, 64, 128, 256, 512 | 7 entries (adds 24, 128) |
+| `oss` | — | `dev.warp.WarpOss` | 16, 32, 48, 64, 128, 256, 512 | 7 entries (adds 24, 128) |
+| `warp-oss` | `warp-oss` | — | 16, 32, 48, 64, 128, 256, 512 | 7 entries (adds 24, 128) |
 
-Every `.ico` packs 16/32/48/64/256 as 32-bit BMP except the 256 entry, which is embedded PNG;
-`stable` additionally carries 128.
+Every `.ico` packs its sub-256 entries as 32-bit BMP and the 256 entry as embedded PNG. The
+inherited Warp channels carry 16/32/48/64/256 (`stable` adds 128). The three Synth channels carry
+16/24/32/48/64/128/256 — 24 is on Microsoft's minimum list and was previously missing.
 
 ### Which channel your build uses
 
@@ -172,8 +178,27 @@ logic in `WarpDockTilePlugin.m`.
 
 ### Windows (this fork's usual target)
 
-1. Author a 1024x1024 master, export `16x16 32x32 48x48 64x64 128x128 256x256 512x512`.
-2. Regenerate the `.ico` — per [`script/windows/README.md:102-112`](../../script/windows/README.md):
+For `local` / `oss` / `warp-oss`, don't hand-author rasters — edit the vector master in
+[`assets/icons/synth-family/`](../../assets/icons/synth-family/README.md), mirror it to the
+canonical copy in the sibling Zed checkout, and regenerate:
+
+```shell
+cd ../zed
+uv run --with pillow python script/apply_branding_icons.py
+uv run --with pillow python script/apply_branding_icons.py --check
+```
+
+That writes the full PNG ladder and the `.ico` to **all three** channel directories in one pass —
+the build reads `warp-oss`, the Cargo package and `deploy.ps1` read `oss`, so they must not drift.
+Then force a rebuild of the resource: `cargo clean -p warp` (or touch `app/build.rs`), then
+`./script/run`.
+
+What the generator is doing, if you ever need to reproduce it by hand:
+
+1. Author a 1024x1024 master, export `16x16 24x24 32x32 48x48 64x64 128x128 256x256 512x512`.
+   Keep the surround **transparent** — an opaque canvas edge is what put a black frame around the
+   old icon on the desktop.
+2. Build the `.ico` — per [`script/windows/README.md:102-112`](../../script/windows/README.md):
    ```shell
    convert 16x16.png 32x32.png 48x48.png 64x64.png 256x256.png icon.ico
    ```
@@ -183,10 +208,8 @@ logic in `WarpDockTilePlugin.m`.
    `.ico` files instead embed 256 as PNG, so splice that entry in afterwards. Do **not** let Pillow
    write the whole `.ico` — it PNG-compresses every entry, and Inno Setup's `SetupIconFile` wants
    BMP for the small ones.
-3. Write to **all three** of `app/channels/{local,oss,warp-oss}/icon/no-padding/` — the build reads
-   `warp-oss`, the Cargo package and `deploy.ps1` read `oss`.
-4. Force a rebuild of the resource: `cargo clean -p warp` (or touch `app/build.rs`), then
-   `./script/run`.
+3. Sizes at or below 32 px come from separate simplified vector sources, not from downscaling the
+   master — fine detail dissolves into grey mush below ~1 px of stroke.
 
 ### Linux
 
@@ -201,8 +224,8 @@ Requires Xcode 26+; earlier versions produce no `Assets.car` and the script warn
 ## Known issues
 
 - **`local`, `oss`, and `warp-oss` are duplicate files, not links** (byte-identical across all three
-  directories). Editing one and not the others silently splits Windows branding from packaged
-  branding.
+  directories). They are now written together by the generator, so they no longer drift in practice,
+  but hand-editing one still silently splits Windows branding from packaged branding.
 - **Design guidelines are baked into shipped rasters.** The `dev` and `preview` icons show
   construction circles and diagonals in the final PNG/ICO. The `dev` `icon.json` still references a
   literal `PLACE HERE.png` placeholder layer.
