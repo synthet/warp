@@ -4,7 +4,7 @@ title: Windows local deploy
 description: Overlay Synth Warp OSS onto C:\Program Files\Warp without Inno Setup or the stable channel.
 resource: guides/windows-local-deploy.md
 tags: [docs, guides, windows, deploy]
-timestamp: 2026-08-16T01:15:00Z
+timestamp: 2026-09-19T18:30:00Z
 okf_version: 0.1
 ---
 
@@ -23,6 +23,57 @@ Repeatable file-copy overlay onto the live official install at `C:\Program Files
 `build.ps1 -Release` defaults to `--features gui`. `deploy.ps1` defaults to `--features release_bundle,gui`, so a full deploy **rebuilds** `warp` / `warp_assets` even when `target\release\warp-oss.exe` already exists. Use `-SkipBuild` to overlay that last exe. Run a full `deploy.ps1` when the overlay should include the `release_bundle` feature set.
 
 `script/windows/deploy.cmd` is a double-click wrapper. UAC runs only for the copy into Program Files.
+
+## Deploying from a terminal inside Warp
+
+`deploy.ps1` runs `Stop-InstalledWarp` **before** the copy: it force-kills every `warp.exe` whose
+path resolves to `<InstallDir>\warp.exe`, then waits up to 30s for the file lock. When the shell
+running deploy is itself hosted by that install — the normal case for an agent CLI started from a
+Warp tab — the deploy terminates its own session mid-run. `-NoRestart` does not help; the kill
+happens before the copy, not at the relaunch.
+
+Check the ancestry first:
+
+```powershell
+$p = Get-CimInstance Win32_Process -Filter "ProcessId=$PID"
+while ($p) {
+    "{0} (pid {1}) {2}" -f $p.Name, $p.ProcessId, $p.ExecutablePath
+    $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($p.ParentProcessId)" -ErrorAction SilentlyContinue
+}
+```
+
+A `warp.exe` at `C:\Program Files\Warp\warp.exe` anywhere in that chain means the overlay would
+kill this shell. Split the run in two:
+
+1. Build from inside Warp, with deploy's feature set so the staged exe is not stale:
+   `.\script\windows\build.ps1 -Release -Bin warp-oss -Features "release_bundle,gui"`
+2. Copy from a shell the install does not host — Windows Terminal, conhost, or
+   `script\windows\deploy.cmd` double-clicked: `.\script\windows\deploy.ps1 -SkipBuild`
+
+An agent can do step 1 and must hand step 2 to the operator: it cannot outlive the process it is
+about to kill.
+
+## Verify what is installed
+
+The exe carries its build commit, so the installed/HEAD gap never has to be guessed:
+
+```powershell
+(Get-Item 'C:\Program Files\Warp\warp.exe').VersionInfo.FileVersion   # v0.1.0+<short sha>
+```
+
+```bash
+sha256sum "/c/Program Files/Warp/warp.exe" target/release/warp-oss.exe   # equal => install is that build
+git log --oneline <short sha>..HEAD                                      # what the overlay is missing
+diff -rq "/c/Program Files/Warp" target/warp-deploy-staging
+```
+
+Three differences in that last diff are expected, not drift: `unins000.*` (official uninstaller,
+deliberately never copied), `bin\oz.cmd` (not part of the payload), and `icon.ico` whenever the
+channel icon changed after the last overlay.
+
+`icon.ico` in the install dir is only the loose shortcut/installer icon. The window and taskbar use
+the icon resource compiled into `warp.exe` ([`script/compile_icon`](../../script/compile_icon)), so
+an icon change needs a rebuild — refreshing `icon.ico` in place leaves the old embedded icon.
 
 ## Identity
 

@@ -24,6 +24,7 @@ question.
 | Build / test / lint commands | [`../AGENTS.md`](../AGENTS.md) |
 | Windows GUI compile / resume | [`../script/windows/build.ps1`](../script/windows/build.ps1); wiki: [`guides/build-and-run.md`](guides/build-and-run.md) |
 | Windows local overlay onto Program Files | [`../script/windows/deploy.ps1`](../script/windows/deploy.ps1); wiki: [`guides/windows-local-deploy.md`](guides/windows-local-deploy.md) |
+| Cloud/commercial surface gating | [`../crates/warp_core/src/channel/mod.rs`](../crates/warp_core/src/channel/mod.rs) (`offers_warp_hosted_ai`, `shows_warp_inc_links`) and [`../crates/warp_core/src/channel/state.rs`](../crates/warp_core/src/channel/state.rs) (`warp_cloud_enabled`, `filter_unsupported_features_for`); wiki: [`architecture/cloud-surface-audit.md`](architecture/cloud-surface-audit.md) |
 | OSS disabled cloud URLs | [`../crates/warp_core/src/channel/config.rs`](../crates/warp_core/src/channel/config.rs) (`WarpServerConfig::disabled()`, `192.0.2.0:9`); wiki: [`guides/oss-windows-runtime-warnings.md`](guides/oss-windows-runtime-warnings.md) |
 | App ID / bundle identifiers | [`../crates/warp_core/src/app_id.rs`](../crates/warp_core/src/app_id.rs); wiki: [`technical/app-id.md`](technical/app-id.md) |
 | App feature enable list | [`../app/src/features.rs`](../app/src/features.rs) (`enabled_features()`); enum SoT remains `warp_features` |

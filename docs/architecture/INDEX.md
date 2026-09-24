@@ -16,5 +16,6 @@ Warp-only design notes. Hybrid Zed work lives in the mirrored [zed-warp](../zed-
 - [crate-map.md](crate-map.md) — Warp crates a change typically touches
 - [entity-handle.md](entity-handle.md) — Entity / `ViewHandle` / `AppContext`
 - [synth-fork.md](synth-fork.md) — local-first fork boundary, AppId, telemetry export, OSS sinkhole URLs, cloud-strip compile checks
+- [cloud-surface-audit.md](cloud-surface-audit.md) — which cloud/paid/vendored surfaces are gated, by which mechanism, and what remains
 
 See also: [ARCHITECTURE.md](../ARCHITECTURE.md), [zed-warp/README.md](../zed-warp/README.md).

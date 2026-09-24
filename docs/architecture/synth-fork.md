@@ -44,6 +44,9 @@ and removing or compile-time-gating remote exporters from the local-only service
 
 OSS server URLs use `WarpServerConfig::disabled()` (`http://192.0.2.0:9`, TEST-NET-1 + discard port) so leftover URL interpolation cannot hit Warp production. Logged-out Windows GUI `[WARN]` lines from that sinkhole, missing secure-storage user, and unset personal Drive are expected: [guides/oss-windows-runtime-warnings.md](../guides/oss-windows-runtime-warnings.md).
 
+Which cloud, paid, and vendored surfaces are gated, by which of the four mechanisms, and what is
+still exposed: [cloud-surface-audit.md](cloud-surface-audit.md).
+
 Shipped behavior summary: [features/implemented/local-first.md](../features/implemented/local-first.md). Hybrid constraints that depend on this boundary: [zed-warp/constraints/synth-fork.md](../zed-warp/constraints/synth-fork.md).
 
 ## BYOK and the built-in agent
