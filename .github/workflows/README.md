@@ -1,19 +1,15 @@
-# Release Configurations
+# GitHub Actions (synthet/warp)
 
-This README file documents the format of the `release_configurations.json` file located in this directory.  The file defines Warp's various release channels, and provides values for the various variables that are necessary to run the `create_new_releases.yml` GitHub workflow.
+This fork keeps a **single** workflow: [`ci.yml`](./ci.yml) (`Warp CI`). It runs on
+`github.repository_owner == 'synthet'` using GitHub-hosted runners (`ubuntu-latest`,
+`macos-14`).
 
-At some point, we may want to replace this document with a JSON schema file (which could be used to validate the correctness of the configuration as part of PR presubmit).
+Upstream Warp workflows (release cutting, repo-sync, Oz/docubot automation, Docker Hub
+agent-dev image, warpdotdev/docs dispatch, etc.) are **not** carried in this fork. They
+depended on Warp-internal secrets, Namespace runners, GCP, and `warpdotdev/*` reusable
+workflows. Removing them avoids skipped scheduled runs, failing `update-*-local` jobs, and
+noisy `notify-docs` / `publish-agent-dev-image` failures on every `master` push.
 
-## Fields
-
-* **channel**: The channel's unique identifier
-* **type**: The release cadence.  At present, the valid values are "nightly" or "weekly".
-* **is_prerelease**: If true, the GitHub release for this channel will be marked as prerelease.
-* **is_autopush**: If true, this channel uses the "latest" keyword in `channel_versions.json` to automatically deploy new release candidates.  Non-autopush channels require a manual change in order to deploy them.
-* **release_base_name**: The base name of GitHub releases created for this channel.
-* **release_body_text**: The body text for GitHub releases created for this channel.
-* **sentry_project**: Which Sentry project should receive crash and error reports for this channel.
-* **sentry_environment**: The Sentry environment that corresponds to this channel.
-* **changelog_slack_channel**: The Slack channel where new changelogs will be posted whenever a new release candidates is cut.
-* **gcs_cache_control_value**: The value of the cache-control response header for release DMGs.
-  - **IMPORTANT!!**: the value of the cache-control header _must_ be all lowercase; uppercase values will not be respected by Cloud CDN.
+When merging `warpdotdev/warp` `master`, expect `.github/workflows/` to gain upstream files
+again. Reconcile by keeping `ci.yml` fork overrides (owner + runners, no repo-sync lint) and
+deleting reintroduced upstream-only workflows unless you intentionally adopt them.

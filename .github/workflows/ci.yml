@@ -50,7 +50,7 @@ jobs:
     if: >-
       github.event.pull_request.draft == false &&
       (!startsWith(github.event.pull_request.head.ref, 'repo-sync/') || contains(github.event.pull_request.labels.*.name, 'repo-sync:conflict')) &&
-      github.repository_owner == 'warpdotdev'
+      github.repository_owner == 'synthet'
     outputs:
       affects-database-schema: ${{ github.ref == 'master' || steps.filter.outputs.affects-database-schema }}
       affects-rust-sources: ${{ github.ref == 'master' || steps.filter.outputs.affects-rust-sources }}
@@ -74,7 +74,7 @@ jobs:
       - name: Determine macOS runner type
         id: mac_runner_type
         run: |
-          RUNNER_TYPE='["namespace-profile-mac-ci"]'
+          RUNNER_TYPE='["macos-14"]'
           echo "value=$RUNNER_TYPE" >> $GITHUB_OUTPUT
 
       - name: Determine wasm runner type
@@ -82,7 +82,7 @@ jobs:
         run: |
           # Use a larger (16 core, 64GB ram) runner on Linux to speed up execution time.
           # https://github.com/warpdotdev/warp-internal/settings/actions/runners
-          RUNNER_TYPE='["ubuntu-latest-large"]'
+          RUNNER_TYPE='["ubuntu-latest"]'
           echo "value=$RUNNER_TYPE" >> $GITHUB_OUTPUT
 
   tests:
@@ -114,7 +114,7 @@ jobs:
             name: "Linux"
             # Use a larger (16 core, 64GB ram) runner on Linux to speed up execution time.
             # https://github.com/warpdotdev/warp-internal/settings/actions/runners
-            runner: ubuntu-latest-large
+            runner: ubuntu-latest
             # We don't (yet) have any self-hosted Linux runners.
             is_self_hosted: false
 
@@ -437,7 +437,7 @@ jobs:
     # Temporarily disabled while reconsidering the approach.
     if: false
     timeout-minutes: 25
-    runs-on: ubuntu-latest-large
+    runs-on: ubuntu-latest
     needs: params
     concurrency:
       # The dedicated VM uses a fixed binary path, so serialize remote-server
@@ -564,7 +564,7 @@ jobs:
             name: "Linux"
             # Use a larger (16 core, 64GB ram) runner on Linux to speed up execution time.
             # https://github.com/warpdotdev/warp-internal/settings/actions/runners
-            runner: ubuntu-latest-large
+            runner: ubuntu-latest
             # We don't (yet) have any self-hosted Linux runners.
             is_self_hosted: false
             null_device: "/dev/null"
@@ -663,9 +663,6 @@ jobs:
         run: ./script/lint_powershell -ci
         shell: pwsh
 
-      - name: Validate repo-sync markers
-        uses: warpdotdev/repo-sync/actions/validate-markers@main
-
       - name: Check for incorrectly named test files
         run: |
           # Test files should end in _tests.rs, not _test.rs.
@@ -736,7 +733,7 @@ jobs:
             name: "Linux"
             # Use a larger (16 core, 64GB ram) runner on Linux to speed up execution time.
             # https://github.com/warpdotdev/warp-internal/settings/actions/runners
-            runner: ubuntu-latest-large
+            runner: ubuntu-latest
             # We don't (yet) have any self-hosted Linux runners.
             is_self_hosted: false
             null_device: "/dev/null"
@@ -786,7 +783,7 @@ jobs:
     name: Verify compilation with eval features
     timeout-minutes: 25
     # Match the platform used by agent-mode-evals CI.
-    runs-on: ubuntu-latest-large
+    runs-on: ubuntu-latest
     needs: params
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -815,7 +812,7 @@ jobs:
     timeout-minutes: 3
     runs-on: ubuntu-slim
     # This must run unconditionally on drafts so a draft PR is never treated as passing CI; the
-    # repo-sync/* and non-warpdotdev-owner skips above remain a deliberate exception to that.
+    # repo-sync/* skips on the upstream repo remain; this fork does not run repo-sync PRs.
     if: >-
       !cancelled() &&
       (needs.params.result != 'skipped' || github.event.pull_request.draft == true)
