@@ -1,0 +1,27 @@
+[package]
+name = "remote_control_server"
+edition = "2024"
+description = "Self-hosted remote-control (session-sharing) server and web/mobile viewer for Synth Warp"
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "synth-remote-control-server"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum = { workspace = true, features = ["ws"] }
+clap = { workspace = true, features = ["env"] }
+env_logger.workspace = true
+futures-util = { workspace = true, features = ["sink", "std"] }
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+session-sharing-protocol.workspace = true
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+uuid.workspace = true
+
+[dev-dependencies]
+tokio-tungstenite = "0.26"

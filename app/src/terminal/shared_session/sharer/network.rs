@@ -55,7 +55,7 @@ use crate::terminal::model::block::BlockId;
 #[cfg(not(any(test, feature = "integration_tests")))]
 use crate::terminal::shared_session::SharedSessionScrollbackType;
 use crate::terminal::shared_session::{
-    EventNumber, SELECTION_THROTTLE_PERIOD, SharedSessionSource, connect_endpoint,
+    EventNumber, SELECTION_THROTTLE_PERIOD, SharedSessionSource, connect_endpoint, self_hosted,
 };
 use crate::throttle::throttle;
 
@@ -835,8 +835,13 @@ impl Network {
                         .and_then(|token| token.bearer_token()),
                 };
                 log::info!("Connecting to session sharing server");
+                // Synth Warp is local-first: authenticate to a self-hosted remote-control server.
+                let headers: Vec<_> = iap_headers
+                    .into_iter()
+                    .chain(self_hosted::connect_headers())
+                    .collect();
                 let socket =
-                    WebSocket::connect_with_headers(&create_endpoint, None::<&str>, iap_headers)
+                    WebSocket::connect_with_headers(&create_endpoint, None::<&str>, headers)
                         .await?;
                 log::info!("Connected to session sharing server; preparing initialization");
                 anyhow::Ok((socket.split().await, user_id))
@@ -1103,10 +1108,14 @@ impl Network {
                             .and_then(|state| state.proxy_auth_header())
                             .into_iter()
                             .collect();
+                        let headers: Vec<_> = iap_headers
+                            .into_iter()
+                            .chain(self_hosted::connect_headers())
+                            .collect();
                         let socket = WebSocket::connect_with_headers(
                             &reconnect_endpoint,
                             None::<&str>,
-                            iap_headers,
+                            headers,
                         )
                         .await?;
                         let user_id = UserID {

@@ -49,7 +49,7 @@ use crate::terminal::shared_session::viewer::event_loop::{
     EventLoop, SharedSessionInitialLoadMode,
 };
 use crate::terminal::shared_session::{
-    EventNumber, SELECTION_THROTTLE_PERIOD, SharedSessionSource, connect_endpoint,
+    EventNumber, SELECTION_THROTTLE_PERIOD, SharedSessionSource, connect_endpoint, self_hosted,
 };
 use crate::terminal::{TerminalModel, TerminalView};
 use crate::throttle::throttle;
@@ -303,8 +303,13 @@ impl Network {
             bail!("This channel does not support session-sharing.");
         };
         let user_id = Self::get_user_id(auth_client, &auth_state).await?;
+        // Synth Warp is local-first: authenticate to a self-hosted remote-control server.
+        let headers: Vec<_> = iap_headers
+            .into_iter()
+            .chain(self_hosted::connect_headers())
+            .collect();
         let socket =
-            websocket::WebSocket::connect_with_headers(&join_endpoint, None::<&str>, iap_headers)
+            websocket::WebSocket::connect_with_headers(&join_endpoint, None::<&str>, headers)
                 .await?;
         anyhow::Ok(((socket.split().await), user_id))
     }

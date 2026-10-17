@@ -26,6 +26,7 @@ fn main() -> Result<()> {
     }
     ChannelState::set(state);
     apply_server_root_override();
+    apply_remote_control_override();
 
     warp::run()
 }
@@ -55,6 +56,34 @@ fn apply_server_root_override() {
     }
     if let Err(e) = ChannelState::override_server_root_url(url.to_owned()) {
         eprintln!("{SERVER_ROOT_URL_ENV} is not a valid URL ({url}): {e}");
+    }
+}
+
+/// Environment variable pointing Synth Warp at a self-hosted remote-control server
+/// (`synth-remote-control-server`), e.g. `wss://rc.example.com`.
+///
+/// Replaces Warp's hosted (paid) session-sharing service, which this fork never contacts:
+/// Warp hosts are rejected just like for [`SERVER_ROOT_URL_ENV`].
+const REMOTE_CONTROL_URL_ENV: &str = "SYNTH_WARP_REMOTE_CONTROL_URL";
+
+fn apply_remote_control_override() {
+    let Ok(url) = std::env::var(REMOTE_CONTROL_URL_ENV) else {
+        return;
+    };
+    // Paths are appended to this base (`/sessions/create`), so drop any trailing slash.
+    let url = url.trim().trim_end_matches('/');
+    if url.is_empty() {
+        return;
+    }
+    if warp_core::channel::is_hosted_warp_production_url(url) {
+        eprintln!(
+            "{REMOTE_CONTROL_URL_ENV} points at Warp's hosted cloud ({url}); ignoring it. \
+             Synth Warp only shares terminals with a self-hosted server."
+        );
+        return;
+    }
+    if let Err(e) = ChannelState::override_session_sharing_server_url(url.to_owned()) {
+        eprintln!("{REMOTE_CONTROL_URL_ENV} is not a valid URL ({url}): {e}");
     }
 }
 
