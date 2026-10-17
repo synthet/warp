@@ -59,6 +59,7 @@ use crate::terminal::shared_session::manager::Manager;
 use crate::terminal::shared_session::permissions_manager::SessionPermissionsManager;
 use crate::terminal::shared_session::presence_manager::PresenceManager;
 use crate::terminal::shared_session::replay_agent_conversations::reconstruct_response_events_from_conversations;
+use crate::terminal::shared_session::self_hosted;
 use crate::terminal::shared_session::settings::SharedSessionSettings;
 use crate::terminal::shared_session::shared_handlers::{
     RemoteUpdateGuard, apply_auto_approve_agent_actions_update, apply_cli_agent_state_update,
@@ -1155,13 +1156,28 @@ impl TerminalManager<TerminalView> {
                     ctx,
                 );
 
-                terminal_view.update(ctx, |view, ctx| {
-                    view.show_persistent_toast(
-                        "Something went wrong. Please try sharing again.".to_string(),
-                        ToastFlavor::Error,
-                        ctx,
-                    );
-                });
+                // Synth Warp is local-first: in share-all mode a lost session (e.g. the
+                // remote-control server restarted) is replaced instead of reported. If the
+                // server is unreachable, the new attempt fails through the usual share error.
+                if self_hosted::share_all_terminals() {
+                    terminal_view.update(ctx, |view, ctx| {
+                        view.attempt_to_share_session(
+                            SharedSessionScrollbackType::All,
+                            None,
+                            SharedSessionSource::user(None),
+                            /* bypass_conversation_guard = */ false,
+                            ctx,
+                        );
+                    });
+                } else {
+                    terminal_view.update(ctx, |view, ctx| {
+                        view.show_persistent_toast(
+                            "Something went wrong. Please try sharing again.".to_string(),
+                            ToastFlavor::Error,
+                            ctx,
+                        );
+                    });
+                }
             }
             NetworkEvent::ControlActionRequested {
                 participant_id,

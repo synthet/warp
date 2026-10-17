@@ -48,7 +48,7 @@ export SYNTH_WARP_REMOTE_CONTROL_ALL_TERMINALS=1   # optional
 - With `ALL_TERMINALS=1`, every new terminal is shared once on its first bootstrap. The link is not
   copied (the dashboard lists them), so the clipboard is left alone, and closing a tab does not
   ask to confirm ending its share. A terminal the user stops sharing is not re-shared by a later
-  subshell.
+  subshell. If the server restarts, auto-shared terminals share themselves again.
 - Self-hosted shares do not revoke control or end after local inactivity: the point is driving an
   unattended terminal. Stopping sharing works as upstream.
 

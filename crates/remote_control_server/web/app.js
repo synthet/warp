@@ -424,7 +424,7 @@ class RemoteTerminal {
     const [kind, body] = RemoteTerminal.variant(event.event_type);
     switch (kind) {
       case "PtyBytesRead":
-        this.term.write(new Uint8Array(body.bytes));
+        this.term.write(decompressPtyBytes(body.bytes));
         break;
       case "CommandExecutionStarted":
         this.running = true;
@@ -529,6 +529,42 @@ class RemoteTerminal {
     $("command-send").disabled = true;
     if (this.ws) this.ws.close();
   }
+}
+
+// Sharers send each PTY batch as an LZ4 block with its decompressed size prepended as a
+// little-endian u32 (`lz4_flex::block::compress_prepend_size`).
+function decompressPtyBytes(bytes) {
+  const src = Uint8Array.from(bytes);
+  if (src.length < 4) return new Uint8Array(0);
+  const size = (src[0] | (src[1] << 8) | (src[2] << 16) | (src[3] << 24)) >>> 0;
+  const dst = new Uint8Array(size);
+  let s = 4;
+  let d = 0;
+  const readLength = (length) => {
+    if (length !== 15) return length;
+    let byte;
+    do {
+      byte = src[s++];
+      length += byte;
+    } while (byte === 255 && s < src.length);
+    return length;
+  };
+  while (s < src.length) {
+    const token = src[s++];
+    const literals = readLength(token >> 4);
+    if (d + literals > size || s + literals > src.length) break;
+    dst.set(src.subarray(s, s + literals), d);
+    s += literals;
+    d += literals;
+    if (s >= src.length) break; // The last sequence carries literals only.
+    const offset = src[s] | (src[s + 1] << 8);
+    s += 2;
+    const matchLength = readLength(token & 15) + 4;
+    if (offset === 0 || offset > d || d + matchLength > size) break;
+    // Byte-by-byte: matches may overlap their own output.
+    for (let m = d - offset, end = d + matchLength; d < end; ) dst[d++] = dst[m++];
+  }
+  return dst.subarray(0, d);
 }
 
 // Scrollback blocks store bare `\n` line breaks; xterm needs CRLF to return to column 0.

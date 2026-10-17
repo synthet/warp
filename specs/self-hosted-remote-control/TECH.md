@@ -49,7 +49,9 @@ Routes match what the client already dials via `connect_endpoint`:
 ## Web app (`web/app.js`)
 Speaks the viewer protocol directly (serde's externally tagged JSON). Scrollback blocks are the
 client's JSON `SerializedBlock`; the app writes `stylized_command` / `stylized_output` with
-bare `\n` normalized to CRLF. Live `PtyBytesRead` bytes go to xterm verbatim. Input:
+bare `\n` normalized to CRLF. Live `PtyBytesRead` payloads are LZ4 blocks with a little-endian
+u32 size prefix (`lz4_flex::block::compress_prepend_size`); `app.js` decodes them before writing to
+xterm, which also swallows Warp's DCS shell-integration hooks. Input:
 - Idle (`CommandExecutionFinished` seen): command bar → `ExecuteCommand { buffer_id = current
   block id }`; the block id comes from `init_block_id` / `next_block_id`.
 - Running (`CommandExecutionStarted`): keystrokes, key bar, and command bar → `WriteToPty`.
@@ -69,6 +71,7 @@ bare `\n` normalized to CRLF. Live `PtyBytesRead` bytes go to xterm verbatim. In
 | `agent_input_footer/mod.rs` | Remote-control chip not login-gated when self-hosted. |
 | `view/shared_session/view_impl.rs` | Self-hosted shares are remote-control shares (banner copy, no ACL dialog) and skip the inactivity revoke/end timer, as ambient-agent shares already do. |
 | `terminal/view.rs` | Share-all: share on the first bootstrap only, when `NotShared`. |
+| `local_tty/terminal_view_adaptor.rs` | Share-all: when a resume is rejected (server restarted, session reaped), start a fresh share instead of showing an error toast. |
 | `workspace/view.rs` | Share-all: don't copy a link per new terminal, and don't confirm closing a shared tab/pane (every tab is shared). |
 
 Upstream code paths are kept and gated, not deleted, per
@@ -80,5 +83,7 @@ Upstream code paths are kept and gated, not deleted, per
   terminals end sharing when they exceed it and must be re-shared.
 - Warp prompt rendering (`ActivePrompt::WarpPrompt`) and agent conversation events are not
   rendered by the web app.
-- No persistence across server restarts; terminals reconnect and get `SessionNotFound` → the user
-  re-shares.
+- No persistence across server restarts; terminals reconnect and get `SessionNotFound`. In
+  share-all mode they re-share automatically (new session ids); otherwise the user re-shares.
+- The web app renders the PTY stream (LZ4-framed per event, decoded in `app.js`), not Warp's block
+  UI, so Warp's own prompt (PS1 is rendered natively by Warp) does not appear in the browser.

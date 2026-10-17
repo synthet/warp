@@ -88,5 +88,5 @@ Open `https://rc.example.com`, sign in with the token, and pick a terminal.
 | No sharing entries in Synth Warp | `SYNTH_WARP_REMOTE_CONTROL_URL` set in the environment Warp was launched from; it must start with `ws://` or `wss://` |
 | "Failed to share" | Server reachable from that machine; `SYNTH_WARP_REMOTE_CONTROL_TOKEN` matches (`warp-oss.log` warns when it is unset) |
 | Web app keeps asking for the token | The cookie is `SameSite=Strict`; open the server's own URL, not through another site |
-| Terminal stopped appearing after a while | A share ends at 100 MB of output (client cap) or when the server restarts; share it again |
+| Terminal stopped appearing after a while | A share ends at 100 MB of output (client cap) or when the server restarts; share it again (with `ALL_TERMINALS=1`, a server restart re-shares automatically) |
 | Commands rejected as busy | A command is already running; use the key bar / typing instead |
