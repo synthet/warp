@@ -57,11 +57,10 @@ use crate::terminal::shared_session::presence_manager::{
 use crate::terminal::shared_session::role_change_modal::{
     RoleChangeCloseSource, RoleChangeOpenSource,
 };
-use crate::terminal::shared_session::self_hosted;
 use crate::terminal::shared_session::settings::SharedSessionSettings;
 use crate::terminal::shared_session::{
     COPY_LINK_TEXT, SharedSessionActionSource, SharedSessionScrollbackType, SharedSessionSource,
-    SharedSessionStatus, join_link,
+    SharedSessionStatus, join_link, self_hosted,
 };
 use crate::terminal::view::{
     ContextMenuAction, Event, InlineBannerItem, InlineBannerType, PendingUserQueryKind,

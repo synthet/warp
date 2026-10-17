@@ -59,7 +59,6 @@ use crate::terminal::shared_session::manager::Manager;
 use crate::terminal::shared_session::permissions_manager::SessionPermissionsManager;
 use crate::terminal::shared_session::presence_manager::PresenceManager;
 use crate::terminal::shared_session::replay_agent_conversations::reconstruct_response_events_from_conversations;
-use crate::terminal::shared_session::self_hosted;
 use crate::terminal::shared_session::settings::SharedSessionSettings;
 use crate::terminal::shared_session::shared_handlers::{
     RemoteUpdateGuard, apply_auto_approve_agent_actions_update, apply_cli_agent_state_update,
@@ -72,7 +71,7 @@ use crate::terminal::shared_session::sharer::network::{
 };
 use crate::terminal::shared_session::{
     SharedSessionActionSource, SharedSessionScrollbackType, SharedSessionSource,
-    SharedSessionStatus, max_session_size,
+    SharedSessionStatus, max_session_size, self_hosted,
 };
 use crate::terminal::view::{ConversationRestorationInNewPaneType, Event as TerminalViewEvent};
 use crate::terminal::writeable_pty::terminal_manager_util::wire_up_remote_server_controller_with_view;

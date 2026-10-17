@@ -6,8 +6,7 @@
 //! joiners replay. Connections hand it typed messages plus an outbound channel; it never touches
 //! sockets, which keeps it unit-testable.
 
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -264,8 +263,7 @@ impl Hub {
         conn_id: ConnId,
         message: sharer::UpstreamMessage,
     ) {
-        use sharer::DownstreamMessage as Down;
-        use sharer::UpstreamMessage as Up;
+        use sharer::{DownstreamMessage as Down, UpstreamMessage as Up};
 
         let mut sessions = self.sessions();
         let Some(session) = sessions.get_mut(&session_id) else {
@@ -604,8 +602,7 @@ impl Hub {
         message: viewer::UpstreamMessage,
     ) {
         use sharer::DownstreamMessage as ToSharer;
-        use viewer::DownstreamMessage as Down;
-        use viewer::UpstreamMessage as Up;
+        use viewer::{DownstreamMessage as Down, UpstreamMessage as Up};
 
         let mut sessions = self.sessions();
         let Some(session) = sessions.get_mut(&session_id) else {

@@ -5,14 +5,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::Json;
-use axum::Router;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
 use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE, SET_COOKIE};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use axum::{Json, Router};
 use futures_util::stream::SplitStream;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -22,9 +21,8 @@ use session_sharing_protocol::{sharer, viewer};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
-use crate::auth;
 use crate::hub::{Hub, SharerLabels};
-use crate::web;
+use crate::{auth, web};
 
 /// Header a Synth Warp sharer uses to tell the dashboard which machine a terminal is on.
 pub const HOST_LABEL_HEADER: &str = "x-synth-host";
