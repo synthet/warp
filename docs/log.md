@@ -4,6 +4,10 @@ Append-only. One line per wiki restructure, newest under the current month.
 Format: `- YYYY-MM-DD: <verb> — <details and paths>` (verbs: `created`, `updated`, `ingested`,
 `lint-fixed`, `reorganized`).
 
+## 2026-10
+
+- 2026-10-18: created — recorded upstream merge preservation, verification results, and the maintainer's acceptance of test failures in [reports/upstream-sync-2026-10-18.md](reports/upstream-sync-2026-10-18.md).
+
 ## 2026-08
 
 - 2026-08-18: updated — closed items 12 (unused-code warnings: the 15 Aug list is gone; a workspace build newly surfaces three dead logout-flow symbols under `app/src/tui/`, left in place) and 13 (demoted four expected empty-state warnings to `debug`, and recorded why `HandleFocusChange` was deliberately left alone — it is a generic unhandled-action warning in warpui_core, not focus-specific), in [planning/conversation-backlog.md](planning/conversation-backlog.md).
