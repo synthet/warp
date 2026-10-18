@@ -386,6 +386,7 @@ fn start_tui_device_login_with_entrypoint(
 /// Synth Warp is local-first: never bounce the TUI into device-authorization logout.
 pub fn log_out_tui(_ctx: &mut AppContext) {}
 
+#[allow(dead_code)]
 fn set_logged_out_phase(ctx: &mut AppContext) {
     let event = TuiLoginModel::handle(ctx).update(ctx, |model, ctx| {
         model.phase = TuiLoginPhase::AwaitingLogin { browser_url: None };

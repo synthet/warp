@@ -24,7 +24,7 @@ foreach ($source in $sources) {
     }
     $results = Invoke-ScriptAnalyzer @scriptAnalyzerParams
     Write-Output $results
-    $errorsAndWarnings = $results | Where-Object { $_.Severity -ge [Microsoft.Windows.PowerShell.ScriptAnalyzer.Generic.DiagnosticSeverity]::Warning }
+    $errorsAndWarnings = $results | Where-Object { $_.Severity -in 'Warning', 'Error', 'ParseError' }
     $problemCount = ($errorsAndWarnings | Measure-Object).Count
     $totalProblemCount += $problemCount
 }

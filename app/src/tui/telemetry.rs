@@ -24,6 +24,7 @@ impl AuthenticationEntrypoint {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Journey {
     InitialLogin,
+    #[allow(dead_code)]
     PostLogout,
 }
 
@@ -383,6 +384,7 @@ impl TuiOnboardingTelemetry {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn post_logout_authentication_started(&mut self) -> TuiOnboardingTelemetryEvent {
         self.flow = Some(ActiveFlow::new(Journey::PostLogout, Instant::now()));
         self.authentication_started(AuthenticationEntrypoint::OpenBrowser)
