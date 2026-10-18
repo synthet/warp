@@ -141,6 +141,7 @@ use warp_core::context_flag::ContextFlag;
 use warp_core::semantic_selection::SemanticSelection;
 use warp_core::user_preferences::GetUserPreferences as _;
 use warp_errors::{report_error, report_if_error};
+use warp_terminal::event::{ExitReason, ObservedExitStatus};
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 #[cfg(feature = "local_fs")]
 use warp_util::path::LineAndColumnArg;
@@ -221,8 +222,7 @@ use crate::ai::agent::{
 use crate::ai::agent::{CurrentHead, DiffBase};
 use crate::ai::agent_conversations_model::{AgentConversationsModel, AgentConversationsModelEvent};
 use crate::ai::ambient_agents::{
-    AmbientAgentTask, AmbientAgentTaskId, AmbientConversationStatus,
-    conversation_output_status_from_conversation,
+    AmbientAgentTaskId, AmbientConversationStatus, conversation_output_status_from_conversation,
 };
 use crate::ai::blocklist::agent_view::agent_input_footer::toolbar_item::AgentToolbarItemKind;
 use crate::ai::blocklist::agent_view::orchestration_conversation_links::pane_group_id_containing_terminal_view;
@@ -259,20 +259,23 @@ use crate::ai::blocklist::telemetry_banner::{TelemetryBanner, should_collect_ai_
 use crate::ai::blocklist::usage::conversation_usage_view::{
     ConversationUsageInfo, ConversationUsageView, TimingInfo,
 };
+use crate::ai::blocklist::usage::request_metadata_turn_view::{
+    RequestMetadataTurnView, RequestMetadataTurnViewEvent,
+};
 use crate::ai::blocklist::{
     AIBlock, AIBlockEvent, ATTACH_AS_AGENT_MODE_CONTEXT_TEXT, AutofireAction,
     BlocklistAIActionEvent, BlocklistAIActionModel, BlocklistAIContextEvent,
     BlocklistAIContextModel, BlocklistAIController, BlocklistAIControllerEvent,
     BlocklistAIHistoryEvent, BlocklistAIHistoryModel, BlocklistAIInputEvent, BlocklistAIInputModel,
-    ClientIdentifiers, ConversationSelection, ConversationStatusUpdate, InputConfig, InputType,
-    InputTypeAutoDetectionSource, LegacyPassiveSuggestionsEvent, LegacyPassiveSuggestionsModel,
-    MaaPassiveSuggestionsEvent, MaaPassiveSuggestionsModel, PRE_REWIND_PREFIX,
-    PassiveSuggestionsModels, PendingAttachment, PendingQueryState, QueuedQuery, QueuedQueryId,
-    QueuedQueryModel, QueuedQueryOrigin, RequestFileEditsFormatKind, ShellCommandExecutor,
-    ShellCommandExecutorEvent, SlashCommandRequest, StartAgentExecutor, StartAgentExecutorEvent,
-    StartAgentRequest, ai_brand_color, block_context_from_terminal_model,
-    get_ai_block_overflow_menu_element_position_id, get_attached_blocks_chip_element_position_id,
-    is_lrc_auto_queue_active,
+    CancellationRoute, ClientIdentifiers, ConversationSelection, ConversationStatusUpdate,
+    InputConfig, InputType, InputTypeAutoDetectionSource, LegacyPassiveSuggestionsEvent,
+    LegacyPassiveSuggestionsModel, MaaPassiveSuggestionsEvent, MaaPassiveSuggestionsModel,
+    PRE_REWIND_PREFIX, PassiveSuggestionsModels, PendingAttachment, PendingQueryState, QueuedQuery,
+    QueuedQueryId, QueuedQueryModel, QueuedQueryOrigin, RequestFileEditsFormatKind,
+    ShellCommandExecutor, ShellCommandExecutorEvent, ShellRecoveryResult, SlashCommandRequest,
+    StartAgentExecutor, StartAgentExecutorEvent, StartAgentRequest, ai_brand_color,
+    block_context_from_terminal_model, get_ai_block_overflow_menu_element_position_id,
+    get_attached_blocks_chip_element_position_id, is_lrc_auto_queue_active,
 };
 use crate::ai::conversation_details_panel::ConversationDetailsPanelEvent;
 use crate::ai::conversation_utils;
@@ -354,8 +357,9 @@ use crate::server::ids::{ObjectUid, SyncId};
 use crate::server::server_api::ServerApi;
 use crate::server::telemetry::{
     self, AgentModeAttachContextMethod, AgentModeEntrypoint, AgentModeRewindEntrypoint,
-    AnonymousUserSignupEntrypoint, BootstrappingInfo, InteractionSource, NotificationAgentVariant,
-    NotificationsTurnedOnSource, PaletteSource, PromptSuggestionViewType,
+    AnonymousUserSignupEntrypoint, BootstrappingInfo, CloudAgentShellExitDetection,
+    CloudAgentShellRecoveryFailureClass, CloudAgentShellRecoveryOutcome, InteractionSource,
+    NotificationAgentVariant, NotificationsTurnedOnSource, PaletteSource, PromptSuggestionViewType,
     SaveAsWorkflowModalSource, SecretInteraction, SharingDialogSource, SlowBootstrapInfo,
     TelemetryEvent, ToggleBlockFilterSource, WorkflowTelemetryMetadata,
 };
@@ -472,6 +476,7 @@ use crate::terminal::shared_session::{
     SharedSessionActionSource, SharedSessionScrollbackType, SharedSessionSource,
     SharedSessionStatus, self_hosted,
 };
+use crate::terminal::shell_recovery::{CloudShellRecoveryRequest, recovered_command_output};
 use crate::terminal::view::block_onboarding::onboarding_prompt_block::OnboardingPromptBlock;
 use crate::terminal::view::init_environment::mode_selector::{
     EnvironmentSetupMode, EnvironmentSetupModeSelector, EnvironmentSetupModeSelectorEvent,
@@ -549,7 +554,7 @@ use crate::workspace::{
     WorkspaceRegistry,
 };
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
-use crate::workspaces::workspace::CustomerType;
+use crate::workspaces::workspace::{ChargeUnit, CustomerType};
 use crate::{
     AIAgentActionResultType, AIRequestUsageModel, ActiveSession as WindowActiveSession, safe_error,
     safe_warn, send_telemetry_from_ctx, send_telemetry_sync_from_ctx,
@@ -719,17 +724,10 @@ pub const DEFAULT_ASK_AI_AUTOSUGGESTION_TEXT: &str = "What happened here?";
 
 const WARP_MD_PATH: &str = "WARP.md";
 
-/// `shell_plugins` tag reported by bootstrap when the shell's `^R` binding has been rebound away
-/// from its default reverse-history-search widget (e.g. by fzf or atuin). Must match the tag
-/// name used in `app/assets/bundled/bootstrap/zsh_body.sh`.
-const EXTERNAL_CTRL_R_HISTORY_PLUGIN_TAG: &str = "external_ctrl_r_history";
-
-/// `shell_plugins` tag reported by bootstrap when the shell's `^T` binding has been rebound away
-/// from its default line-editor binding to an external file-search widget (e.g. fzf). Independent
-/// of [`EXTERNAL_CTRL_R_HISTORY_PLUGIN_TAG`] -- a shell can have either, both, or neither, since
-/// each binding is detected and reported on its own. Must match the tag name used in
-/// `app/assets/bundled/bootstrap/zsh_body.sh`.
-const EXTERNAL_CTRL_T_FILE_PLUGIN_TAG: &str = "external_ctrl_t_file";
+/// `shell_plugins` tags reported by bootstrap when ctrl-r identifies a supported shell plugin.
+/// fzf provides ctrl-r, ctrl-t, and alt-c, while atuin only provides ctrl-r.
+const FZF_PLUGIN_TAG: &str = "fzf";
+const ATUIN_PLUGIN_TAG: &str = "atuin";
 
 /// Name of the bootstrap-installed shell function invoked to hand ctrl-r off to the shell's
 /// own external history widget. Must match the function name defined in
@@ -740,6 +738,17 @@ const EXTERNAL_CTRL_R_HELPER_COMMAND: &str = "warp_run_external_ctrl_r_widget";
 /// external file-search widget. Must match the function name defined in
 /// `app/assets/bundled/bootstrap/zsh_body.sh`.
 const EXTERNAL_CTRL_T_HELPER_COMMAND: &str = "warp_run_external_ctrl_t_widget";
+
+/// Name of the bootstrap-installed shell function invoked to hand alt-c off to fzf's directory
+/// search widget.
+const EXTERNAL_ALT_C_HELPER_COMMAND: &str = "warp_run_external_alt_c_widget";
+
+fn ctrl_t_apply_mode(shell_type: ShellType) -> ShellWidgetApplyMode {
+    match shell_type {
+        ShellType::Fish => ShellWidgetApplyMode::Replace,
+        ShellType::Bash | ShellType::Zsh | ShellType::PowerShell => ShellWidgetApplyMode::Splice,
+    }
+}
 
 pub const LONG_RUNNING_AGENT_REQUESTED_COMMAND_CONTEXT_KEY: &str = "LongRunningRequestedCommand";
 pub const LONG_RUNNING_AGENT_REQUESTED_COMMAND_USER_TOOK_OVER_CONTEXT_KEY: &str =
@@ -1774,6 +1783,7 @@ pub enum Event {
         size_update: SizeUpdate,
     },
     ExecuteCommand(ExecuteCommandEvent),
+    RecoverCloudShell(CloudShellRecoveryRequest),
     BlockStarted {
         is_for_in_band_command: bool,
     },
@@ -1823,6 +1833,9 @@ pub enum Event {
     FailedToShareSession {
         reason: String,
         cause: Option<Arc<anyhow::Error>>,
+    },
+    SharedSessionFailed {
+        reason: String,
     },
     RejoinCurrentSession,
     StopSharingCurrentSession {
@@ -2045,23 +2058,6 @@ pub enum Event {
     /// The pane group swaps visibility instead of cloning the conversation.
     SwapPaneToConversation {
         conversation_id: AIConversationId,
-    },
-    /// Emitted by `OrchestrationViewerModel` when a child of a shared-session
-    /// orchestration first reports a `session_id`. The pane group materializes
-    /// a dedicated hidden shared-session viewer pane for the child, with its
-    /// own `TerminalView`, `BlocklistAIController`, and viewer-side `Network`
-    /// joining the child's session. Subsequent pill clicks navigate to the
-    /// hidden pane via the existing `SwapPaneToConversation` mechanism.
-    EnsureSharedSessionViewerChildPane {
-        conversation_id: AIConversationId,
-        session_id: session_sharing_protocol::common::SessionId,
-    },
-    /// Unified-stack counterpart to [`Self::EnsureSharedSessionViewerChildPane`].
-    /// Carries the fetched task snapshot so pane construction uses the same
-    /// current-state materialization decision as pill-click restoration.
-    EnsureUnifiedViewerChildPane {
-        conversation_id: AIConversationId,
-        task: Box<AmbientAgentTask>,
     },
     /// A unified-stack child viewer could not join its dedicated live
     /// execution session. The pane group keeps the child passive and
@@ -2755,6 +2751,10 @@ pub struct TerminalView {
     /// Cached view ids for usage footers keyed by the AI block view id that owns them.
     usage_footer_view_ids: HashMap<EntityId, EntityId>,
 
+    /// Cached view ids for per-turn request-metadata "Turn" panels, keyed by the AI block
+    /// view id that owns them.
+    turn_panel_view_ids: HashMap<EntityId, EntityId>,
+
     // Whether the block onboarding view is active or not.
     block_onboarding_active: bool,
 
@@ -2971,6 +2971,7 @@ pub struct TerminalView {
     /// suppresses `AgentExitedShellProcess` telemetry so manual shutdown paths
     /// (tab close, update relaunch, etc.) are not attributed to agent commands.
     manual_pty_shutdown_requested: bool,
+    pending_cloud_shell_recovery: Option<CloudShellRecoveryRequest>,
 
     ephemeral_message_model: ModelHandle<EphemeralMessageModel>,
 
@@ -4452,6 +4453,7 @@ impl TerminalView {
             last_observed_conversation_status: Default::default(),
             last_observed_active_subagent: Default::default(),
             usage_footer_view_ids: Default::default(),
+            turn_panel_view_ids: Default::default(),
             block_onboarding_active: false,
             onboarding_prompt_block: None,
             settings_import_onboarding_block: None,
@@ -4521,6 +4523,7 @@ impl TerminalView {
             active_init_project_model: None,
             is_pending_aws_login: false,
             manual_pty_shutdown_requested: false,
+            pending_cloud_shell_recovery: None,
             first_time_cloud_agent_setup_view,
             cloud_agent_team_required_view,
             environment_setup_mode_selector,
@@ -5469,6 +5472,14 @@ impl TerminalView {
                 && let Some(reason) = self.finish_reason_for_conversation(*conversation_id, ctx)
             {
                 self.drain_queued_prompts(*conversation_id, reason, ctx);
+            } else if QueuedQueryModel::as_ref(ctx).has_queue(*conversation_id) {
+                log::info!(
+                    "event=turn_drain_deferred terminal_id={:?} conversation_id={conversation_id} active_subagent={has_active_subagent} has_finished_block={} queue_len={}",
+                    self.view_id,
+                    self.finish_reason_for_conversation(*conversation_id, ctx)
+                        .is_some(),
+                    QueuedQueryModel::as_ref(ctx).queue(*conversation_id).len(),
+                );
             }
 
             // If the most recent action in the current interaction turn created or updated a plan
@@ -5541,6 +5552,7 @@ impl TerminalView {
         let id = QueuedQueryModel::handle(ctx).update(ctx, |model, ctx| {
             model.append(conversation_id, QueuedQuery::new(prompt, origin), ctx)
         });
+        self.maybe_dispatch_steering_prompt_now(conversation_id, ctx);
         Some(id)
     }
 
@@ -5575,6 +5587,7 @@ impl TerminalView {
                     ctx,
                 );
             });
+            self.maybe_dispatch_steering_prompt_now(conversation_id, ctx);
         } else {
             self.send_user_query_after_next_conversation_finished(
                 prompt, /* show_close_button */ true, /* show_send_now_button */ false,
@@ -5583,9 +5596,33 @@ impl TerminalView {
         }
     }
 
+    /// If `conversation_id`'s queue is in `Steering` mode and nothing is currently streaming for
+    /// it, attempts to dispatch the just-queued row immediately rather than waiting for a future
+    /// turn-completion event that may never come (e.g. the conversation has nothing else in
+    /// flight right now). No-ops when a stream is already active for the conversation --
+    /// `Steering`'s piggyback-on-next-request and idle-drain mechanisms pick the row up once
+    /// that stream's turn produces a natural boundary, so firing here too would interrupt it.
+    fn maybe_dispatch_steering_prompt_now(
+        &mut self,
+        conversation_id: AIConversationId,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if !QueuedQueryModel::as_ref(ctx).is_steering(conversation_id) {
+            return;
+        }
+        if self
+            .ai_controller
+            .as_ref(ctx)
+            .has_active_stream_for_conversation(conversation_id, ctx)
+        {
+            return;
+        }
+        self.drain_queued_prompts(conversation_id, FinishReason::Complete, ctx);
+    }
+
     /// Drains one prompt from the queued-query singleton for `conversation_id` when that
     /// conversation finishes.
-    fn drain_queued_prompts(
+    pub(crate) fn drain_queued_prompts(
         &mut self,
         conversation_id: AIConversationId,
         finish_reason: FinishReason,
@@ -5597,6 +5634,9 @@ impl TerminalView {
                 let first_row_is_in_edit_mode =
                     QueuedQueryModel::as_ref(ctx).first_row_is_in_edit_mode(conversation_id);
                 if first_row_is_in_edit_mode && !input_is_empty {
+                    log::info!(
+                        "event=turn_drain_deferred conversation_id={conversation_id} reason=editing_head_with_local_draft",
+                    );
                     return;
                 }
 
@@ -5605,6 +5645,27 @@ impl TerminalView {
                 let action = QueuedQueryModel::as_ref(ctx).peek_autofire(conversation_id);
                 match action {
                     Some(AutofireAction::Submit { query_id, text }) => {
+                        if QueuedQueryModel::as_ref(ctx)
+                            .queue(conversation_id)
+                            .iter()
+                            .any(|row| {
+                                row.id() == query_id && row.shared_session_prompt().is_some()
+                            })
+                        {
+                            // Shared-session injections are normally dispatched via `Steering`'s
+                            // piggyback-on-next-request mechanism, or immediately when queued
+                            // while idle; reaching one here means neither applied (e.g. a prior
+                            // dispatch was deferred because a CLI subagent was active), so try
+                            // dispatching the head row now that this turn finished.
+                            self.ai_controller.update(ctx, |controller, ctx| {
+                                controller.dispatch_queued_warp_agent_prompt(
+                                    conversation_id,
+                                    None,
+                                    ctx,
+                                );
+                            });
+                            return;
+                        }
                         self.input.update(ctx, |input, ctx| {
                             input.submit_queued_prompt_for_active_pane(
                                 text,
@@ -6391,6 +6452,21 @@ impl TerminalView {
                         }
                     }
                 }
+                // Likewise for any open per-turn "Turn" panel(s).
+                if !self.turn_panel_view_ids.is_empty() {
+                    let owner_block_ids: Vec<EntityId> =
+                        self.turn_panel_view_ids.keys().copied().collect();
+                    for owner_id in &owner_block_ids {
+                        if let Some(ai_block_handle) = self.ai_block_handle_by_view_id(*owner_id) {
+                            ai_block_handle.update(ctx, |block, ctx| {
+                                block.handle_action(
+                                    &AIBlockAction::SetIsTurnPanelExpanded(false),
+                                    ctx,
+                                );
+                            });
+                        }
+                    }
+                }
 
                 if self.is_ambient_agent_session(ctx)
                     && self
@@ -7171,8 +7247,6 @@ impl TerminalView {
             conversation.total_agent_response_time_since_last_user_query_ms();
         let wall_to_wall_response_time_ms =
             conversation.wall_to_wall_response_time_since_last_query();
-        let usage_totals = conversation.usage_totals();
-        let charged_usage_for_last_block = conversation.charged_usage_for_last_block();
 
         let conversation_usage_info = ConversationUsageInfo {
             credits_spent: conversation.inference_credits_spent(),
@@ -7186,10 +7260,9 @@ impl TerminalView {
             lines_added: tool_usage.apply_file_diff_stats.lines_added,
             lines_removed: tool_usage.apply_file_diff_stats.lines_removed,
             commands_executed: tool_usage.run_command_stats.commands_executed,
-            total_tokens: usage_totals.charged_usage.map(|usage| usage.total_tokens()),
-            total_cost_in_cents: usage_totals.total_cost_in_cents(),
-            tokens_for_last_block: charged_usage_for_last_block.map(|usage| usage.total_tokens()),
-            cost_in_cents_for_last_block: charged_usage_for_last_block
+            total_cost_in_cents: conversation.usage_totals().total_cost_in_cents(),
+            cost_in_cents_for_last_block: conversation
+                .charged_usage_for_last_block()
                 .map(|usage| usage.total_cost_in_cents()),
         };
 
@@ -7255,6 +7328,73 @@ impl TerminalView {
                 },
                 ctx,
             );
+        }
+
+        ctx.notify();
+    }
+
+    fn handle_turn_panel_toggled(
+        &mut self,
+        source_ai_block_view_id: EntityId,
+        conversation_id: AIConversationId,
+        exchange_id: AIAgentExchangeId,
+        is_expanded: bool,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if self
+            .turn_panel_view_ids
+            .remove(&source_ai_block_view_id)
+            .is_some()
+            && let Some(ai_block_handle) = self.ai_block_handle_by_view_id(source_ai_block_view_id)
+        {
+            ai_block_handle.update(ctx, |block, ctx| block.set_turn_panel_view(None, ctx));
+        }
+
+        if !is_expanded {
+            ctx.notify();
+            return;
+        }
+
+        match UserWorkspaces::as_ref(ctx).charge_unit() {
+            ChargeUnit::Cents => {}
+            ChargeUnit::Credits => {
+                ctx.notify();
+                return;
+            }
+        }
+
+        let Some(conversation) =
+            BlocklistAIHistoryModel::as_ref(ctx).conversation(&conversation_id)
+        else {
+            report_error!("Could not find conversation for turn panel");
+            return;
+        };
+        let Some(data) = conversation.turn_panel_data(exchange_id) else {
+            log::warn!("Exchange {exchange_id} does not close its turn; not opening turn panel");
+            return;
+        };
+
+        let turn_view = ctx.add_typed_action_view(|ctx| RequestMetadataTurnView::new(data, ctx));
+
+        // Close the panel when the user clicks its "X" button.
+        ctx.subscribe_to_view(&turn_view, move |me, _, event, ctx| match event {
+            RequestMetadataTurnViewEvent::CloseRequested => {
+                if let Some(ai_block_handle) =
+                    me.ai_block_handle_by_view_id(source_ai_block_view_id)
+                {
+                    ai_block_handle.update(ctx, |block, ctx| {
+                        block.handle_action(&AIBlockAction::SetIsTurnPanelExpanded(false), ctx);
+                    });
+                }
+            }
+        });
+
+        self.turn_panel_view_ids
+            .insert(source_ai_block_view_id, turn_view.id());
+        if let Some(ai_block_handle) = self.ai_block_handle_by_view_id(source_ai_block_view_id) {
+            ai_block_handle.update(ctx, |block, ctx| {
+                block.set_turn_panel_view(Some(turn_view), ctx)
+            });
         }
 
         ctx.notify();
@@ -7866,6 +8006,24 @@ impl TerminalView {
                 // We need to manually invoke ctrl-c to terminate the running command because the
                 // user's ctrl-c was directed to the AIBlock instead of the command's shell block.
                 self.ctrl_c(ctx);
+            }
+            ShellCommandExecutorEvent::InterruptForInjectedFollowup {
+                conversation_id,
+                block_id,
+            } => {
+                let should_interrupt = {
+                    let model = self.model.lock();
+                    let block = model.block_list().active_block();
+                    block.id() == block_id
+                        && block.ai_conversation_id() == Some(*conversation_id)
+                        && block.is_executing()
+                        && !block
+                            .long_running_control_state()
+                            .is_some_and(|state| state.is_user_in_control())
+                };
+                if should_interrupt {
+                    self.write_to_pty(vec![escape_sequences::C0::ETX], ctx);
+                }
             }
             ShellCommandExecutorEvent::TransferControlToUser { reason, .. } => {
                 // Transfer control of the long-running command to the user.
@@ -8961,6 +9119,14 @@ impl TerminalView {
             ctx,
         );
     }
+
+    fn cloud_shell_recovery_duration_ms(request: &CloudShellRecoveryRequest) -> u32 {
+        request
+            .recovery_started_at
+            .elapsed()
+            .as_millis()
+            .min(u128::from(u32::MAX)) as u32
+    }
     /// Shows or hides the CLI agent footer from a shared session update.
     pub fn apply_cli_agent_footer_visibility(&mut self, show: bool, ctx: &mut ViewContext<Self>) {
         if show {
@@ -8991,13 +9157,18 @@ impl TerminalView {
             .as_ref(ctx)
             .has_active_stream_for_conversation(conversation_id, ctx);
 
-        self.ai_controller.update(ctx, |controller, ctx| {
-            controller.cancel_conversation_progress(
+        let route = self.ai_controller.update(ctx, |controller, ctx| {
+            controller.cancel_conversation_progress_routed(
                 conversation_id,
                 CancellationReason::ManuallyCancelled,
                 ctx,
-            );
+            )
         });
+        // An external harness interrupts its own agent's turn and settles the conversation's
+        // status itself; a Ctrl-C to the PTY would kill the agent instead.
+        if route == CancellationRoute::ExternalHarness {
+            return;
+        }
 
         let visible_conversation_id = self
             .agent_view_controller
@@ -9044,19 +9215,22 @@ impl TerminalView {
     /// Handles a shared-session cancel control action (a viewer's stop or a server-side steering
     /// interrupt) for the live conversation bound to `server_conversation_token`. The conversation
     /// is stopped the same way a local stop is, so an in-flight agent command is interrupted along
-    /// with the turn rather than left running to completion.
+    /// with the turn rather than left running to completion. Returns `false` when the token names
+    /// no live, unfinished conversation, in which case nothing was cancelled.
     #[cfg(feature = "local_tty")]
     pub(crate) fn handle_shared_session_cancel_action(
         &mut self,
         server_conversation_token: SessionSharingServerConversationToken,
         ctx: &mut ViewContext<Self>,
-    ) {
+    ) -> bool {
         let conversation_id = self.ai_controller.update(ctx, |controller, ctx| {
             controller.conversation_for_shared_session_cancel_action(server_conversation_token, ctx)
         });
-        if let Some(conversation_id) = conversation_id {
-            self.stop_local_agent_conversation(conversation_id, ctx);
-        }
+        let Some(conversation_id) = conversation_id else {
+            return false;
+        };
+        self.stop_local_agent_conversation(conversation_id, ctx);
+        true
     }
 
     fn user_write_ctrl_c_to_pty(&mut self, ctx: &mut ViewContext<Self>) {
@@ -9431,10 +9605,8 @@ impl TerminalView {
             && !model.is_read_only()
     }
 
-    /// If ctrl-r was pressed at an idle prompt on a session whose shell has rebound `^R` away
-    /// from its default reverse-history-search widget (reported via the
-    /// [`EXTERNAL_CTRL_R_HISTORY_PLUGIN_TAG`] shell plugin tag, e.g. by fzf or atuin), hands the
-    /// keypress off to that widget instead of opening Warp's own command search.
+    /// If ctrl-r was pressed at an idle prompt on a session using fzf or atuin, hands the keypress
+    /// off to that plugin instead of opening Warp's own command search.
     ///
     /// Returns `true` if the handoff was triggered, in which case the caller should not open
     /// Warp's command search.
@@ -9453,10 +9625,8 @@ impl TerminalView {
                 .as_ref(ctx)
                 .get(session_id)
                 .is_some_and(|session| {
-                    session
-                        .shell()
-                        .plugins()
-                        .contains(EXTERNAL_CTRL_R_HISTORY_PLUGIN_TAG)
+                    session.shell().plugins().contains(FZF_PLUGIN_TAG)
+                        || session.shell().plugins().contains(ATUIN_PLUGIN_TAG)
                 });
         if !has_external_ctrl_r_widget || self.model.lock().is_alt_screen_active() {
             return false;
@@ -9466,15 +9636,14 @@ impl TerminalView {
             input.trigger_external_shell_widget_handoff(
                 EXTERNAL_CTRL_R_HELPER_COMMAND,
                 ShellWidgetApplyMode::Replace,
-                false, /* capture_cursor */
+                true, /* capture_cursor */
                 ctx,
             )
         })
     }
 
-    /// If ctrl-t was pressed at an idle prompt on a session whose shell has rebound `^T` to an
-    /// external file-search widget (reported via the [`EXTERNAL_CTRL_T_FILE_PLUGIN_TAG`] shell
-    /// plugin tag, e.g. by fzf), hands the keypress off to that widget. Mirrors
+    /// If ctrl-t was pressed at an idle prompt on a session using fzf, hands the keypress off to
+    /// fzf's file-search widget. Mirrors
     /// [`Self::maybe_trigger_external_ctrl_r_history_search`], but lands the selection either by
     /// inserting it into the input editor at the cursor position or by replacing the whole
     /// buffer, depending on the session's shell; see [`Input::trigger_external_shell_widget_handoff`]
@@ -9495,10 +9664,7 @@ impl TerminalView {
         let Some(session) = self.sessions.as_ref(ctx).get(session_id) else {
             return false;
         };
-        if !session
-            .shell()
-            .plugins()
-            .contains(EXTERNAL_CTRL_T_FILE_PLUGIN_TAG)
+        if !session.shell().plugins().contains(FZF_PLUGIN_TAG)
             || self.model.lock().is_alt_screen_active()
         {
             return false;
@@ -9507,12 +9673,7 @@ impl TerminalView {
         // own token-aware replacement and so returns the whole new line; bash/zsh's helper
         // instead searches independently of the draft and reports a plain path to splice in at
         // the cursor. See `ShellWidgetApplyMode` and the fish/bash/zsh helper implementations.
-        let apply_mode = match session.shell().shell_type() {
-            ShellType::Fish => ShellWidgetApplyMode::Replace,
-            ShellType::Bash | ShellType::Zsh | ShellType::PowerShell => {
-                ShellWidgetApplyMode::Splice
-            }
-        };
+        let apply_mode = ctrl_t_apply_mode(session.shell().shell_type());
 
         self.input.update(ctx, |input, ctx| {
             input.trigger_external_shell_widget_handoff(
@@ -9522,6 +9683,39 @@ impl TerminalView {
                 ctx,
             )
         })
+    }
+
+    /// If alt-c was pressed at an idle prompt on a session using fzf, hands the keypress off to
+    /// fzf's directory-search widget.
+    pub fn maybe_trigger_external_alt_c_directory_search(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if !self.external_alt_c_binding_eligible(ctx) {
+            return false;
+        }
+
+        self.input.update(ctx, |input, ctx| {
+            input.trigger_external_shell_widget_handoff(
+                EXTERNAL_ALT_C_HELPER_COMMAND,
+                ShellWidgetApplyMode::Replace,
+                true, /* capture_cursor */
+                ctx,
+            )
+        })
+    }
+
+    pub(crate) fn external_alt_c_binding_eligible(&self, app: &AppContext) -> bool {
+        if !FeatureFlag::ShellWidgetHandoff.is_enabled()
+            || self.is_long_running()
+            || self.input.as_ref(app).is_voltron_open()
+            || self.model.lock().is_alt_screen_active()
+        {
+            return false;
+        }
+        self.active_block_session_id()
+            .and_then(|session_id| self.sessions.as_ref(app).get(session_id))
+            .is_some_and(|session| session.shell().plugins().contains(FZF_PLUGIN_TAG))
     }
 
     /// Returns `true` when an interactive SSH command has been detected at
@@ -11730,6 +11924,165 @@ impl TerminalView {
         ctx.notify();
     }
 
+    fn cloud_shell_recovery_request(
+        &self,
+        status: ObservedExitStatus,
+    ) -> Option<CloudShellRecoveryRequest> {
+        let model = self.model.lock();
+        let block_list = model.block_list();
+        let active_block_index = block_list.active_block_index().0;
+        let block = block_list
+            .blocks()
+            .get(active_block_index)
+            .filter(|block| block.requested_command_action_id().is_some())
+            .or_else(|| {
+                active_block_index.checked_sub(1).and_then(|index| {
+                    block_list
+                        .blocks()
+                        .get(index)
+                        .filter(|block| block.requested_command_action_id().is_some())
+                })
+            })?;
+        let action_id = block.requested_command_action_id()?.clone();
+        let requested_working_directory = self
+            .active_block_metadata
+            .as_ref()
+            .and_then(BlockMetadata::current_working_directory)
+            .map(str::to_owned)
+            .or_else(|| block.pwd().cloned());
+
+        Some(CloudShellRecoveryRequest {
+            action_id,
+            block_id: block.id().clone(),
+            partial_output: block.output_with_secrets_unobfuscated(),
+            status,
+            requested_working_directory,
+            session_id: block.session_id(),
+            start_ts: block.start_ts().cloned(),
+            recovery_started_at: Instant::now(),
+        })
+    }
+
+    fn try_begin_cloud_shell_recovery(
+        &mut self,
+        status: ObservedExitStatus,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if !FeatureFlag::CloudAgentShellRespawn.is_enabled()
+            || self.manual_pty_shutdown_requested
+            || self.pending_cloud_shell_recovery.is_some()
+            || !self.is_login_shell_bootstrapped
+            || self
+                .ambient_agent_view_model
+                .as_ref()
+                .is_some_and(|ambient| ambient.as_ref(ctx).is_third_party_harness())
+        {
+            return false;
+        }
+        {
+            let model = self.model.lock();
+            if model.is_read_only()
+                || !model.is_shared_ambient_agent_session()
+                || !model.shared_session_status().is_active_sharer()
+                || model
+                    .block_list()
+                    .is_executing_oz_environment_startup_commands()
+            {
+                return false;
+            }
+        }
+        let Some(request) = self.cloud_shell_recovery_request(status) else {
+            return false;
+        };
+        self.ai_action_model
+            .as_ref(ctx)
+            .shell_command_executor(ctx)
+            .update(ctx, |executor, _| {
+                executor.begin_shell_recovery(&request.action_id, &request.block_id);
+            });
+        self.pending_cloud_shell_recovery = Some(request.clone());
+        Self::send_cloud_shell_recovery_telemetry(
+            CloudAgentShellRecoveryOutcome::Started,
+            &request,
+            None,
+            None,
+            None,
+            ctx,
+        );
+        self.model.lock().prepare_shell_recovery(status);
+        self.input.update(ctx, |input, ctx| {
+            input.editor().update(ctx, |editor, ctx| {
+                editor.set_interaction_state(crate::editor::InteractionState::Disabled, ctx);
+            });
+        });
+        ctx.emit(Event::RecoverCloudShell(request));
+        true
+    }
+
+    /// Abandons the pending recovery and finalizes the exit it was deferring.
+    pub(crate) fn fail_cloud_shell_recovery(
+        &mut self,
+        failure_class: CloudAgentShellRecoveryFailureClass,
+        error: anyhow::Error,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let Some(request) = self.pending_cloud_shell_recovery.take() else {
+            return;
+        };
+        log::warn!("Cloud shell recovery failed: {error:#}");
+        self.ai_action_model
+            .as_ref(ctx)
+            .shell_command_executor(ctx)
+            .update(ctx, |executor, _| executor.abort_shell_recovery());
+        Self::send_cloud_shell_recovery_telemetry(
+            CloudAgentShellRecoveryOutcome::Failed,
+            &request,
+            Some(Self::cloud_shell_recovery_duration_ms(&request)),
+            None,
+            Some(failure_class),
+            ctx,
+        );
+        self.model
+            .lock()
+            .finalize_exit(ExitReason::ShellProcessExited {
+                status: request.status,
+            });
+    }
+
+    fn send_cloud_shell_recovery_telemetry(
+        outcome: CloudAgentShellRecoveryOutcome,
+        request: &CloudShellRecoveryRequest,
+        duration_ms: Option<u32>,
+        used_fallback_directory: Option<bool>,
+        failure_class: Option<CloudAgentShellRecoveryFailureClass>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let (detection, exit_code, signal) = match request.status {
+            ObservedExitStatus::Code(code) => {
+                (CloudAgentShellExitDetection::ExitCode, Some(code), None)
+            }
+            ObservedExitStatus::Signal(signal) => {
+                (CloudAgentShellExitDetection::Signal, None, Some(signal))
+            }
+            ObservedExitStatus::Unavailable => {
+                (CloudAgentShellExitDetection::Unavailable, None, None)
+            }
+        };
+        send_telemetry_from_ctx!(
+            TelemetryEvent::CloudAgentShellRecovery {
+                outcome,
+                detection,
+                status_available: !matches!(request.status, ObservedExitStatus::Unavailable),
+                exit_code,
+                signal,
+                duration_ms,
+                used_fallback_directory,
+                failure_class,
+            },
+            ctx
+        );
+    }
+
     /// Sends telemetry if an AI-requested command caused the shell to exit, and
     /// returns the conversation that issued that command along with the
     /// (secret-redacted) command text so the caller can finalize it as a
@@ -12159,6 +12512,19 @@ impl TerminalView {
                 // TODO(vorporeal): Remove this once we have a visual bell
                 // indicator in terminal tabs.
                 ctx.request_user_attention();
+            }
+            ModelEvent::ShellExitObserved { status } => {
+                if self.pending_cloud_shell_recovery.is_some() {
+                    self.fail_cloud_shell_recovery(
+                        CloudAgentShellRecoveryFailureClass::ReplacementShellExit,
+                        anyhow::anyhow!("replacement shell exited before bootstrap"),
+                        ctx,
+                    );
+                } else if !self.try_begin_cloud_shell_recovery(*status, ctx) {
+                    self.model
+                        .lock()
+                        .finalize_exit(ExitReason::ShellProcessExited { status: *status });
+                }
             }
             ModelEvent::Exit { reason } => {
                 if !self.manual_pty_shutdown_requested
@@ -13674,7 +14040,7 @@ impl TerminalView {
         if notification.event == CLIAgentEventType::SessionStart {
             send_telemetry_from_ctx!(
                 TelemetryEvent::CLIAgentPluginDetected {
-                    cli_agent: notification.agent.into(),
+                    cli_agent: notification.agent,
                 },
                 ctx
             );
@@ -13887,6 +14253,7 @@ impl TerminalView {
             agent,
             status,
             session_context,
+            ..
         } = event
         else {
             return;
@@ -13959,7 +14326,7 @@ impl TerminalView {
             .or(session_context.summary.as_deref().filter(|s| !s.is_empty()))
             .unwrap_or(agent.command_prefix())
             .to_owned();
-        let description = if let CLIAgentSessionStatus::Blocked { message } = status {
+        let description = if let CLIAgentSessionStatus::Blocked { message, .. } = status {
             message.clone().unwrap_or_default()
         } else {
             session_context.response.clone().unwrap_or_default()
@@ -13976,7 +14343,7 @@ impl TerminalView {
             trigger,
             title,
             description,
-            Some(NotificationAgentVariant::CLIAgent((*agent).into())),
+            Some(NotificationAgentVariant::CLIAgent(*agent)),
             ctx,
         );
     }
@@ -15736,6 +16103,11 @@ impl TerminalView {
             if self.usage_footer_view_ids.contains_key(view_id) {
                 handle.update(ctx, |block, ctx| {
                     block.handle_action(&AIBlockAction::ToggleIsUsageFooterExpanded, ctx);
+                });
+            }
+            if self.turn_panel_view_ids.contains_key(view_id) {
+                handle.update(ctx, |block, ctx| {
+                    block.handle_action(&AIBlockAction::SetIsTurnPanelExpanded(false), ctx);
                 });
             }
         }
@@ -21162,6 +21534,15 @@ impl TerminalView {
             AIBlockEvent::ResumeConversation { conversation_id } => {
                 self.handle_resume_conversation(conversation_id, ctx);
             }
+            AIBlockEvent::ContinueWithWarpCredits { conversation_id } => {
+                BlocklistAIHistoryModel::handle(ctx).update(ctx, |history_model, ctx| {
+                    history_model.set_conversation_use_warp_credits_instead_of_chatgpt(
+                        *conversation_id,
+                        ctx,
+                    );
+                });
+                self.handle_resume_conversation(conversation_id, ctx);
+            }
             AIBlockEvent::InsertForkSlashCommand => {
                 #[cfg(target_family = "wasm")]
                 let command_name = commands::FORK.name;
@@ -21203,6 +21584,19 @@ impl TerminalView {
                 is_expanded,
             } => {
                 self.handle_usage_footer_toggled(block.id(), *conversation_id, *is_expanded, ctx);
+            }
+            AIBlockEvent::TurnPanelToggled {
+                conversation_id,
+                exchange_id,
+                is_expanded,
+            } => {
+                self.handle_turn_panel_toggled(
+                    block.id(),
+                    *conversation_id,
+                    *exchange_id,
+                    *is_expanded,
+                    ctx,
+                );
             }
             AIBlockEvent::OpenSettings => {
                 ctx.emit(Event::OpenSettings(SettingsSection::WarpAgent));
@@ -23644,6 +24038,7 @@ impl TerminalView {
         };
 
         let request = RunAgentsRequest {
+            metadata: Default::default(),
             summary: summary.clone(),
             base_prompt: "Shared instructions for every child agent.".to_owned(),
             skills: vec![],
@@ -23653,6 +24048,7 @@ impl TerminalView {
             agent_run_configs: agent_names
                 .into_iter()
                 .map(|name| RunAgentsAgentRunConfig {
+                    metadata: Default::default(),
                     name,
                     prompt: "Do the work.".to_owned(),
                     title: String::new(),
@@ -23679,7 +24075,7 @@ impl TerminalView {
                     AIAgentAction {
                         id: AIAgentActionId::from("fake-run-agents-action-id".to_owned()),
                         task_id: TaskId::new("fake-task-id".to_owned()),
-                        action: AIAgentActionType::RunAgents(request),
+                        action: AIAgentActionType::RunAgents(Box::new(request)),
                         requires_result: true,
                     },
                 ),
@@ -23725,6 +24121,7 @@ impl TerminalView {
             user_query_mode: UserQueryMode::default(),
             running_command: None,
             intended_agent: None,
+            base: None,
         }];
 
         // Create a real conversation in the history model for this dummy block so it renders.
@@ -26836,7 +27233,7 @@ impl TerminalView {
     pub(super) fn toggle_file_tree(
         &mut self,
         source: crate::server::telemetry::FileTreeSource,
-        cli_agent: Option<crate::server::telemetry::CLIAgentType>,
+        cli_agent: Option<CLIAgent>,
         ctx: &mut ViewContext<Self>,
     ) {
         use crate::server::telemetry::TelemetryEvent;
@@ -26885,6 +27282,71 @@ impl PtyIntentEvent for Event {
 }
 
 impl TerminalSurface for TerminalView {
+    fn on_cloud_shell_recovered(
+        &mut self,
+        restored_working_directory: String,
+        used_fallback_directory: bool,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if self.pending_cloud_shell_recovery.is_none() {
+            return;
+        }
+        if !self.model.lock().shared_session_status().is_active_sharer() {
+            self.fail_cloud_shell_recovery(
+                CloudAgentShellRecoveryFailureClass::SharedSessionRebind,
+                anyhow::anyhow!("shared session was no longer active after shell recovery"),
+                ctx,
+            );
+            return;
+        }
+        let Some(request) = self.pending_cloud_shell_recovery.take() else {
+            return;
+        };
+        let output = recovered_command_output(
+            &request.partial_output,
+            request.status,
+            &restored_working_directory,
+            used_fallback_directory,
+        );
+        Self::send_cloud_shell_recovery_telemetry(
+            CloudAgentShellRecoveryOutcome::Succeeded,
+            &request,
+            Some(Self::cloud_shell_recovery_duration_ms(&request)),
+            Some(used_fallback_directory),
+            None,
+            ctx,
+        );
+        let result = ShellRecoveryResult {
+            block_id: request.block_id,
+            output,
+            status: request.status,
+            restored_working_directory,
+            used_fallback_directory,
+            start_ts: request.start_ts,
+            completed_ts: Some(Local::now()),
+        };
+        self.ai_action_model
+            .as_ref(ctx)
+            .shell_command_executor(ctx)
+            .update(ctx, |executor, _| {
+                executor.finish_shell_recovery(result);
+            });
+        self.input.update(ctx, |input, ctx| {
+            input.editor().update(ctx, |editor, ctx| {
+                editor.set_interaction_state(crate::editor::InteractionState::Editable, ctx);
+            });
+        });
+        ctx.notify();
+    }
+
+    fn on_cloud_shell_recovery_failed(
+        &mut self,
+        failure_class: CloudAgentShellRecoveryFailureClass,
+        error: anyhow::Error,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        self.fail_cloud_shell_recovery(failure_class, error, ctx);
+    }
     #[cfg(feature = "local_tty")]
     fn on_shell_determined(&mut self, ctx: &mut ViewContext<Self>) {
         if !self.model.lock().shared_session_status().is_viewer() {
@@ -29109,9 +29571,12 @@ impl View for TerminalView {
         if self.is_input_box_visible(&model_lock, app) {
             context.set.insert(INPUT_BOX_VISIBLE_KEY);
         }
-
-        if self.input.as_ref(app).editor().as_ref(app).is_focused() {
+        let input = self.input.as_ref(app);
+        if input.editor().as_ref(app).is_focused() {
             context.set.insert("EditorFocused");
+        }
+        if input.is_voltron_open() {
+            context.set.insert("VoltronActive");
         }
 
         if model_lock.block_list().selection().is_some() {

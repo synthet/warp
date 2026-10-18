@@ -1,5 +1,5 @@
 use warp_graphql::ai::{AgentTaskState, PlatformErrorCode};
-use warp_graphql::platform_error::PlatformErrorInfo;
+use warp_graphql::platform_error::{PlatformErrorInfo, PlatformErrorMessageFormat};
 
 use super::AgentDriverError;
 use super::terminal::ShareSessionError;
@@ -187,6 +187,19 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
                 PlatformErrorCode::EnvironmentSetupFailed,
             ),
         ),
+        AgentDriverError::SetupCommandFailed {
+            command, output, ..
+        } => (
+            AgentTaskState::Failed,
+            setup_command_status_update(error, command, output.as_deref()),
+        ),
+        AgentDriverError::SetupCommandTimedOut { .. } => (
+            AgentTaskState::Failed,
+            TaskStatusUpdate::with_error_code(
+                error.to_string(),
+                PlatformErrorCode::EnvironmentSetupFailed,
+            ),
+        ),
         // The shell died while an environment setup command was running
         // (e.g. the command ran `exit`). This is a user-side environment
         // configuration problem, so classify as FAILED.
@@ -239,10 +252,10 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
         ),
 
         // --- Setup errors ---
-        AgentDriverError::TeamMetadataRefreshTimeout => (
+        AgentDriverError::TeamMetadataRefreshFailed(err) => (
             AgentTaskState::Error,
             TaskStatusUpdate::with_error_code(
-                "Timed out refreshing team metadata. Please check your network connection and try again.",
+                format!("Failed to refresh team metadata: {err:#}"),
                 PlatformErrorCode::InternalError,
             ),
         ),
@@ -337,17 +350,23 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
                 PlatformErrorCode::ResourceNotFound,
             ),
         ),
-        AgentDriverError::HarnessCommandFailed { exit_code } => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::with_error_code(
-                format!("Harness command exited with code {exit_code}"),
-                PlatformErrorCode::InternalError,
-            ),
-        ),
+        AgentDriverError::HarnessCommandFailed { exit_code, output } => {
+            let mut platform_error =
+                PlatformErrorInfo::new(PlatformErrorCode::InternalError, false);
+            platform_error.detail.clone_from(output);
+            (
+                AgentTaskState::Failed,
+                TaskStatusUpdate {
+                    message: format!("Harness command exited with code {exit_code}"),
+                    error_code: Some(PlatformErrorCode::InternalError),
+                    platform_error: Some(Box::new(platform_error)),
+                },
+            )
+        }
         AgentDriverError::HarnessSetupFailed { harness, reason } => (
             AgentTaskState::Failed,
             TaskStatusUpdate::with_error_code(
-                format!("Harness '{harness}' validation failed: {reason}"),
+                format!("Harness '{harness}' setup failed: {reason}"),
                 PlatformErrorCode::EnvironmentSetupFailed,
             ),
         ),
@@ -358,11 +377,14 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
                 PlatformErrorCode::EnvironmentSetupFailed,
             ),
         ),
-        AgentDriverError::HarnessAuthCheckFailed { harness, .. } => {
+        AgentDriverError::HarnessAuthCheckFailed { harness, detail } => {
+            let detail_separator = match detail.chars().last() {
+                Some('.' | '!' | '?') => " ",
+                _ => ". ",
+            };
             let message = format!(
-                "Harness '{harness}' authentication check failed: login credentials \
-                 are invalid or expired. Verify that the authentication secret \
-                 configured for this harness is correct."
+                "Harness '{harness}' authentication check failed: {detail}{detail_separator}\
+                 Verify that the authentication secret configured for this harness is correct."
             );
             (
                 AgentTaskState::Failed,
@@ -413,16 +435,50 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
             AgentTaskState::Failed,
             TaskStatusUpdate::message(error.to_string()),
         ),
-
-        // SIGTERM reaches the client from externally-originating shutdowns —
-        // server-initiated instance teardown, container-runtime stops, self-hosted
-        // worker termination — and the client cannot distinguish which initiated
-        // it. Not a Warp-side defect the user can act on, so report FAILED.
-        AgentDriverError::TerminatedBySignal => (
-            AgentTaskState::Failed,
-            TaskStatusUpdate::message(error.to_string()),
-        ),
     }
+}
+
+pub(super) fn setup_command_status_update(
+    error: &AgentDriverError,
+    command: &str,
+    output: Option<&str>,
+) -> TaskStatusUpdate {
+    let plain_text = format!("{error}. Check your repository URLs and setup commands.");
+    let mut update = TaskStatusUpdate::with_error_code(
+        plain_text.clone(),
+        PlatformErrorCode::EnvironmentSetupFailed,
+    );
+
+    if let Some(output) = output {
+        // Indentation keeps arbitrary backticks in the output from closing a fenced code block.
+        let markdown = format!(
+            "Failed to run setup command {}:\n\n    {}\n\nCheck your repository URLs and setup commands.",
+            markdown_code_span(command),
+            output.replace('\n', "\n    "),
+        );
+        let info = update.platform_error.as_mut().expect("platform error");
+        info.user_facing_messages
+            .insert(PlatformErrorMessageFormat::PlainText, plain_text);
+        info.user_facing_messages
+            .insert(PlatformErrorMessageFormat::Markdown, markdown);
+    }
+    update
+}
+
+fn markdown_code_span(text: &str) -> String {
+    let longest_run = text
+        .split(|character| character != '`')
+        .map(str::len)
+        .max()
+        .unwrap_or(0);
+    let fence = "`".repeat(longest_run + 1);
+    let text = text.replace("\r\n", " ").replace(&['\r', '\n'][..], " ");
+    let padding = if text.starts_with('`') || text.ends_with('`') {
+        " "
+    } else {
+        ""
+    };
+    format!("{fence}{padding}{text}{padding}{fence}")
 }
 
 /// Map a `PlatformErrorCode` to the `AgentTaskState` it implies. Not specific
@@ -430,7 +486,9 @@ pub fn classify_driver_error(error: &AgentDriverError) -> (AgentTaskState, TaskS
 /// `PlatformErrorCode` first, then share this mapping.
 fn task_state_for_platform_error_code(code: PlatformErrorCode) -> AgentTaskState {
     match code {
-        PlatformErrorCode::AuthenticationRequired
+        PlatformErrorCode::AgentStreamFailure
+        | PlatformErrorCode::AgentStreamNetworkError
+        | PlatformErrorCode::AuthenticationRequired
         | PlatformErrorCode::InternalError
         | PlatformErrorCode::ResourceUnavailable => AgentTaskState::Error,
         PlatformErrorCode::BudgetExceeded
@@ -466,7 +524,7 @@ fn classify_git_credentials_error(
                 TaskStatusUpdate {
                     message,
                     error_code: Some(info.code),
-                    platform_error: Some(Box::new(info.clone())),
+                    platform_error: Some(info.clone()),
                 },
             )
         }

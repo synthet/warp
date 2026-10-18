@@ -13,7 +13,7 @@ use warpui::{
 
 #[cfg(test)]
 use super::team::TeamVisibility;
-use super::team::{DiscoverableTeam, MembershipRole, Team};
+use super::team::{DiscoverableTeam, DiscoveryOptions, MembershipRole, Team};
 #[cfg(test)]
 use super::workspace::WorkspaceMemberUsageInfo;
 use super::workspace::{
@@ -41,16 +41,14 @@ use crate::workspaces::workspace::{
     AIAutonomyPolicy, AiAutonomySettings, BillingMetadata, CustomerType, SplitListSetting,
     WorkspaceMember, WorkspaceSettings,
 };
-use crate::workspaces::workspace::{
-    AiOverages, PurchaseAddOnCreditsPolicy, UsageBasedPricingSettings,
-};
+use crate::workspaces::workspace::{AiOverages, UsageBasedPricingSettings, UserTier};
 pub(crate) mod billing_workspace_settings;
 pub(crate) mod team_workspace_settings;
 pub(crate) use team_workspace_settings::TeamContextForOperationResolver;
 #[cfg(test)]
 pub(crate) use team_workspace_settings::TeamlessScopeForTest;
 #[cfg(not(target_family = "wasm"))]
-pub(crate) use team_workspace_settings::{GeminiEnterpriseBackgroundHost, TeamScopeForCli};
+pub(crate) use team_workspace_settings::{GeminiEnterpriseBackgroundHost, HeadlessTeamScope};
 pub use team_workspace_settings::{
     ResolvedTeamScope, TeamContext, TeamContextForOperation, TeamContextResolver, TeamScope,
 };
@@ -83,8 +81,11 @@ pub enum UserWorkspacesEvent {
         team_uid: ServerId,
     },
     JoinTeamInWorkspaceRejected(anyhow::Error),
+    JoinWorkspaceFromDiscoverySuccess,
+    JoinWorkspaceFromDiscoveryRejected(anyhow::Error),
     FetchDiscoverableTeamsSuccess(Vec<DiscoverableTeam>),
-    FetchDiscoverableTeamsRejected(anyhow::Error),
+    FetchDiscoveryOptionsSuccess(DiscoveryOptions),
+    FetchDiscoveryOptionsRejected(anyhow::Error),
     TransferTeamOwnershipSuccess,
     TransferTeamOwnershipRejected(anyhow::Error),
     SetTeamMemberRoleSuccess,
@@ -127,12 +128,9 @@ pub struct UserWorkspaces {
     workspaces: Tracked<Vec<Workspace>>,
     window_team_uids: HashMap<WindowId, Option<ServerId>>,
     joinable_teams: Vec<DiscoverableTeam>,
-    /// The user-level add-on credits purchase policy from the latest
-    /// workspaces-metadata response. Teamless (fresh free) users have no
-    /// team and their only workspace is the server's placeholder, which is
-    /// filtered out of `workspaces` — this is the only place their purchase
-    /// policy survives.
-    user_purchase_policy: Option<PurchaseAddOnCreditsPolicy>,
+    /// The user-level plan terms from the latest workspaces-metadata response; the fallback for
+    /// users whose only workspace is the server's placeholder filtered out of `workspaces`.
+    user_tier: UserTier,
     /// The model catalog to fall back to when no current workspace exists: before login, or
     /// for a logged-in user whose only workspace is the server's placeholder, which is
     /// filtered out of `workspaces`.
@@ -153,9 +151,9 @@ pub struct WorkspacesMetadataResponse {
     /// The server-authoritative AI credit availability decision, piggybacked
     /// on the metadata query so every refresh keeps the shared state fresh.
     pub ai_credit_availability: Option<AICreditAvailability>,
-    /// The user-level add-on credits purchase policy; the teamless-purchase
-    /// fallback (see [`UserWorkspaces::purchase_policy`]).
-    pub user_purchase_policy: Option<PurchaseAddOnCreditsPolicy>,
+    /// The user-level plan terms; the teamless fallback (see
+    /// [`UserWorkspaces::purchase_policy`] and [`UserWorkspaces::charge_unit`]).
+    pub user_tier: UserTier,
 }
 
 // A representation of all data we fetch at a single time via our 10 minute poll.
@@ -195,7 +193,7 @@ impl UserWorkspaces {
             workspaces: cached_workspaces.into(),
             window_team_uids: Default::default(),
             joinable_teams: Default::default(),
-            user_purchase_policy: None,
+            user_tier: Default::default(),
             workspaceless_models_by_feature: None,
             team_client,
             workspace_client,
@@ -246,7 +244,7 @@ impl UserWorkspaces {
             workspaces: cached_workspaces.into(),
             window_team_uids: Default::default(),
             joinable_teams: Default::default(),
-            user_purchase_policy: None,
+            user_tier: Default::default(),
             workspaceless_models_by_feature: None,
             team_client,
             workspace_client,
@@ -357,6 +355,16 @@ impl UserWorkspaces {
         if self.team_uid_for_window(window_id) != previous_team_uid {
             ctx.emit(UserWorkspacesEvent::WindowTeamChanged { window_id });
         }
+        ctx.notify();
+    }
+
+    fn update_discovery_options(
+        &mut self,
+        options: DiscoveryOptions,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        self.joinable_teams.clone_from(&options.legacy_teams);
+        ctx.emit(UserWorkspacesEvent::FetchDiscoveryOptionsSuccess(options));
         ctx.notify();
     }
     pub fn inherited_or_default_team_uid(
@@ -623,11 +631,11 @@ impl UserWorkspaces {
             .and_then(|workspace_uid| self.workspace_from_uid(workspace_uid))
     }
 
-    /// Updates the user-level add-on credits purchase policy captured from a
-    /// workspaces-metadata response. Must be called on every path that
-    /// applies such a response so the teamless fallback can't go stale.
-    pub fn set_user_purchase_policy(&mut self, policy: Option<PurchaseAddOnCreditsPolicy>) {
-        self.user_purchase_policy = policy;
+    /// Updates the user-level plan terms captured from a workspaces-metadata response. Must be
+    /// called on every path that applies such a response so the teamless fallback can't go
+    /// stale.
+    pub fn set_user_tier(&mut self, user_tier: UserTier) {
+        self.user_tier = user_tier;
     }
 
     pub fn current_workspace_mut(&mut self) -> Option<&mut Workspace> {
@@ -874,7 +882,7 @@ impl UserWorkspaces {
                 let workspaces = response.metadata.workspaces;
                 let joinable_teams = response.metadata.joinable_teams;
 
-                self.set_user_purchase_policy(response.metadata.user_purchase_policy);
+                self.set_user_tier(response.metadata.user_tier);
                 self.update_workspaces(workspaces.clone(), ctx);
                 self.update_joinable_teams(joinable_teams, ctx);
 
@@ -939,6 +947,25 @@ impl UserWorkspaces {
                     .await
             },
             Self::on_remove_user_from_team,
+        );
+    }
+
+    fn on_fetch_discovery_options(
+        &mut self,
+        options: Result<DiscoveryOptions, anyhow::Error>,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        match options {
+            Err(err) => ctx.emit(UserWorkspacesEvent::FetchDiscoveryOptionsRejected(err)),
+            Ok(options) => self.update_discovery_options(options, ctx),
+        }
+    }
+
+    pub fn fetch_discovery_options(&mut self, ctx: &mut ModelContext<Self>) {
+        let team_client = self.team_client.clone();
+        let _ = ctx.spawn(
+            async move { team_client.get_discovery_options().await },
+            Self::on_fetch_discovery_options,
         );
     }
 
@@ -1217,25 +1244,35 @@ impl UserWorkspaces {
         );
     }
 
-    fn on_fetch_discoverable_teams(
+    fn on_join_workspace_from_discovery(
         &mut self,
-        teams: Result<Vec<DiscoverableTeam>, anyhow::Error>,
+        result: Result<WorkspacesMetadataWithPricing>,
         ctx: &mut ModelContext<Self>,
     ) {
-        match teams {
-            Err(e) => ctx.emit(UserWorkspacesEvent::FetchDiscoverableTeamsRejected(e)),
-            Ok(teams) => {
-                self.update_joinable_teams(teams, ctx);
+        match result {
+            Err(err) => ctx.emit(UserWorkspacesEvent::JoinWorkspaceFromDiscoveryRejected(err)),
+            Ok(result) => {
+                self.on_workspaces_updated(Ok(result), ctx);
+                ctx.emit(UserWorkspacesEvent::JoinWorkspaceFromDiscoverySuccess);
             }
         }
+        ctx.notify();
     }
 
-    /// Make request to get list of discoverable teams for a user
-    pub fn fetch_discoverable_teams(&mut self, ctx: &mut ModelContext<Self>) {
+    pub fn join_workspace_from_discovery(
+        &mut self,
+        workspace_uid: WorkspaceUid,
+        team_uid: Option<ServerId>,
+        ctx: &mut ModelContext<Self>,
+    ) {
         let team_client = self.team_client.clone();
         let _ = ctx.spawn(
-            async move { team_client.get_discoverable_teams().await },
-            Self::on_fetch_discoverable_teams,
+            async move {
+                team_client
+                    .join_workspace_from_discovery(workspace_uid, team_uid)
+                    .await
+            },
+            Self::on_join_workspace_from_discovery,
         );
     }
 
@@ -1694,6 +1731,8 @@ impl UserWorkspaces {
                     requests_used_since_last_refresh: 0,
                     request_limit: 1000,
                     is_unlimited: false,
+                    included_usage_cents: None,
+                    usage_cents_used_since_last_refresh: None,
                     is_request_limit_prorated: false,
                 },
             }],

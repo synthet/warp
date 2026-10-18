@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::io::Write as _;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -46,6 +46,7 @@ fn exchange_with_working_directory(
             user_query_mode: UserQueryMode::Normal,
             running_command: None,
             intended_agent: None,
+            base: None,
         }],
         output_status,
         added_message_ids: HashSet::new(),
@@ -609,7 +610,7 @@ fn prepare_orders_guards_cancellation_token_check_and_attachment_transfer() {
                     .update_conversation_for_new_request_input(
                         RequestInput {
                             conversation_id,
-                            input_messages: HashMap::from([(task_id, Vec::new())]),
+                            input_messages: Vec::from([(task_id, Vec::new())]),
                             working_directory: None,
                             model_id: LLMId::from("test-model"),
                             coding_model_id: LLMId::from("test-coding-model"),
