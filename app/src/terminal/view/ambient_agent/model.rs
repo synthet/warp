@@ -965,6 +965,11 @@ impl AmbientAgentViewModel {
         let request = RunFollowupRequest {
             message: prompt.clone(),
         };
+        if self.pending_followup_prompt.is_some() {
+            log::warn!(
+                "event=viewer_followup_slot_replaced task_id={task_id} route=setup_failure_debug",
+            );
+        }
         self.pending_followup_prompt = Some(prompt);
         ctx.emit(AmbientAgentViewModelEvent::FollowupDispatched);
 
@@ -1001,6 +1006,9 @@ impl AmbientAgentViewModel {
             None,
         );
 
+        if self.pending_followup_prompt.is_some() {
+            log::warn!("event=viewer_followup_slot_replaced task_id={task_id} route=run_followup",);
+        }
         self.pending_followup_prompt = Some(prompt);
         self.status = Status::WaitingForSession {
             progress: AgentProgress::new(),
@@ -1106,12 +1114,18 @@ impl AmbientAgentViewModel {
                     Harness::Claude => Some(HarnessAuthSecretsConfig {
                         claude_auth_secret_name: Some(name.clone()),
                         codex_auth_secret_name: None,
+                        pi_auth_secret_name: None,
                     }),
                     Harness::Codex => Some(HarnessAuthSecretsConfig {
                         claude_auth_secret_name: None,
                         codex_auth_secret_name: Some(name.clone()),
+                        pi_auth_secret_name: None,
                     }),
-                    _ => None,
+                    Harness::Oz
+                    | Harness::OpenCode
+                    | Harness::Gemini
+                    | Harness::Pi
+                    | Harness::Unknown => None,
                 });
 
         AgentConfigSnapshot {
@@ -1137,6 +1151,7 @@ impl AmbientAgentViewModel {
 
         let (prompt, mode) = extract_user_query_mode(prompt);
         let request = SpawnAgentRequest {
+            metadata: Default::default(),
             prompt: Some(prompt),
             mode,
             config,

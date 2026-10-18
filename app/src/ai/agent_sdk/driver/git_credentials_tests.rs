@@ -3,22 +3,78 @@ use warp_graphql::error::{
     PlatformError as GraphqlPlatformError, UserFacingError, UserFacingErrorInterface,
 };
 use warp_graphql::platform_error::{
-    PlatformErrorInfo, PlatformErrorInfoResponse, PlatformErrorMetadataResponse,
+    PlatformErrorInfo, PlatformErrorInfoResponse, PlatformErrorMessage, PlatformErrorMessageFormat,
+    PlatformErrorMetadataResponse,
 };
 use warp_graphql::response_context::ResponseContext;
 
 use super::*;
-use crate::server::server_api::ai::TaskGitCredentialsResponse;
+use crate::server::server_api::ai::{MockAIClient, TaskGitCredentialsResponse};
+
+#[test]
+fn refresh_keeps_the_captured_repository_scope() {
+    let output = BlockingCommand::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "ai::agent_sdk::driver::git_credentials::tests::retained_scope_refresh_subprocess",
+            "--nocapture",
+        ])
+        .env("WARP_TEST_RETAINED_SCOPE_REFRESH", "1")
+        .env("WARP_ISOLATION_PLATFORM", "docker")
+        .env("WARP_WORKLOAD_TOKEN", "test-workload-token")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn retained_scope_refresh_subprocess() {
+    if std::env::var_os("WARP_TEST_RETAINED_SCOPE_REFRESH").is_none() {
+        return;
+    }
+    for captured_scope in [false, true] {
+        let _flag = warp_core::features::FeatureFlag::FactoryDeferredRepositories
+            .override_enabled(!captured_scope);
+        let mut ai_client = MockAIClient::new();
+        ai_client
+            .expect_get_task_git_credentials()
+            .times(1)
+            .withf(move |task_id, _, partial, factory_scope| {
+                task_id == "task-one" && *partial && *factory_scope == captured_scope
+            })
+            .returning(|_, _, _, _| {
+                Ok(TaskGitCredentialsResponse {
+                    credentials: Vec::new(),
+                    failed_hosts: Vec::new(),
+                })
+            });
+        let ai_client: Arc<dyn AIClient> = Arc::new(ai_client);
+        futures::executor::block_on(try_refresh("task-one", &ai_client, captured_scope)).unwrap();
+    }
+}
 
 #[test]
 fn from_user_facing_converts_platform_error_preserving_metadata_and_debug() {
     let error = TaskGitCredentialsError::from_user_facing(UserFacingError {
-        error: UserFacingErrorInterface::PlatformError(GraphqlPlatformError {
+        error: UserFacingErrorInterface::PlatformError(Box::new(GraphqlPlatformError {
             message: "GitHub is temporarily unavailable.".to_string(),
             detail: Some("Repository access could not be resolved.".to_string()),
             info: PlatformErrorInfoResponse {
+                error_message: "GitHub is temporarily unavailable.".to_string(),
                 code: PlatformErrorCode::ResourceUnavailable,
+                http_status: 503,
+                user_facing_messages: vec![PlatformErrorMessage {
+                    format: PlatformErrorMessageFormat::PlainText,
+                    message: "GitHub is temporarily unavailable.".to_string(),
+                }],
+                detail: Some("Repository access could not be resolved.".to_string()),
                 retryable: true,
+                is_user_error: false,
                 metadata: vec![
                     PlatformErrorMetadataResponse {
                         key: "provider".to_string(),
@@ -30,8 +86,10 @@ fn from_user_facing_converts_platform_error_preserving_metadata_and_debug() {
                     },
                 ],
                 debug: Some("request-id=dogfood-only".to_string()),
+                metrics_category: "dependency_unavailable".to_string(),
+                trace_id: Some("0123456789abcdef".to_string()),
             },
-        }),
+        })),
         response_context: ResponseContext {
             server_version: None,
         },
@@ -44,8 +102,22 @@ fn from_user_facing_converts_platform_error_preserving_metadata_and_debug() {
             info,
         } => {
             assert_eq!(message, "GitHub is temporarily unavailable.");
+            assert_eq!(
+                info.error_message.as_deref(),
+                Some("GitHub is temporarily unavailable.")
+            );
             assert_eq!(info.code, PlatformErrorCode::ResourceUnavailable);
+            assert_eq!(info.http_status, Some(503));
+            assert_eq!(
+                info.user_facing_messages[&PlatformErrorMessageFormat::PlainText],
+                "GitHub is temporarily unavailable."
+            );
+            assert_eq!(
+                info.detail.as_deref(),
+                Some("Repository access could not be resolved.")
+            );
             assert!(info.retryable);
+            assert_eq!(info.is_user_error, Some(false));
             assert_eq!(
                 detail.as_deref(),
                 Some("Repository access could not be resolved.")
@@ -53,6 +125,11 @@ fn from_user_facing_converts_platform_error_preserving_metadata_and_debug() {
             assert_eq!(info.metadata["provider"], "github");
             assert_eq!(info.metadata["resource"], "installation");
             assert_eq!(info.debug.as_deref(), Some("request-id=dogfood-only"));
+            assert_eq!(
+                info.metrics_category.as_deref(),
+                Some("dependency_unavailable")
+            );
+            assert_eq!(info.trace_id.as_deref(), Some("0123456789abcdef"));
         }
         error => panic!("expected structured platform error, got {error:?}"),
     }
@@ -62,15 +139,25 @@ fn dependency_error(retryable: bool) -> TaskGitCredentialsError {
     TaskGitCredentialsError::Platform {
         message: "GitHub is temporarily unavailable.".to_string(),
         detail: Some("Repository access could not be resolved.".to_string()),
-        info: PlatformErrorInfo {
+        info: Box::new(PlatformErrorInfo {
+            error_message: Some("GitHub is temporarily unavailable.".to_string()),
             code: PlatformErrorCode::ResourceUnavailable,
+            http_status: Some(503),
+            user_facing_messages: std::collections::BTreeMap::from([(
+                PlatformErrorMessageFormat::PlainText,
+                "GitHub is temporarily unavailable.".to_string(),
+            )]),
+            detail: Some("Repository access could not be resolved.".to_string()),
             retryable,
+            is_user_error: Some(false),
             metadata: std::collections::BTreeMap::from([
                 ("provider".to_string(), "github".to_string()),
                 ("resource".to_string(), "installation".to_string()),
             ]),
             debug: None,
-        },
+            metrics_category: Some("dependency_unavailable".to_string()),
+            trace_id: None,
+        }),
     }
 }
 
@@ -118,7 +205,7 @@ fn write_gh_hosts_yml_uses_gh_cli_filename() -> Result<()> {
             email: Some("octocat@example.com".to_string()),
             host: "github.com".to_string(),
         }],
-        temp_dir.path(),
+        &gh_config_dir,
     )?;
 
     let hosts_path = gh_config_dir.join(GH_HOSTS_FILENAME);
@@ -158,7 +245,7 @@ fn write_gh_hosts_yml_excludes_gitlab_credentials() -> Result<()> {
                 host: "gitlab.com".to_string(),
             },
         ],
-        temp_dir.path(),
+        &gh_config_dir,
     )?;
 
     let hosts = std::fs::read_to_string(gh_config_dir.join(GH_HOSTS_FILENAME))?;
@@ -172,6 +259,7 @@ fn write_gh_hosts_yml_excludes_gitlab_credentials() -> Result<()> {
 #[test]
 fn write_gh_hosts_yml_skips_gitlab_only_credentials() -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
+    let gh_config_dir = temp_dir.path().join(".config").join("gh");
 
     write_gh_hosts_yml(
         &[GitCredential {
@@ -180,12 +268,78 @@ fn write_gh_hosts_yml_skips_gitlab_only_credentials() -> Result<()> {
             email: None,
             host: "gitlab.com".to_string(),
         }],
-        temp_dir.path(),
+        &gh_config_dir,
     )?;
 
-    assert!(!temp_dir.path().join(".config").join("gh").exists());
+    assert!(!gh_config_dir.exists());
 
     Ok(())
+}
+
+#[test]
+fn gh_config_dir_follows_gh_precedence() {
+    struct Case {
+        name: &'static str,
+        is_windows: bool,
+        env: Vec<(&'static str, &'static str)>,
+        expected: &'static str,
+    }
+    let cases = [
+        Case {
+            name: "GH_CONFIG_DIR wins over everything",
+            is_windows: true,
+            env: vec![
+                ("GH_CONFIG_DIR", "/gh-config-dir"),
+                ("XDG_CONFIG_HOME", "/xdg"),
+                ("APPDATA", "/appdata"),
+            ],
+            expected: "/gh-config-dir",
+        },
+        Case {
+            name: "XDG_CONFIG_HOME wins over APPDATA",
+            is_windows: true,
+            env: vec![("XDG_CONFIG_HOME", "/xdg"), ("APPDATA", "/appdata")],
+            expected: "/xdg/gh",
+        },
+        Case {
+            name: "Windows uses APPDATA",
+            is_windows: true,
+            env: vec![("APPDATA", "/appdata")],
+            expected: "/appdata/GitHub CLI",
+        },
+        Case {
+            name: "other platforms ignore APPDATA",
+            is_windows: false,
+            env: vec![("APPDATA", "/appdata")],
+            expected: "/home/user/.config/gh",
+        },
+        Case {
+            name: "empty variables are treated as unset",
+            is_windows: true,
+            env: vec![
+                ("GH_CONFIG_DIR", ""),
+                ("XDG_CONFIG_HOME", ""),
+                ("APPDATA", ""),
+            ],
+            expected: "/home/user/.config/gh",
+        },
+        Case {
+            name: "nothing set falls back to the home directory",
+            is_windows: true,
+            env: vec![],
+            expected: "/home/user/.config/gh",
+        },
+    ];
+
+    for case in cases {
+        let resolved = resolve_gh_config_dir(Path::new("/home/user"), case.is_windows, |key| {
+            case.env
+                .iter()
+                .find(|(name, _)| *name == key)
+                .map(|(_, value)| OsString::from(value))
+        });
+        assert_eq!(resolved, PathBuf::from(case.expected), "{}", case.name);
+    }
 }
 
 fn github_credential() -> GitCredential {
@@ -693,4 +847,82 @@ fn refreshed_credentials_return_err_when_the_local_write_fails() {
     let message = format!("{error:#}");
     assert!(message.contains("Failed to write refreshed git credentials"));
     assert!(message.contains("github.com"));
+}
+
+#[test]
+fn git_home_dir_resolves_from_the_environment_in_git_order() -> Result<()> {
+    let existing_home = tempfile::tempdir()?;
+    let existing_home_path = existing_home.path().to_string_lossy().into_owned();
+    let missing_home_path = existing_home
+        .path()
+        .join("does-not-exist")
+        .to_string_lossy()
+        .into_owned();
+    // Splits a path into the non-empty drive and path halves whose concatenation is the original.
+    let split_drive = |path: &str| {
+        let (drive, rest) = path.split_at(1);
+        (drive.to_string(), rest.to_string())
+    };
+    let (existing_drive, existing_rest) = split_drive(&existing_home_path);
+    let (missing_drive, missing_rest) = split_drive(&missing_home_path);
+
+    struct Case {
+        name: &'static str,
+        env: Vec<(&'static str, String)>,
+        expected: Option<String>,
+    }
+    let cases = [
+        Case {
+            name: "HOME wins over every other variable",
+            env: vec![
+                ("HOME", "/from/home".to_string()),
+                ("HOMEDRIVE", existing_drive.clone()),
+                ("HOMEPATH", existing_rest.clone()),
+                ("USERPROFILE", "/from/userprofile".to_string()),
+            ],
+            expected: Some("/from/home".to_string()),
+        },
+        Case {
+            name: "an empty HOME is treated as unset",
+            env: vec![
+                ("HOME", String::new()),
+                ("USERPROFILE", "/from/userprofile".to_string()),
+            ],
+            expected: Some("/from/userprofile".to_string()),
+        },
+        Case {
+            name: "HOMEDRIVE and HOMEPATH win over USERPROFILE when the directory exists",
+            env: vec![
+                ("HOMEDRIVE", existing_drive),
+                ("HOMEPATH", existing_rest),
+                ("USERPROFILE", "/from/userprofile".to_string()),
+            ],
+            expected: Some(existing_home_path.clone()),
+        },
+        Case {
+            name: "a missing HOMEDRIVE and HOMEPATH directory falls back to USERPROFILE",
+            env: vec![
+                ("HOMEDRIVE", missing_drive),
+                ("HOMEPATH", missing_rest),
+                ("USERPROFILE", "/from/userprofile".to_string()),
+            ],
+            expected: Some("/from/userprofile".to_string()),
+        },
+        Case {
+            name: "nothing set resolves to nothing",
+            env: vec![],
+            expected: None,
+        },
+    ];
+
+    for case in cases {
+        let resolved = git_home_dir(|key| {
+            case.env
+                .iter()
+                .find(|(name, _)| *name == key)
+                .map(|(_, value)| OsString::from(value))
+        });
+        assert_eq!(resolved, case.expected.map(PathBuf::from), "{}", case.name);
+    }
+    Ok(())
 }

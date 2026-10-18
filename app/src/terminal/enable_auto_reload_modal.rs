@@ -14,11 +14,14 @@ use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent as _, UiComponentStyles};
 use warpui::{AppContext, Element, Entity, SingletonEntity as _, View, ViewContext, ViewHandle};
 
+use crate::ai::blocklist::view_util::usage_display_unit;
 use crate::features::FeatureFlag;
 use crate::menu::MenuItemFields;
 use crate::modal::{MODAL_PADDING, MODAL_WIDTH, Modal, ModalEvent};
+use crate::pricing::addon_pack::pack_menu_label;
 use crate::send_telemetry_from_ctx;
 use crate::server::telemetry::{AutoReloadModalAction, TelemetryEvent};
+use crate::settings::{AISettings, AISettingsChangedEvent};
 use crate::ui_components::blended_colors;
 use crate::view_components::{Dropdown, DropdownAction, ToastFlavor};
 use crate::workspaces::user_workspaces::{UserWorkspaces, UserWorkspacesEvent};
@@ -112,6 +115,13 @@ impl EnableAutoReloadModalBody {
             },
         );
 
+        ctx.subscribe_to_model(&AISettings::handle(ctx), |me, _, event, ctx| {
+            if matches!(event, AISettingsChangedEvent::UsageDisplayUnit { .. }) {
+                me.update_addon_credits_options(ctx);
+                ctx.notify();
+            }
+        });
+
         let denomination_dropdown = ctx.add_typed_action_view(|ctx| {
             let mut dropdown = Dropdown::new(ctx);
             dropdown.set_top_bar_max_width(DENOMINATION_DROPDOWN_WIDTH);
@@ -133,10 +143,10 @@ impl EnableAutoReloadModalBody {
     fn update_addon_credits_options(&mut self, ctx: &mut ViewContext<Self>) {
         self.addon_credits_options = Vec::new();
 
-        let workspaces = UserWorkspaces::as_ref(ctx);
-        let premium_bps = workspaces
+        let premium_bps = UserWorkspaces::as_ref(ctx)
             .purchase_policy()
             .map_or(0, |policy| policy.effective_premium_bps());
+        let unit = usage_display_unit(ctx);
         let base_rate = self
             .addon_credits_options
             .first()
@@ -146,19 +156,8 @@ impl EnableAutoReloadModalBody {
             .iter()
             .enumerate()
             .map(|(index, option)| {
-                let price_cents = option.price_usd_cents_with_premium(premium_bps);
-                let price_label = if price_cents % 100 == 0 {
-                    format!("${}", price_cents / 100)
-                } else {
-                    format!("${:.2}", price_cents as f64 / 100.)
-                };
-                let primary_text = format!("{price_label} / {} credits", option.credits);
-                let discount_percent = if base_rate > 0.0 {
-                    let actual_rate = option.rate();
-                    ((base_rate - actual_rate) / base_rate * 100.0).round() as u32
-                } else {
-                    0
-                };
+                let primary_text = pack_menu_label(option, premium_bps, unit);
+                let discount_percent = option.discount_percent(base_rate);
                 if discount_percent > 0 {
                     MenuItemFields::new_with_custom_label(
                         Arc::new(

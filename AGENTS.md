@@ -132,6 +132,7 @@ Environment variables:
 ### Platform Setup
 - `./script/bootstrap` - Platform-specific setup plus common agent skill installation from `skills-lock.json`; prompts for project/global when an install or update is needed unless a target flag or environment override is provided.
 - `./script/bootstrap --skip-common-skills` - Platform setup without installing or updating common agent skills.
+- `WARP_SKIP_COMMON_SKILLS_INSTALL=1 ./script/run` (or `./script/bootstrap`) - Skip the common-skills install/update check without changing configuration.
 - `./script/bootstrap --install-common-skills` - Explicitly install common agent skills from `skills-lock.json`; this is the default behavior.
 - `./script/bootstrap --install-common-skills-in-repo` - Platform setup plus common agent skill installation in this checkout's `.agents/skills`. **Do not use after synthet-code-framework adopt:** `.agents/skills` is a generated mirror of `.claude/skills/` and an in-repo common-skills install is wiped on the next `python scripts/sync_assistant_trees.py`.
 - `./script/bootstrap --install-common-skills-globally` - Platform setup plus common agent skill installation in `~/.agents/skills`.

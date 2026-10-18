@@ -109,6 +109,10 @@ fn oss_policy_removes_cloud_agents_but_keeps_local_and_remote_dev_tools() {
         FeatureFlag::OzHandoff,
         FeatureFlag::SyncAmbientPlans,
         FeatureFlag::NamedAgents,
+        FeatureFlag::CloudAgentExecutionConfig,
+        FeatureFlag::CloudAgentShellRespawn,
+        FeatureFlag::FactoryDeferredRepositories,
+        FeatureFlag::PreviewUrlsMcp,
         FeatureFlag::CloudConversations,
         FeatureFlag::AgentView,
         FeatureFlag::AgentHarness,
@@ -122,6 +126,10 @@ fn oss_policy_removes_cloud_agents_but_keeps_local_and_remote_dev_tools() {
     assert!(!flags.contains(&FeatureFlag::OzHandoff));
     assert!(!flags.contains(&FeatureFlag::SyncAmbientPlans));
     assert!(!flags.contains(&FeatureFlag::NamedAgents));
+    assert!(!flags.contains(&FeatureFlag::CloudAgentExecutionConfig));
+    assert!(!flags.contains(&FeatureFlag::CloudAgentShellRespawn));
+    assert!(!flags.contains(&FeatureFlag::FactoryDeferredRepositories));
+    assert!(!flags.contains(&FeatureFlag::PreviewUrlsMcp));
     assert!(!flags.contains(&FeatureFlag::CloudConversations));
     assert!(flags.contains(&FeatureFlag::AgentView));
     assert!(flags.contains(&FeatureFlag::AgentHarness));
@@ -146,6 +154,7 @@ fn oz_capable_channels_keep_cloud_agent_features() {
 fn oss_policy_removes_warp_hosted_ai_features() {
     let mut flags = HashSet::from([
         FeatureFlag::SuperGrok,
+        FeatureFlag::ChatGPTSubscription,
         FeatureFlag::GeminiEnterprise,
         FeatureFlag::AgentModeComputerUse,
         FeatureFlag::BackgroundComputerUse,
@@ -161,6 +170,7 @@ fn oss_policy_removes_warp_hosted_ai_features() {
     filter_unsupported_features_for(&mut flags, Channel::Oss, false);
 
     assert!(!flags.contains(&FeatureFlag::SuperGrok));
+    assert!(!flags.contains(&FeatureFlag::ChatGPTSubscription));
     assert!(!flags.contains(&FeatureFlag::GeminiEnterprise));
     assert!(!flags.contains(&FeatureFlag::AgentModeComputerUse));
     assert!(!flags.contains(&FeatureFlag::BackgroundComputerUse));
@@ -174,13 +184,14 @@ fn oss_policy_removes_warp_hosted_ai_features() {
 fn warp_hosted_ai_channels_keep_their_features() {
     let mut flags = HashSet::from([
         FeatureFlag::SuperGrok,
+        FeatureFlag::ChatGPTSubscription,
         FeatureFlag::GeminiEnterprise,
         FeatureFlag::SharedBlockTitleGeneration,
     ]);
 
     filter_unsupported_features_for(&mut flags, Channel::Stable, true);
 
-    assert_eq!(flags.len(), 3);
+    assert_eq!(flags.len(), 4);
 }
 
 #[test]

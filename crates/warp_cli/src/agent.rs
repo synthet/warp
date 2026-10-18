@@ -67,31 +67,72 @@ impl RepositoryHeadRef {
     }
 }
 
-/// Server-supplied override for an environment repository's initial HEAD.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Canonical repository identity used by server-owned preparation instructions.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct RepositoryHeadOverride {
+pub struct RepositoryIdentity {
     pub code_forge: RepositoryForge,
+    #[serde(rename = "owner")]
     pub repo_owner: String,
+    #[serde(rename = "repo")]
     pub repo_name: String,
-    pub head: RepositoryHeadRef,
 }
 
-impl RepositoryHeadOverride {
-    pub fn identity(&self) -> (RepositoryForge, &str, &str) {
+impl RepositoryIdentity {
+    pub fn identity(&self) -> (RepositoryForge, String, String) {
         (
             self.code_forge,
-            self.repo_owner.as_str(),
-            self.repo_name.as_str(),
+            self.repo_owner.to_lowercase(),
+            self.repo_name.to_lowercase(),
         )
     }
 
     fn validate(&self) -> Result<(), String> {
-        if self.repo_owner.is_empty() {
-            return Err("repo_owner must not be empty".to_string());
+        if self.repo_owner.is_empty() || self.repo_owner.trim() != self.repo_owner {
+            return Err(
+                "repo_owner must not be empty or contain surrounding whitespace".to_string(),
+            );
         }
-        if self.repo_name.is_empty() {
-            return Err("repo_name must not be empty".to_string());
+        if self.repo_name.is_empty() || self.repo_name.trim() != self.repo_name {
+            return Err(
+                "repo_name must not be empty or contain surrounding whitespace".to_string(),
+            );
+        }
+        Ok(())
+    }
+}
+
+/// Server-supplied repository preparation override.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RepositoryPreparationOverride {
+    pub code_forge: RepositoryForge,
+    pub repo_owner: String,
+    pub repo_name: String,
+    pub head: RepositoryHeadRef,
+    pub clone_from: Option<RepositoryIdentity>,
+    #[serde(default)]
+    pub preserve_origin: bool,
+}
+
+impl RepositoryPreparationOverride {
+    pub fn identity(&self) -> (RepositoryForge, String, String) {
+        (
+            self.code_forge,
+            self.repo_owner.to_lowercase(),
+            self.repo_name.to_lowercase(),
+        )
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        RepositoryIdentity {
+            code_forge: self.code_forge,
+            repo_owner: self.repo_owner.clone(),
+            repo_name: self.repo_name.clone(),
+        }
+        .validate()?;
+        if let Some(clone_from) = &self.clone_from {
+            clone_from.validate()?;
         }
         match &self.head {
             RepositoryHeadRef::CommitSha(commit_sha) => {
@@ -114,18 +155,24 @@ impl RepositoryHeadOverride {
                 }
             }
         }
+        if self.clone_from.is_some() && !self.preserve_origin {
+            return Err("clone_from requires preserve_origin".to_string());
+        }
+        if self.preserve_origin && self.clone_from.is_none() {
+            return Err("preserve_origin requires clone_from".to_string());
+        }
         Ok(())
     }
 }
 
-impl FromStr for RepositoryHeadOverride {
+impl FromStr for RepositoryPreparationOverride {
     type Err = String;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let head_override = serde_json::from_str::<Self>(value)
-            .map_err(|error| format!("invalid repository head override JSON: {error}"))?;
-        head_override.validate()?;
-        Ok(head_override)
+        let preparation_override = serde_json::from_str::<Self>(value)
+            .map_err(|error| format!("invalid repository preparation override JSON: {error}"))?;
+        preparation_override.validate()?;
+        Ok(preparation_override)
     }
 }
 
@@ -215,12 +262,13 @@ impl HiddenComputerUseArgs {
         }
     }
 }
-const HARNESS_VALUE_VARIANTS: [Harness; 5] = [
+const HARNESS_VALUE_VARIANTS: [Harness; 6] = [
     Harness::Oz,
     Harness::Claude,
     Harness::OpenCode,
     Harness::Gemini,
     Harness::Codex,
+    Harness::Pi,
 ];
 
 /// The execution harness for an agent run.
@@ -238,6 +286,7 @@ pub enum Harness {
     Gemini,
     /// Delegate to the `codex` CLI.
     Codex,
+    Pi,
     /// A harness produced by a newer client/server that this client doesn't
     /// recognize. Surfaced via deserialization fallbacks (e.g. unknown GraphQL
     /// enum values, unknown `harness_type` strings); never selectable from the
@@ -264,6 +313,7 @@ impl ValueEnum for Harness {
                 .help("Delegate to the `opencode` CLI"),
             Harness::Gemini => PossibleValue::new("gemini").help("Delegate to the `gemini` CLI"),
             Harness::Codex => PossibleValue::new("codex").help("Delegate to the `codex` CLI"),
+            Harness::Pi => PossibleValue::new("pi"),
             Harness::Unknown => return None,
         };
         if !self.should_display_in_help_text() {
@@ -282,7 +332,9 @@ impl Harness {
     pub fn parse_local_child_harness(value: &str) -> Option<Self> {
         match Self::parse_orchestration_harness(value) {
             Some(harness @ (Self::Claude | Self::OpenCode | Self::Codex)) => Some(harness),
-            Some(Self::Oz) | Some(Self::Gemini) | Some(Self::Unknown) | None => None,
+            Some(Self::Oz) | Some(Self::Gemini) | Some(Self::Pi) | Some(Self::Unknown) | None => {
+                None
+            }
         }
     }
 
@@ -299,7 +351,7 @@ impl Harness {
     pub fn should_display_in_help_text(self) -> bool {
         match self {
             Self::Oz | Self::Claude | Self::Codex => true,
-            Self::OpenCode | Self::Gemini | Self::Unknown => false,
+            Self::OpenCode | Self::Gemini | Self::Pi | Self::Unknown => false,
         }
     }
 
@@ -310,6 +362,7 @@ impl Harness {
             Self::OpenCode => "OpenCode",
             Self::Gemini => "Gemini CLI",
             Self::Codex => "Codex",
+            Self::Pi => "Pi",
             Self::Unknown => "Unknown",
         }
     }
@@ -328,6 +381,7 @@ impl Harness {
             "opencode" => Some(Harness::OpenCode),
             "gemini" => Some(Harness::Gemini),
             "codex" => Some(Harness::Codex),
+            "pi" => Some(Harness::Pi),
             "unknown" => Some(Harness::Unknown),
             _ => None,
         }
@@ -345,6 +399,7 @@ impl Harness {
             Harness::OpenCode => "opencode",
             Harness::Gemini => "gemini",
             Harness::Codex => "codex",
+            Harness::Pi => "pi",
             Harness::Unknown => "unknown",
         }
     }
@@ -354,6 +409,16 @@ impl fmt::Display for Harness {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.config_name())
     }
+}
+
+/// How the agent driver talks to a third-party harness.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default, ValueEnum)]
+pub enum HarnessTransport {
+    /// Run the harness CLI interactively inside the driver's terminal session.
+    #[default]
+    Pty,
+    /// Spawn the harness as a child process and drive it over the Agent Client Protocol.
+    Acp,
 }
 
 #[cfg(test)]
@@ -374,6 +439,8 @@ pub enum AgentCommand {
     Run(RunAgentArgs),
     /// Dispatch a cloud agent.
     RunCloud(RunCloudArgs),
+    /// Prepare a pre-warmed sandbox and wait for it to be claimed.
+    RunCloudStandby(RunCloudStandbyArgs),
     /// Manage agent profiles.
     #[command(subcommand)]
     Profile(AgentProfileCommand),
@@ -396,6 +463,7 @@ impl AgentCommand {
         match self {
             AgentCommand::Run(_) => "agent run",
             AgentCommand::RunCloud(_) => "agent run-cloud",
+            AgentCommand::RunCloudStandby(_) => "agent run-cloud-standby",
             AgentCommand::Profile(_) => "agent profile",
             AgentCommand::List(_) => "agent list",
             AgentCommand::Get(_) => "agent get",
@@ -405,6 +473,14 @@ impl AgentCommand {
             AgentCommand::Skills(_) => "agent skills",
         }
     }
+}
+
+/// Identifies the allocated sandbox to prepare without starting an agent task.
+#[derive(Debug, Clone, Args)]
+pub struct RunCloudStandbyArgs {
+    /// UID of the pre-warmed sandbox row this container was allocated for.
+    #[arg(long = "standby-id", value_name = "ID")]
+    pub standby_id: String,
 }
 
 #[derive(Debug, Clone, Args)]
@@ -509,12 +585,13 @@ pub struct RunAgentArgs {
     #[arg(
         long = "idle-on-fail",
         value_name = "DURATION",
-        env = "OZ_IDLE_ON_FAIL",
         num_args = 0..=1,
         default_missing_value = "15m",
         hide = true
     )]
     pub idle_on_fail: Option<humantime::Duration>,
+    #[arg(long = "legacy-idle-on-fail-env", env = "OZ_IDLE_ON_FAIL", hide = true)]
+    pub idle_on_fail_env: Option<humantime::Duration>,
 
     #[command(flatten)]
     pub snapshot: SnapshotArgs,
@@ -525,6 +602,14 @@ pub struct RunAgentArgs {
     /// accepting the compatibility shape until all producers have been updated.
     #[arg(long = "task-id", hide = true, conflicts_with_all = ["prompt", "saved_prompt", "file"])]
     pub task_id: Option<String>,
+    /// Execution whose server-owned settings configure this task launch.
+    #[arg(
+        long = "execution-id",
+        env = "WARP_EXECUTION_ID",
+        hide = true,
+        requires = "task_id"
+    )]
+    pub execution_id: Option<String>,
 
     /// Whether we are running the agent in a sandboxed environment.
     #[arg(long = "sandboxed", hide = true)]
@@ -567,6 +652,20 @@ pub struct RunAgentArgs {
     #[arg(long = "harness", value_name = "HARNESS", default_value_t = Harness::Oz, hide = true)]
     pub harness: Harness,
 
+    /// How to drive a third-party harness. Unset means the harness's interactive CLI runs in the
+    /// terminal session; `acp` drives the harness over the Agent Client Protocol instead. Has no
+    /// effect on the `oz` harness.
+    ///
+    /// Cloud workers set this through `WARP_HARNESS_TRANSPORT` rather than the flag, so a pinned
+    /// CLI predating this option ignores it instead of rejecting an unknown argument.
+    #[arg(
+        long = "harness-transport",
+        value_name = "TRANSPORT",
+        env = "WARP_HARNESS_TRANSPORT",
+        hide = true
+    )]
+    pub harness_transport: Option<HarnessTransport>,
+
     /// Skip the initial LLM turn for this run. Used by the empty-prompt cloud-handoff
     /// path so the cloud agent comes up ready for follow-up without hallucinating a
     /// response against an empty user message.
@@ -585,7 +684,7 @@ pub struct RunAgentArgs {
     #[arg(long = "configure-git-credentials-with-github", hide = true, requires_all = ["task_id"])]
     pub configure_git_credentials_with_github: bool,
 
-    /// Repository HEAD override supplied by the server for this task.
+    /// Repository preparation override supplied by the server for this task.
     #[arg(
         long = "repository-head-override-json",
         value_name = "JSON",
@@ -593,7 +692,7 @@ pub struct RunAgentArgs {
         requires = "task_id",
         hide = true
     )]
-    pub repository_head_overrides: Vec<RepositoryHeadOverride>,
+    pub repository_preparation_overrides: Vec<RepositoryPreparationOverride>,
 
     /// Remove the origin remote from environment repositories after setup.
     #[arg(long = "remove-repository-origins", requires = "task_id", hide = true)]
@@ -601,6 +700,10 @@ pub struct RunAgentArgs {
 }
 
 impl RunAgentArgs {
+    pub fn effective_idle_on_fail(&self) -> Option<humantime::Duration> {
+        self.idle_on_fail.or(self.idle_on_fail_env)
+    }
+
     /// Combine `mcp_specs` with legacy `mcp_servers` (UUIDs) into a single list.
     pub fn all_mcp_specs(&self) -> Vec<MCPSpec> {
         let mut specs = self.mcp_specs.clone();
@@ -727,7 +830,7 @@ pub struct RunCloudArgs {
 
     /// Path to a file to attach to the agent query.
     ///
-    /// Can be specified multiple times to attach multiple files (maximum 5).
+    /// Can be specified multiple times to attach multiple files (maximum 25).
     ///
     /// Example: --attach file1.png --attach file2.txt
     #[arg(

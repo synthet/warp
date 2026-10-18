@@ -10,7 +10,7 @@ function Write-FixtureFile {
         [string] $Content
     )
 
-    New-Item -ItemType Directory -Path (Split-Path $Path) -Force | Out-Null
+    New-Item -ItemType Directory -Path (Split-Path -Path $Path) -Force | Out-Null
     [System.IO.File]::WriteAllText($Path, $Content)
 }
 
@@ -84,10 +84,10 @@ $runningProcess = $null
 try {
     New-Item -ItemType Directory -Path (Join-Path $inputDir 'resources') -Force | Out-Null
     New-Item -ItemType Directory -Path $assetsDir -Force | Out-Null
-    Copy-Item "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" (
+    Copy-Item -Path "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Destination (
         Join-Path $inputDir 'warp-tui-dev.exe'
     )
-    Write-FixtureFile (Join-Path $inputDir 'resources\marker.txt') 'fixture'
+    Write-FixtureFile -Path (Join-Path $inputDir 'resources\marker.txt') -Content 'fixture'
     foreach ($asset in @(
             'conpty.dll',
             'OpenConsole.exe',
@@ -95,17 +95,17 @@ try {
             'vcruntime140_1.dll',
             'msvcp140.dll'
         )) {
-        Write-FixtureFile (Join-Path $assetsDir $asset) $asset
+        Write-FixtureFile -Path (Join-Path $assetsDir $asset) -Content $asset
     }
 
     $version1 = 'v0.2026.07.29.00.00.dev_01'
     $version2 = 'v0.2026.07.29.00.00.dev_02'
-    $installer1 = Build-FixtureInstaller $version1 'WarpAgentCLIDevSetup-v1' `
-        $inputDir $assetsDir $outputDir
-    $installer2 = Build-FixtureInstaller $version2 'WarpAgentCLIDevSetup-v2' `
-        $inputDir $assetsDir $outputDir
+    $installer1 = Build-FixtureInstaller -Version $version1 -OutputName 'WarpAgentCLIDevSetup-v1' `
+        -InputDir $inputDir -AssetsDir $assetsDir -OutputDir $outputDir
+    $installer2 = Build-FixtureInstaller -Version $version2 -OutputName 'WarpAgentCLIDevSetup-v2' `
+        -InputDir $inputDir -AssetsDir $assetsDir -OutputDir $outputDir
 
-    Invoke-Installer $installer1 $installDir $binDir
+    Invoke-Installer -Installer $installer1 -InstallDir $installDir -BinDir $binDir
     if ((Get-Content (Join-Path $installDir 'current') -Raw).Trim() -cne $version1) {
         throw 'The first install did not activate v1'
     }
@@ -129,7 +129,7 @@ try {
         throw 'The v1 fixture process exited before the upgrade'
     }
 
-    Invoke-Installer $installer2 $installDir $binDir
+    Invoke-Installer -Installer $installer2 -InstallDir $installDir -BinDir $binDir
     if ((Get-Content (Join-Path $installDir 'current') -Raw).Trim() -cne $version2) {
         throw 'The upgrade did not activate v2'
     }
@@ -158,8 +158,8 @@ try {
     $runningProcess = $null
     $untrustedBinDir = Join-Path $testRoot 'untrusted command root'
     $untrustedLauncher = Join-Path $untrustedBinDir 'warp-dev.cmd'
-    Write-FixtureFile $untrustedLauncher 'must remain'
-    Invoke-Installer (Join-Path $installDir 'unins000.exe') $installDir $untrustedBinDir -Uninstall
+    Write-FixtureFile -Path $untrustedLauncher -Content 'must remain'
+    Invoke-Installer -Installer (Join-Path $installDir 'unins000.exe') -InstallDir $installDir -BinDir $untrustedBinDir -Uninstall
     if (Test-Path -LiteralPath $launcherPath) {
         throw 'Uninstall left the channel launcher behind'
     }

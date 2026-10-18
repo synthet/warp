@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Result, anyhow, bail};
+use ordered_float::OrderedFloat;
 use regex::Regex;
 use warp_errors::report_error;
 use warp_graphql::billing::{
@@ -8,8 +9,8 @@ use warp_graphql::billing::{
     BillingCycleUsageHistory as GqlBillingCycleUsageHistory, BillingMetadata as GqlBillingMetadata,
     BonusGrant as GqlBonusGrant, BonusGrantScope as GqlBonusGrantScope,
     ByoApiKeyPolicy as GqlByoApiKeyPolicy, ByoEndpointPolicy as GqlByoEndpointPolicy,
-    CodebaseContextPolicy as GqlCodebaseContextPolicy, CustomerType as GqlCustomerType,
-    DelinquencyStatus as GqlDelinquencyStatus,
+    ChargeUnit as GqlChargeUnit, CodebaseContextPolicy as GqlCodebaseContextPolicy,
+    CustomerType as GqlCustomerType, DelinquencyStatus as GqlDelinquencyStatus,
     EnterpriseCreditsAutoReloadPolicy as GqlEnterpriseCreditsAutoReloadPolicy,
     EnterprisePayAsYouGoPolicy as GqlEnterprisePayAsYouGoPolicy, InstanceShape as GqlInstanceShape,
     ManagedByokByoePolicy as GqlManagedByokByoePolicy, MultiAdminPolicy as GqlMultiAdminPolicy,
@@ -28,7 +29,10 @@ use warp_graphql::billing::{
 use warp_graphql::queries::get_conversation_usage as gql_usage;
 use warp_graphql::queries::get_workspaces_metadata_for_user::User as GqlUser;
 use warp_graphql::subscriptions::get_warp_drive_updates::WarpDriveUpdate;
-use warp_graphql::user::DiscoverableTeamData as GqlDiscoverableTeamData;
+use warp_graphql::user::{
+    DiscoverableTeamData as GqlDiscoverableTeamData,
+    DiscoverableWorkspaceData as GqlDiscoverableWorkspaceData,
+};
 use warp_graphql::workspace::{
     AddonCreditsSettings as GqlAddonCreditsSettings,
     AdminEnablementSetting as GqlAdminEnablementSetting, AiAutonomyValue as GqlAiAutonomyValue,
@@ -48,7 +52,9 @@ use warp_graphql::workspace::{
     WriteToPtyAutonomyValue as GqlWriteToPtyAutonomyValue,
 };
 
-use super::team::{DiscoverableTeam, MembershipRole, Team, TeamMember, TeamVisibility};
+use super::team::{
+    DiscoverableTeam, DiscoverableWorkspace, MembershipRole, Team, TeamMember, TeamVisibility,
+};
 use super::user_workspaces::WorkspacesMetadataResponse;
 use super::workspace::{
     AIAutonomyPolicy, AddonCreditsSettings, AdminEnablementSetting, AiAutonomySettings,
@@ -80,10 +86,10 @@ use crate::server::graphql::schema::object_action_history_from_gql;
 use crate::server::ids::ServerId;
 use crate::settings::AgentModeCommandExecutionPredicate;
 use crate::workspaces::workspace::{
-    AiOverages, BonusGrantsPurchased, ByoApiKeyPolicy, ByoEndpointPolicy, CodebaseContextPolicy,
-    EnterpriseCreditsAutoReloadPolicy, EnterprisePayAsYouGoPolicy, ManagedByokByoePolicy,
-    MultiAdminPolicy, NativeWorkspacesPolicy, PurchaseAddOnCreditsPolicy,
-    UsageBasedPricingSettings, WorkspaceUid,
+    AiOverages, BonusGrantsPurchased, ByoApiKeyPolicy, ByoEndpointPolicy, ChargeUnit,
+    CodebaseContextPolicy, EnterpriseCreditsAutoReloadPolicy, EnterprisePayAsYouGoPolicy,
+    ManagedByokByoePolicy, MultiAdminPolicy, NativeWorkspacesPolicy, PurchaseAddOnCreditsPolicy,
+    UsageBasedPricingSettings, UserTier, WorkspaceUid,
 };
 
 pub const PLACEHOLDER_WORKSPACE_UID: &str = "NOT_A_REAL_WORKSPACE_UID";
@@ -95,6 +101,21 @@ impl From<GqlTeamMember> for TeamMember {
             email: gql_team_member.email,
             role: gql_team_member.role.into(),
             is_disabled: gql_team_member.is_disabled,
+        }
+    }
+}
+
+impl From<GqlDiscoverableWorkspaceData> for DiscoverableWorkspace {
+    fn from(gql_workspace: GqlDiscoverableWorkspaceData) -> Self {
+        Self {
+            workspace_uid: gql_workspace.workspace_uid.into_inner().into(),
+            name: gql_workspace.name,
+            open_teams: gql_workspace
+                .open_teams
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+            member_count: i64::from(gql_workspace.member_count),
         }
     }
 }
@@ -236,6 +257,12 @@ impl From<GqlWorkspaceMemberUsageInfo> for WorkspaceMemberUsageInfo {
             request_limit: gql_workspace_member_usage_info.request_limit,
             requests_used_since_last_refresh: gql_workspace_member_usage_info
                 .requests_used_since_last_refresh,
+            included_usage_cents: gql_workspace_member_usage_info
+                .included_usage_cents
+                .map(OrderedFloat),
+            usage_cents_used_since_last_refresh: gql_workspace_member_usage_info
+                .usage_cents_used_since_last_refresh
+                .map(OrderedFloat),
             is_unlimited: gql_workspace_member_usage_info.is_unlimited,
             is_request_limit_prorated: gql_workspace_member_usage_info.is_request_limit_prorated,
         }
@@ -360,6 +387,9 @@ impl From<GqlUgcCollectionEnablementSetting> for UgcCollectionEnablementSetting 
 
 impl From<&gql_usage::ConversationUsage> for ConversationUsageInfo {
     fn from(gql: &gql_usage::ConversationUsage) -> Self {
+        let usage_metadata =
+            persistence::model::ConversationUsageMetadata::from(&gql.usage_metadata);
+        let total_cost_in_cents = usage_metadata.billed_cost_in_cents();
         let persistence::model::ConversationUsageMetadata {
             credits_spent,
             platform_credits_spent,
@@ -368,7 +398,7 @@ impl From<&gql_usage::ConversationUsage> for ConversationUsageInfo {
             context_window_usage,
             context_window_segments,
             ..
-        } = (&gql.usage_metadata).into();
+        } = usage_metadata;
         ConversationUsageInfo {
             credits_spent,
             platform_credits_spent,
@@ -381,12 +411,8 @@ impl From<&gql_usage::ConversationUsage> for ConversationUsageInfo {
             lines_added: tool.apply_file_diff_stats.lines_added,
             lines_removed: tool.apply_file_diff_stats.lines_removed,
             commands_executed: tool.run_command_stats.commands_executed,
-            // GAP: the settings usage-history surface sources this view from
-            // a GraphQL query that does not yet expose a token count or
-            // per-category cost breakdown (Milestone 3 / vertical B).
-            total_tokens: None,
-            total_cost_in_cents: None,
-            tokens_for_last_block: None,
+            total_cost_in_cents,
+            // The settings usage-history query carries no per-block breakdown.
             cost_in_cents_for_last_block: None,
         }
     }
@@ -504,6 +530,7 @@ impl From<GqlAddonCreditsSettings> for AddonCreditsSettings {
             max_monthly_spend_cents: gql_settings.max_monthly_spend_cents,
             selected_auto_reload_credit_denomination: gql_settings
                 .selected_auto_reload_credit_denomination,
+            selected_auto_reload_usage_cents: gql_settings.selected_auto_reload_usage_cents,
         }
     }
 }
@@ -670,8 +697,8 @@ fn convert_billing_cycle_usage(history: GqlBillingCycleUsageHistory) -> BillingC
                         cost_type: entry.cost_type,
                         usage_bucket: entry.usage_bucket,
                         usage_source: entry.usage_source,
-                        credits_used: entry.credits_used,
-                        cost_cents: entry.cost_cents,
+                        credits_used: entry.credits_used_exact,
+                        cost_cents: entry.cost_cents_exact,
                         attributed_team_uid: entry.attributed_team_uid,
                     })
                     .collect(),
@@ -680,11 +707,30 @@ fn convert_billing_cycle_usage(history: GqlBillingCycleUsageHistory) -> BillingC
     }
 }
 
+impl From<GqlChargeUnit> for ChargeUnit {
+    fn from(gql_charge_unit: GqlChargeUnit) -> ChargeUnit {
+        match gql_charge_unit {
+            GqlChargeUnit::Credits => ChargeUnit::Credits,
+            GqlChargeUnit::Cents => ChargeUnit::Cents,
+            GqlChargeUnit::Other(value) => {
+                report_error!(
+                    "Invalid ChargeUnit. Make sure to update client GraphQL types!",
+                    extra: { "value" => %value },
+                    warp_errors::ReportErrorLogMode::OncePerRun
+                );
+                // Fail closed to the unit every server supports.
+                ChargeUnit::Credits
+            }
+        }
+    }
+}
+
 impl From<GqlTier> for Tier {
     fn from(gql_tier: GqlTier) -> Tier {
         Self {
             name: gql_tier.name,
             description: gql_tier.description,
+            charge_unit: gql_tier.charge_unit.into(),
             warp_ai_policy: gql_tier.warp_ai_policy.map(From::from),
             workspace_size_policy: gql_tier.team_size_policy.map(From::from),
             shared_notebooks_policy: gql_tier.shared_notebooks_policy.map(From::from),
@@ -799,6 +845,8 @@ impl BonusGrant {
             user_facing_message: bonus_grant.user_facing_message,
             request_credits_granted: bonus_grant.request_credits_granted,
             request_credits_remaining: bonus_grant.request_credits_remaining,
+            usage_cents_granted: bonus_grant.usage_cents_granted,
+            usage_cents_remaining: bonus_grant.usage_cents_remaining,
             scope,
         }
     }
@@ -1502,15 +1550,16 @@ pub fn workspaces_metadata_response_from_gql(
         .experiments
         .and_then(|experiments| convert_to_server_experiment!(experiments));
 
-    // A teamless user's only workspace is the placeholder filtered out
-    // above, so the user-level policy is the only place their add-on
-    // credits purchase policy — gating and premium pricing alike —
-    // survives (see
-    // [`crate::workspaces::user_workspaces::UserWorkspaces::purchase_policy`]).
-    let user_purchase_policy = gql_user
+    let user_tier = gql_user
         .billing_metadata
-        .and_then(|billing_metadata| billing_metadata.tier.purchase_add_on_credits_policy)
-        .map(Into::into);
+        .map(|billing_metadata| UserTier {
+            purchase_policy: billing_metadata
+                .tier
+                .purchase_add_on_credits_policy
+                .map(Into::into),
+            charge_unit: billing_metadata.tier.charge_unit.into(),
+        })
+        .unwrap_or_default();
 
     // TODO(skambashi) refactor to return back workspaces, and not teams
     WorkspacesMetadataResponse {
@@ -1518,7 +1567,7 @@ pub fn workspaces_metadata_response_from_gql(
         joinable_teams,
         experiments,
         ai_credit_availability: Some(gql_user.ai_credit_availability.into()),
-        user_purchase_policy,
+        user_tier,
     }
 }
 

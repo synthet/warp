@@ -41,7 +41,7 @@ pub(crate) mod view_util;
 // Consumed by `tui_export` for the `warp_tui` frontend.
 #[cfg_attr(not(feature = "tui"), allow(unused_imports))]
 pub use action_model::AIActionStatus;
-pub(crate) use action_model::recording_controller::RecordingController;
+pub(crate) use action_model::recording_controller::{RecordingController, video_recording_enabled};
 #[cfg(not(target_family = "wasm"))]
 pub(crate) use action_model::recording_finalize::{
     FinalizeReason, finalize_recording_for_conversation,
@@ -52,7 +52,8 @@ pub use action_model::{
     AskUserQuestionExecutor, NewConversationDecision, RequestFileEditsExecutor,
 };
 pub use action_model::{
-    BlocklistAIActionEvent, BlocklistAIActionModel, ShellCommandExecutor, ShellCommandExecutorEvent,
+    BlocklistAIActionEvent, BlocklistAIActionModel, ShellCommandExecutor,
+    ShellCommandExecutorEvent, ShellRecoveryResult,
 };
 #[cfg_attr(target_family = "wasm", allow(unused_imports))]
 pub(crate) use action_model::{
@@ -94,6 +95,10 @@ pub use context_model::{
     PendingFile,
 };
 pub use controller::BlocklistAIController;
+#[cfg_attr(target_family = "wasm", allow(unused_imports))]
+pub(in crate::ai) use controller::external_harness::ExternalHarnessPrompt;
+#[cfg_attr(target_family = "wasm", allow(unused_imports))]
+pub(crate) use controller::external_harness::{ExternalHarnessCancel, ExternalHarnessTurn};
 pub use controller::input_context::{
     BLOCK_CONTEXT_ATTACHMENT_REGEX, DIFF_HUNK_ATTACHMENT_REGEX, DRIVE_OBJECT_ATTACHMENT_REGEX,
 };
@@ -101,7 +106,8 @@ pub use controller::input_context::{
 pub(crate) use controller::response_stream::ResponseStream;
 pub(crate) use controller::response_stream::ResponseStreamId;
 pub(crate) use controller::{
-    BlocklistAIControllerEvent, ClientIdentifiers, SessionContext, SlashCommandRequest,
+    BlocklistAIControllerEvent, CancellationRoute, ClientIdentifiers, SessionContext,
+    SlashCommandRequest,
 };
 pub(crate) use conversation_selection::{
     ConversationSelection, ConversationSelectionEvent, ConversationSelectionHandle,
@@ -126,13 +132,19 @@ pub(crate) use passive_suggestions::{
 #[cfg(test)]
 pub(crate) use permissions::is_agent_mode_autonomy_allowed;
 pub use permissions::{BlocklistAIPermissions, CommandExecutionPermissionAllowedReason};
+#[cfg_attr(target_family = "wasm", allow(unused_imports))]
+pub(crate) use permissions::{
+    CommandExecutionPermission, CommandExecutionPermissionDeniedReason, FileWritePermission,
+    FileWritePermissionDeniedReason,
+};
 #[cfg_attr(target_family = "wasm", allow(unused))]
 pub(crate) use persistence::PersistedAIInputType;
 #[cfg_attr(target_family = "wasm", allow(unused))]
 pub use persistence::maybe_build_ai_query_upsert_event;
 pub(crate) use persistence::{PersistedAIInput, SerializedBlockListItem};
 pub(crate) use queued_query::{
-    AutofireAction, QueuedQuery, QueuedQueryId, QueuedQueryOrigin, is_lrc_auto_queue_active,
+    AutofireAction, QueuedPromptDeliveryMode, QueuedQuery, QueuedQueryId, QueuedQueryOrigin,
+    is_lrc_auto_queue_active,
 };
 #[cfg_attr(not(feature = "tui"), allow(unused_imports))]
 pub use queued_query::{QueuedQueryEvent, QueuedQueryModel};
