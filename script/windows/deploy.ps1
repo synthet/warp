@@ -18,7 +18,9 @@ param(
     [switch]$Help,
     [switch]$SkipBuild,
     [switch]$Debug,
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'Release')]
     [switch]$Release,
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'Restart')]
     [switch]$Restart,
     [switch]$NoRestart,
     [switch]$CopyOnly,
@@ -44,9 +46,9 @@ if (-not $InstallDir) {
 }
 
 # -Release is the default; -Debug opts into a faster non-release overlay.
-$UseRelease = -not $Debug
+$UseRelease = if ($Release) { $true } else { -not $Debug }
 # -Restart is the default; -NoRestart skips relaunch.
-$ShouldRestart = -not $NoRestart
+$ShouldRestart = if ($Restart) { $true } else { -not $NoRestart }
 
 function Show-Usage {
     Write-Output @'
@@ -154,7 +156,7 @@ function Write-CliShim {
     Set-Content -LiteralPath $Path -Value $content -Encoding ascii -NoNewline
 }
 
-function Invoke-PrepareResources {
+function Invoke-PrepareResource {
     param([string]$DestinationDir, [string]$CargoProfile)
     $bundledSource = Join-Path $RepoRoot 'resources\bundled'
     $bundledDest = Join-Path $DestinationDir 'bundled'
@@ -236,13 +238,25 @@ function Initialize-DeployStaging {
 
     $cargoProfile = if ($UseRelease) { 'release' } else { 'debug' }
     Write-Output 'Preparing bundled resources...'
-    Invoke-PrepareResources -DestinationDir (Join-Path $StagingDir 'resources') -CargoProfile $cargoProfile
+    Invoke-PrepareResource -DestinationDir (Join-Path $StagingDir 'resources') -CargoProfile $cargoProfile
 
     Write-CliShim -Path (Join-Path $StagingDir 'bin\warp.cmd') -ExePath $installedExe
     Write-CliShim -Path (Join-Path $StagingDir 'bin\warp-oss.cmd') -ExePath $installedExe
 }
 
-function Stop-InstalledWarp {
+function Invoke-StopInstalledWarp {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseCompatibleCommands',
+        '',
+        Justification = 'Process inspection only runs on Windows.'
+    )]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSAvoidUsingEmptyCatchBlock',
+        '',
+        Justification = 'CIM query is best-effort.'
+    )]
+    [CmdletBinding()]
+    param()
     $exePath = Join-Path $InstallDir 'warp.exe'
     if (-not (Test-Path -LiteralPath $exePath -PathType Leaf)) {
         return
@@ -267,6 +281,7 @@ function Stop-InstalledWarp {
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     } catch {
         # CIM query is best-effort; file-lock wait below is the real gate.
+        $null = $_
     }
 
     $deadline = (Get-Date).AddSeconds(30)
@@ -317,7 +332,7 @@ function Copy-StagingToInstallDir {
     }
 }
 
-function Update-WarpContextMenuScheme {
+function Invoke-UpdateWarpContextMenuScheme {
     $commandKeys = @(
         'Software\Classes\Directory\shell\WarpTab\command',
         'Software\Classes\Directory\Background\shell\WarpTab\command',
@@ -370,9 +385,9 @@ function Request-ElevationAndCopy {
 }
 
 function Invoke-CopyAndFinish {
-    Stop-InstalledWarp
+    Invoke-StopInstalledWarp
     Copy-StagingToInstallDir
-    Update-WarpContextMenuScheme
+    Invoke-UpdateWarpContextMenuScheme
     $installed = Join-Path $InstallDir 'warp.exe'
     Write-Output "Deployed $installed"
     if ($ShouldRestart) {

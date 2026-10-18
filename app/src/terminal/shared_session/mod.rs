@@ -23,6 +23,7 @@ pub mod render_util;
 pub mod replay_agent_conversations;
 pub mod role_change_modal;
 mod selections;
+pub mod self_hosted;
 pub mod settings;
 pub mod share_modal;
 pub(super) mod shared_handlers;
@@ -337,6 +338,11 @@ pub fn join_native_intent(session_id: &SessionId) -> String {
 
 /// Returns the link to join a shared session.
 pub fn join_link(session_id: &SessionId) -> String {
+    // Synth Warp is local-first: self-hosted sessions open in that server's own web app.
+    if let Some(link) = self_hosted::web_join_link(session_id) {
+        return link;
+    }
+
     // For non-bundled builds against the staging server, use the native app intent
     // because the staging web URL won't resolve to a local build.
     let use_web_url = !ChannelState::uses_staging_server() || cfg!(feature = "release_bundle");

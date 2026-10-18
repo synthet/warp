@@ -7,6 +7,7 @@ Format: `- YYYY-MM-DD: <verb> — <details and paths>` (verbs: `created`, `updat
 ## 2026-10
 
 - 2026-10-18: created — recorded upstream merge preservation, verification results, and the maintainer's acceptance of test failures in [reports/upstream-sync-2026-10-18.md](reports/upstream-sync-2026-10-18.md).
+- 2026-10-17: created — self-hosted remote control: [guides/self-hosted-remote-control.md](guides/self-hosted-remote-control.md) and [specs/self-hosted-remote-control](../specs/self-hosted-remote-control/PRODUCT.md); updated [guides/INDEX.md](guides/INDEX.md), [features/implemented/INDEX.md](features/implemented/INDEX.md), [features/implemented/local-first.md](features/implemented/local-first.md), [architecture/cloud-surface-audit.md](architecture/cloud-surface-audit.md), [FAQ.md](../FAQ.md).
 
 ## 2026-08
 

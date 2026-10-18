@@ -23,6 +23,7 @@ param(
     [int]$RetryWaitSeconds = 15,
     [string]$Bin = 'warp-oss',
     [string]$Features = 'gui',
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'Package')]
     [string]$Package = 'warp'
 )
 
@@ -180,6 +181,13 @@ function Initialize-BuildEnvironment {
 }
 
 function Get-FreeRamGb {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute(
+        'PSUseCompatibleCommands',
+        '',
+        Justification = 'Memory inspection only runs on Windows.'
+    )]
+    [CmdletBinding()]
+    param()
     try {
         $os = Get-CimInstance Win32_OperatingSystem
         return [math]::Round($os.FreePhysicalMemory / 1MB, 1)
@@ -188,7 +196,7 @@ function Get-FreeRamGb {
     }
 }
 
-function Get-DefaultJobs {
+function Get-DefaultJobCount {
     $freeGb = Get-FreeRamGb
     $jobs = [int][math]::Floor($freeGb / 6)
     if ($jobs -lt 1) { $jobs = 1 }
@@ -204,7 +212,7 @@ function Test-RetryableFailure {
     if ($ExitCode -lt 0) { return $true }
     # NTSTATUS: STACK_BUFFER_OVERRUN, NO_MEMORY, STACK_OVERFLOW
     if ($ExitCode -in @(3221226505, 3221225495, 3221225725)) { return $true }
-    return $Text -match 'os error 1455|paging file|Файл подкачки|memory allocation of|STATUS_STACK_BUFFER_OVERRUN|0xc0000409|internal compiler error|fatal runtime error|failed to mmap|signal: 9|\bKilled\b|STATUS_NO_MEMORY|file lock on package cache|Blocking waiting for file lock'
+    return $Text -match 'os error 1455|paging file|\u0424\u0430\u0439\u043b \u043f\u043e\u0434\u043a\u0430\u0447\u043a\u0438|memory allocation of|STATUS_STACK_BUFFER_OVERRUN|0xc0000409|internal compiler error|fatal runtime error|failed to mmap|signal: 9|\bKilled\b|STATUS_NO_MEMORY|file lock on package cache|Blocking waiting for file lock'
 }
 
 function Save-BuildState {
@@ -244,10 +252,13 @@ function Read-BuildState {
 }
 
 function Invoke-CargoBuild {
-    param([int]$JobCount)
+    param(
+        [int]$JobCount,
+        [string]$CargoPackage
+    )
     $cargoArgs = @(
         'build',
-        '-p', $Package,
+        '-p', $CargoPackage,
         '--bin', $Bin,
         '--features', $Features,
         '-j', "$JobCount"
@@ -288,7 +299,7 @@ Initialize-BuildEnvironment
 
 $autoJobs = $Jobs -le 0
 if ($autoJobs) {
-    $Jobs = Get-DefaultJobs
+    $Jobs = Get-DefaultJobCount
 }
 $previous = Read-BuildState
 if ($Clean) {
@@ -311,14 +322,14 @@ $env:CARGO_INCREMENTAL = '1'
 Write-Output "cargo=$(cargo --version)"
 Write-Output "rustc=$(rustc --version)"
 Write-Output "jobs=$Jobs freeRAM=$(Get-FreeRamGb)GB log=$LogPath"
-Add-Content -Path $LogPath -Value "`n==== $(Get-Date -Format o) bin=$Bin features=$Features jobs=$Jobs release=$Release ===="
+Add-Content -Path $LogPath -Value "`n==== $(Get-Date -Format o) package=$Package bin=$Bin features=$Features jobs=$Jobs release=$Release ===="
 
 $maxAttempts = [Math]::Max(1, $Retries + 1)
 $exitCode = 1
 for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
     Write-Output "Attempt $attempt / $maxAttempts (jobs=$Jobs)"
     Save-BuildState -Attempt $attempt -JobCount $Jobs -ExitCode 0 -Reason 'running'
-    $exitCode = Invoke-CargoBuild -JobCount $Jobs
+    $exitCode = Invoke-CargoBuild -JobCount $Jobs -CargoPackage $Package
     if ($exitCode -eq 0) {
         Save-BuildState -Attempt $attempt -JobCount $Jobs -ExitCode 0 -Reason 'ok'
         $profileDir = if ($Release) { 'release' } else { 'debug' }

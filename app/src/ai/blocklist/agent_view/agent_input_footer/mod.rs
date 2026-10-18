@@ -2168,9 +2168,12 @@ impl AgentInputFooter {
     /// user is anonymous or logged out, since session sharing requires a
     /// real account.
     fn sync_remote_control_button(&self, ctx: &mut ViewContext<Self>) {
-        let login_required = AuthStateProvider::as_ref(ctx)
+        let is_anonymous_or_logged_out = AuthStateProvider::as_ref(ctx)
             .get()
             .is_anonymous_or_logged_out();
+        // Synth Warp is local-first: a self-hosted remote-control server needs no Warp account.
+        let login_required = is_anonymous_or_logged_out
+            && !crate::terminal::shared_session::self_hosted::is_enabled();
         let tooltip = if login_required {
             START_REMOTE_CONTROL_LOGIN_REQUIRED_TOOLTIP
         } else {

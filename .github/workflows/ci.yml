@@ -143,7 +143,7 @@ jobs:
 
           - os: "windows"
             name: "Windows"
-            runner: windows-latest-large
+            runner: windows-latest
             # We don't (yet) have any self-hosted Windows runners.
             is_self_hosted: false
     runs-on: ${{ matrix.runner }}
@@ -619,7 +619,7 @@ jobs:
 
           - os: "windows"
             name: "Windows"
-            runner: windows-latest-large
+            runner: windows-latest
             # We don't (yet) have any self-hosted Windows runners.
             is_self_hosted: false
             null_device: "NUL"
@@ -798,7 +798,7 @@ jobs:
 
           - os: "windows"
             name: "Windows"
-            runner: windows-latest-large
+            runner: windows-latest
             # We don't (yet) have any self-hosted Windows runners.
             is_self_hosted: false
             null_device: "NUL"

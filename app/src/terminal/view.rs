@@ -474,7 +474,7 @@ use crate::terminal::shared_session::role_change_modal::{
 };
 use crate::terminal::shared_session::{
     SharedSessionActionSource, SharedSessionScrollbackType, SharedSessionSource,
-    SharedSessionStatus,
+    SharedSessionStatus, self_hosted,
 };
 use crate::terminal::shell_recovery::{CloudShellRecoveryRequest, recovered_command_output};
 use crate::terminal::view::block_onboarding::onboarding_prompt_block::OnboardingPromptBlock;
@@ -14387,6 +14387,16 @@ impl TerminalView {
                 .add_subshell_separator(subshell_info, self.model.clone(), ctx);
         }
 
+        // Synth Warp is local-first: with `SYNTH_WARP_REMOTE_CONTROL_ALL_TERMINALS`, share each
+        // terminal once, on its first bootstrap, so a later subshell never re-shares a terminal
+        // the user stopped sharing.
+        let auto_share = !self.is_login_shell_bootstrapped
+            && self_hosted::share_all_terminals()
+            && matches!(
+                self.model.lock().shared_session_status(),
+                SharedSessionStatus::NotShared
+            );
+
         self.is_login_shell_bootstrapped = true;
         self.hide_slow_bootstrap_banner(ctx);
 
@@ -14400,6 +14410,8 @@ impl TerminalView {
             SharedSessionStatus::SharePendingPreBootstrap { source } => Some(source.clone()),
             _ => None,
         };
+        let pending_share =
+            pending_share.or_else(|| auto_share.then(|| SharedSessionSource::user(None)));
         if let Some(source) = pending_share {
             log::info!("Terminal bootstrapped with pending shared session; attempting to share");
             self.attempt_to_share_session(

@@ -335,6 +335,34 @@ impl ChannelState {
                 state.config.oz_config.oz_root_url.as_ref(),
             ),
         );
+        // Synth Warp is local-first: a self-hosted remote-control server re-enables session
+        // sharing. Runs after the subtractive filter so it wins over `OSS_CONTROL_PLANE_FEATURES`.
+        enable_self_hosted_remote_control_features_for(
+            flags,
+            state.channel,
+            state
+                .config
+                .server_config
+                .session_sharing_server_url
+                .as_deref(),
+        );
+    }
+
+    /// Whether session sharing goes to a user-run remote-control server
+    /// (`crates/remote_control_server`) rather than Warp's hosted service.
+    ///
+    /// Such a server authenticates with a shared token instead of a Warp account, so callers
+    /// use this to skip Warp login gates and ACL dialogs that cannot work there.
+    pub fn self_hosted_remote_control_enabled() -> bool {
+        let state = CHANNEL_STATE.lock();
+        self_hosted_remote_control_enabled_for(
+            state.channel,
+            state
+                .config
+                .server_config
+                .session_sharing_server_url
+                .as_deref(),
+        )
     }
 
     pub fn server_root_url() -> Cow<'static, str> {
@@ -567,6 +595,33 @@ pub fn filter_unsupported_features_for(
         for flag in WARP_HOSTED_AI_FEATURES {
             flags.remove(flag);
         }
+    }
+}
+
+/// Session-sharing flags a self-hosted remote-control server makes usable on OSS builds.
+const SELF_HOSTED_REMOTE_CONTROL_FEATURES: &[FeatureFlag] = &[
+    FeatureFlag::CreatingSharedSessions,
+    FeatureFlag::HOARemoteControl,
+    FeatureFlag::SharedSessionWriteToLongRunningCommands,
+];
+
+/// See [`ChannelState::self_hosted_remote_control_enabled`]. Warp's own sharing hosts never count,
+/// so this cannot re-enable the paid hosted service.
+pub fn self_hosted_remote_control_enabled_for(
+    channel: Channel,
+    session_sharing_server_url: Option<&str>,
+) -> bool {
+    channel == Channel::Oss
+        && session_sharing_server_url.is_some_and(|url| !is_hosted_warp_production_url(url))
+}
+
+pub fn enable_self_hosted_remote_control_features_for(
+    flags: &mut HashSet<FeatureFlag>,
+    channel: Channel,
+    session_sharing_server_url: Option<&str>,
+) {
+    if self_hosted_remote_control_enabled_for(channel, session_sharing_server_url) {
+        flags.extend(SELF_HOSTED_REMOTE_CONTROL_FEATURES);
     }
 }
 

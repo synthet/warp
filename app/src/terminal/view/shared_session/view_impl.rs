@@ -60,7 +60,7 @@ use crate::terminal::shared_session::role_change_modal::{
 use crate::terminal::shared_session::settings::SharedSessionSettings;
 use crate::terminal::shared_session::{
     COPY_LINK_TEXT, SharedSessionActionSource, SharedSessionScrollbackType, SharedSessionSource,
-    SharedSessionStatus, join_link,
+    SharedSessionStatus, join_link, self_hosted,
 };
 use crate::terminal::view::{
     ContextMenuAction, Event, InlineBannerItem, InlineBannerType, PendingUserQueryKind,
@@ -676,15 +676,20 @@ impl TerminalView {
             input.set_shared_session_presence_manager(presence_manager);
         });
         let share_source = self.pending_share_source.take();
-        let is_remote_control = matches!(share_source, Some(SharedSessionActionSource::FooterChip));
+        // Synth Warp is local-first: every self-hosted share is a remote-control share.
+        let is_remote_control = matches!(share_source, Some(SharedSessionActionSource::FooterChip))
+            || self_hosted::is_enabled();
         self.insert_shared_session_started_banner(
             scrollback_type,
             is_remote_control,
             started_at,
             ctx,
         );
+        // Synth Warp is local-first: the sharing dialog edits Warp-account ACLs, which a
+        // self-hosted server (shared-token auth) does not have.
         let skip_sharing_dialog =
-            matches!(share_source, Some(SharedSessionActionSource::FooterChip));
+            matches!(share_source, Some(SharedSessionActionSource::FooterChip))
+                || self_hosted::is_enabled();
 
         self.pane_configuration.update(ctx, |pane_config, ctx| {
             pane_config.refresh_pane_header_overflow_menu_items(ctx);
@@ -1102,7 +1107,9 @@ impl TerminalView {
         // For ambient agent shared sessions, we do not auto-revoke roles or end the
         // session due to inactivity. Clear any existing timer and return early so
         // the session stays open until explicitly closed.
-        if self.model.lock().is_shared_ambient_agent_session() {
+        // Synth Warp is local-first: the same holds for self-hosted remote control, whose only
+        // viewers hold the owner's token and whose point is driving an unattended terminal.
+        if self.model.lock().is_shared_ambient_agent_session() || self_hosted::is_enabled() {
             if let Some(sharer) = self.shared_session_sharer_mut()
                 && let Some(old_abort_handle) = sharer.inactivity_timer_abort_handle.take()
             {

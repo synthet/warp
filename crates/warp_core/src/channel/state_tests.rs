@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 
 use super::{
-    cloud_agents_enabled_for, derive_http_origin_from_ws_url, filter_unsupported_features_for,
-    is_hosted_warp_cloud_host, warp_cloud_enabled_for,
+    cloud_agents_enabled_for, derive_http_origin_from_ws_url,
+    enable_self_hosted_remote_control_features_for, filter_unsupported_features_for,
+    is_hosted_warp_cloud_host, self_hosted_remote_control_enabled_for, warp_cloud_enabled_for,
 };
 use crate::channel::{Channel, is_disabled_root_url};
 use crate::features::FeatureFlag;
@@ -287,4 +288,46 @@ fn warp_cloud_for_local_and_dev_follows_server_root() {
         Channel::Dev,
         "http://127.0.0.1:8080"
     ));
+}
+
+#[test]
+fn self_hosted_remote_control_requires_oss_and_a_non_warp_server() {
+    assert!(self_hosted_remote_control_enabled_for(
+        Channel::Oss,
+        Some("wss://rc.example.com")
+    ));
+    assert!(!self_hosted_remote_control_enabled_for(Channel::Oss, None));
+    assert!(!self_hosted_remote_control_enabled_for(
+        Channel::Oss,
+        Some("wss://sessions.app.warp.dev")
+    ));
+    // Warp's own channels already share through Warp's service; this is not a second path.
+    assert!(!self_hosted_remote_control_enabled_for(
+        Channel::Stable,
+        Some("wss://rc.example.com")
+    ));
+}
+
+#[test]
+fn self_hosted_remote_control_survives_the_oss_control_plane_filter() {
+    let mut flags = HashSet::from([FeatureFlag::HOARemoteControl, FeatureFlag::AgentView]);
+    filter_unsupported_features_for(&mut flags, Channel::Oss, false);
+    assert!(!flags.contains(&FeatureFlag::HOARemoteControl));
+
+    enable_self_hosted_remote_control_features_for(
+        &mut flags,
+        Channel::Oss,
+        Some("ws://127.0.0.1:8787"),
+    );
+    assert!(flags.contains(&FeatureFlag::HOARemoteControl));
+    assert!(flags.contains(&FeatureFlag::CreatingSharedSessions));
+    assert!(flags.contains(&FeatureFlag::SharedSessionWriteToLongRunningCommands));
+    assert!(flags.contains(&FeatureFlag::AgentView));
+}
+
+#[test]
+fn no_self_hosted_server_leaves_sharing_disabled_on_oss() {
+    let mut flags = HashSet::new();
+    enable_self_hosted_remote_control_features_for(&mut flags, Channel::Oss, None);
+    assert!(flags.is_empty());
 }

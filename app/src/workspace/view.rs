@@ -4719,7 +4719,12 @@ impl Workspace {
                     window_id,
                     session_id,
                 } => {
-                    if *window_id == ctx.window_id() {
+                    // Synth Warp is local-first: when every terminal is shared automatically,
+                    // the server's dashboard lists them, and copying a link per new tab would
+                    // keep overwriting the clipboard.
+                    if *window_id == ctx.window_id()
+                        && !terminal::shared_session::self_hosted::share_all_terminals()
+                    {
                         me.copy_shared_session_link(session_id, ctx);
                     }
                 }
@@ -12287,9 +12292,12 @@ impl Workspace {
             return false;
         }
         // TODO: remove session sharing flag check when long-running commands are included
-        FeatureFlag::CreatingSharedSessions.is_enabled()
+        let should_confirm = FeatureFlag::CreatingSharedSessions.is_enabled()
             && ContextFlag::CreateSharedSession.is_enabled()
-            && *SessionSettings::as_ref(ctx).should_confirm_close_session
+            && *SessionSettings::as_ref(ctx).should_confirm_close_session;
+        // Synth Warp is local-first: when every terminal is shared automatically, sharing is
+        // the default state of a tab, not something closing it should warn about.
+        should_confirm && !terminal::shared_session::self_hosted::share_all_terminals()
     }
 
     /// Checks if the provided tab indices need to be confirmed before closing, unless skip_confirmation is true.
@@ -16537,7 +16545,10 @@ impl Workspace {
                 ctx,
             ),
             pane_group::Event::CloseSharedSessionPaneRequested { pane_id } => {
-                if *SessionSettings::as_ref(ctx).should_confirm_close_session {
+                // Synth Warp is local-first: see `should_confirm_close_session`.
+                if *SessionSettings::as_ref(ctx).should_confirm_close_session
+                    && !terminal::shared_session::self_hosted::share_all_terminals()
+                {
                     self.show_close_session_confirmation_dialog(
                         OpenDialogSource::ClosePane {
                             pane_group_id: pane_group.id(),

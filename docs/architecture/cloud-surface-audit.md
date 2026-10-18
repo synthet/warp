@@ -126,7 +126,7 @@ descending by user visibility.
 | **`TeamUpdateManager` refresh on page open** | `main_page.rs`, `code_indexing_page.rs` | Fires a workspace-metadata network call when the page is selected |
 | **Settings-sync keybinding** | `main_page.rs` `init_actions_from_parent_view` | Still registered after the widget was removed |
 | **Privacy → Enterprise secret-redaction tab** | `privacy_page.rs` | Fed by `get_enterprise_secret_redaction_regex_list()`; renders only for an enterprise workspace |
-| **Shared-session toggles** | `features_page.rs` `ConfirmCloseSharedSessionWidget` | Local pref for a Warp-cloud feature |
+| **Shared-session toggles** | `features_page.rs` `ConfirmCloseSharedSessionWidget` | Local pref; meaningful again when a self-hosted remote-control server is configured ([guide](../guides/self-hosted-remote-control.md)) |
 | **Warp Drive workflows** | `features_page.rs` "Show Global Workflows in Command Search" | Global workflows come from Warp Drive |
 | **Agent profiles team scoping** | `agent_profiles_page.rs` | Profiles resolve through `ResolvedTeamScope`; `ExecutionProfiles` is `SyncToCloud::Globally(Yes)` |
 | **`warp.dev` docs links** | `features_page.rs`, `knowledge_page.rs`, `warpify_page.rs`, `warp_agent_page.rs` | Informational only; `util/links.rs` retargets just the privacy and feedback destinations |

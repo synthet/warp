@@ -11,3 +11,4 @@ okf_version: 0.1
 # Implemented features
 
 - [local-first.md](local-first.md) — no account required; no hosted Warp cloud; external CLI agents / BYOK
+- [self-hosted remote control](../../guides/self-hosted-remote-control.md) — share terminals to your own server; web/mobile dashboard and remote input

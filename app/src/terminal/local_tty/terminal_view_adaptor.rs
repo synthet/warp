@@ -74,7 +74,7 @@ use crate::terminal::shared_session::sharer::network::{
 };
 use crate::terminal::shared_session::{
     SharedSessionActionSource, SharedSessionScrollbackType, SharedSessionSource,
-    SharedSessionStatus, max_session_size,
+    SharedSessionStatus, max_session_size, self_hosted,
 };
 use crate::terminal::view::{ConversationRestorationInNewPaneType, Event as TerminalViewEvent};
 use crate::terminal::writeable_pty::terminal_manager_util::wire_up_remote_server_controller_with_view;
@@ -1187,13 +1187,28 @@ impl TerminalManager<TerminalView> {
                     ctx,
                 );
 
-                terminal_view.update(ctx, |view, ctx| {
-                    view.show_persistent_toast(
-                        "Something went wrong. Please try sharing again.".to_string(),
-                        ToastFlavor::Error,
-                        ctx,
-                    );
-                });
+                // Synth Warp is local-first: in share-all mode a lost session (e.g. the
+                // remote-control server restarted) is replaced instead of reported. If the
+                // server is unreachable, the new attempt fails through the usual share error.
+                if self_hosted::share_all_terminals() {
+                    terminal_view.update(ctx, |view, ctx| {
+                        view.attempt_to_share_session(
+                            SharedSessionScrollbackType::All,
+                            None,
+                            SharedSessionSource::user(None),
+                            /* bypass_conversation_guard = */ false,
+                            ctx,
+                        );
+                    });
+                } else {
+                    terminal_view.update(ctx, |view, ctx| {
+                        view.show_persistent_toast(
+                            "Something went wrong. Please try sharing again.".to_string(),
+                            ToastFlavor::Error,
+                            ctx,
+                        );
+                    });
+                }
             }
             NetworkEvent::ReconnectLimitReached { reason } => {
                 Self::shared_session_terminated(

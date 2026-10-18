@@ -16,6 +16,10 @@ Use external CLI agents (Claude Code, Codex, Gemini CLI, etc.). Those run entire
 
 The built-in Warp Agent is a different story. Its settings and BYOK/custom-endpoint fields are no longer greyed out behind a Warp login, but the client has no local inference path: it hands your keys to whatever backend `server_root_url` names and that backend does the call. This fork ships no such backend, so out of the box the built-in agent will fail when you send a message. Point it at your own MAA-compatible server with `SYNTH_WARP_SERVER_ROOT_URL` if you have one — warp.dev hosts are rejected. Hosted Warp-credit agents and Warp cloud agents (Oz) are not available here. Details: [docs/architecture/synth-fork.md](docs/architecture/synth-fork.md#byok-and-the-built-in-agent).
 
+## Can I control my terminals from my phone?
+
+Yes, through a server you run instead of Warp's hosted session sharing. Start `synth-remote-control-server`, set `SYNTH_WARP_REMOTE_CONTROL_URL` and `SYNTH_WARP_REMOTE_CONTROL_TOKEN` before launching Synth Warp, and open the server in a browser. No Warp account is needed. See [docs/guides/self-hosted-remote-control.md](docs/guides/self-hosted-remote-control.md).
+
 ## Licensing
 
 Same as upstream: AGPL v3 for the app; MIT for `warpui` / `warpui_core`. See [LICENSE-AGPL](LICENSE-AGPL) and [LICENSE-MIT](LICENSE-MIT).

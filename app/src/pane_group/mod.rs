@@ -2619,6 +2619,21 @@ impl PaneGroup {
             return;
         };
 
+        // Synth Warp is local-first: a self-hosted remote-control server authenticates with its
+        // own token, so there is no Warp login to require and no account ACLs to configure.
+        if shared_session::self_hosted::is_enabled() {
+            terminal_view.update(ctx, |view, ctx| {
+                view.attempt_to_share_session(
+                    shared_session::SharedSessionScrollbackType::All,
+                    Some(open_source),
+                    SharedSessionSource::user(None),
+                    /* bypass_conversation_guard = */ true,
+                    ctx,
+                );
+            });
+            return;
+        }
+
         if AuthStateProvider::as_ref(ctx)
             .get()
             .is_anonymous_or_logged_out()
