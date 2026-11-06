@@ -16,6 +16,7 @@ Thin hub. Failure log: [AGENTS.md](../AGENTS.md) (RCA table).
 - Overlaying this fork onto `C:\Program Files\Warp` (do not use `CHANNEL=stable`; do not uninstall official Warp): [guides/windows-local-deploy.md](guides/windows-local-deploy.md)
 - Logged-out Windows `warp-oss.exe` `[WARN]` spam (WAL, WSL GUID, empty modals, `=C:`, cloud prefs, Intel GPU): expected, not a failed launch — [guides/oss-windows-runtime-warnings.md](guides/oss-windows-runtime-warnings.md)
 - Claude Code `.sh` hook scripts opening Git Bash / an editor on Windows: [guides/claude-code-warp-windows-hooks.md](guides/claude-code-warp-windows-hooks.md)
+- Hidden Kubernetes prompt chip still spawning `kubectl`, and `pwsh` left after Warp exits: [reports/windows-prompt-chip-processes-2026-10-26.md](reports/windows-prompt-chip-processes-2026-10-26.md)
 - Bundle ID / AppId parse (`io.github.synthet.Warp*`): [technical/app-id.md](technical/app-id.md)
 - What this fork includes and excludes: [FAQ.md](../FAQ.md)
 - Deadlocks from terminal model locks: [technical/terminal-model-locking.md](technical/terminal-model-locking.md)

@@ -57,6 +57,7 @@ okf_version: 0.1
 - [agent-asset-inventory.md](agent-asset-inventory.md) — generated command/skill/subagent index
 - [reports/INDEX.md](reports/INDEX.md) — point-in-time audits
 - [reports/oss-windows-startup-warnings-2026-08-15.md](reports/oss-windows-startup-warnings-2026-08-15.md) — 2026-08-15 `warp-oss.exe` WARN snapshot
+- [reports/windows-prompt-chip-processes-2026-10-26.md](reports/windows-prompt-chip-processes-2026-10-26.md) — hidden Kubernetes chip still runs `kubectl`; leftover Windows processes
 - [archive/INDEX.md](archive/INDEX.md) — deprecated pages (OKF lint excluded)
 
 ## Zed × Warp hybrid
