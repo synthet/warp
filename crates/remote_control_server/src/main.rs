@@ -12,9 +12,9 @@ use session_sharing_protocol::common::Role;
 #[derive(Debug, Parser)]
 #[command(name = "synth-remote-control-server", version)]
 struct Args {
-    /// Address to listen on. Put a TLS-terminating proxy in front for anything but a trusted LAN
-    /// or tailnet.
-    #[arg(long, env = "SYNTH_RC_BIND", default_value = "127.0.0.1:8787")]
+    /// Address to listen on; the default covers every local IPv4 address. Put a TLS-terminating
+    /// proxy in front for anything but a trusted LAN or tailnet.
+    #[arg(long, env = "SYNTH_RC_BIND", default_value = "0.0.0.0:8787")]
     bind: SocketAddr,
 
     /// Shared secret that authorizes terminals and the web app. Generated and printed if unset.

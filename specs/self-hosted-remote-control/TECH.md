@@ -78,6 +78,11 @@ Upstream code paths are kept and gated, not deleted, per
 [cloud-surface-audit.md](../../docs/architecture/cloud-surface-audit.md#conventions-when-stripping-more).
 
 ## Known limits / follow-ups
+- A terminal shared after its command started reports idle, because `command_running` is only
+  set by `CommandExecutionStarted`. See the
+  [verification report](../../docs/reports/remote-control-verification-2026-11-05.md).
+- `pwd` is read once from the scrollback at share time, so it stays blank for a terminal shared
+  with no finished blocks.
 - Settings UI for the env vars (today: environment only).
 - The client caps a share at 100 MB (`max_session_size` default); long-lived auto-shared
   terminals end sharing when they exceed it and must be re-shared.

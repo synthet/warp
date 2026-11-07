@@ -4,6 +4,10 @@ Append-only. One line per wiki restructure, newest under the current month.
 Format: `- YYYY-MM-DD: <verb> — <details and paths>` (verbs: `created`, `updated`, `ingested`,
 `lint-fixed`, `reorganized`).
 
+## 2026-11
+
+- 2026-11-05: created — self-hosted remote control verification: [reports/remote-control-verification-2026-11-05.md](reports/remote-control-verification-2026-11-05.md). Updated the guide's troubleshooting table and the spec's known limits with what the run found.
+
 ## 2026-10
 
 - 2026-10-26: created — Windows prompt-chip processes: Kubernetes chip runs `kubectl` while hidden, and breakaway children survive exit, in [reports/windows-prompt-chip-processes-2026-10-26.md](reports/windows-prompt-chip-processes-2026-10-26.md); linked from [reports/INDEX.md](reports/INDEX.md), [INDEX.md](INDEX.md), and [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

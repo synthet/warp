@@ -20,14 +20,14 @@ Design: [specs/self-hosted-remote-control](../../specs/self-hosted-remote-contro
 ```bash
 cargo build --release -p remote_control_server
 export SYNTH_RC_TOKEN="$(openssl rand -hex 32)"   # keep this; terminals and the web app need it
-./target/release/synth-remote-control-server --bind 0.0.0.0:8787
+./target/release/synth-remote-control-server
 ```
 
 If no token is set, the server generates one and prints it at startup (valid for that run only).
 
 | Flag / env | Default | Meaning |
 |------------|---------|---------|
-| `--bind` / `SYNTH_RC_BIND` | `127.0.0.1:8787` | Listen address |
+| `--bind` / `SYNTH_RC_BIND` | `0.0.0.0:8787` | Listen address; the default covers every local IPv4 address |
 | `--token` / `SYNTH_RC_TOKEN` | generated | Shared secret |
 | `--token-file` / `SYNTH_RC_TOKEN_FILE` | — | Read the secret from a file |
 | `--owner-name` / `SYNTH_RC_OWNER_NAME` | `Owner` | Name in participant lists |
@@ -38,7 +38,8 @@ If no token is set, the server generates one and prints it at startup (valid for
 ### TLS
 
 Plain `ws://`/`http://` is only for a trusted LAN or a tailnet. Anywhere else, terminate TLS in
-front of the server, which also lets the web app install as a PWA. Caddy:
+front of the server, which also lets the web app install as a PWA. Start the server with
+`--bind 127.0.0.1:8787` so only the proxy can reach it. Caddy:
 
 ```caddyfile
 rc.example.com {
@@ -81,6 +82,37 @@ Open `https://rc.example.com`, sign in with the token, and pick a terminal.
 - When the phone is the only viewer, the terminal resizes to fit it.
 - *Add to Home Screen* installs it as an app.
 
+## Use it from a phone on your LAN
+
+The web link and QR code come from `SYNTH_WARP_REMOTE_CONTROL_URL`. With `127.0.0.1` there, they open the phone itself, so set the URL to this PC's LAN address. The server already listens on every local address.
+
+The connection is plain HTTP, so anyone who can capture traffic on the network can read the token. That token can type into every shared terminal, so do this only on a trusted network and undo it after testing.
+
+Run this in an **Administrator PowerShell**, not `cmd`, after setting `$ip` to your address (`ipconfig` shows it):
+
+```powershell
+$ip = '<lan-ip>'
+New-NetFirewallRule -DisplayName "Synth Remote (temp)" -Direction Inbound -Protocol TCP -LocalPort 8787 -LocalAddress $ip -RemoteAddress LocalSubnet -Profile Private -Action Allow
+[Environment]::SetEnvironmentVariable('SYNTH_WARP_REMOTE_CONTROL_URL',"ws://${ip}:8787",'User')
+```
+
+Then restart both apps, so they read the new values:
+
+1. Stop the server and start it from a new window. It should log `listening on http://0.0.0.0:8787`.
+2. Fully close Synth Warp and reopen it from the Start menu. This ends any agent session running inside it.
+3. Connect the phone to the same network and scan the new QR code. The PC dashboard moves to the LAN address too, so sign in there again.
+
+The QR code does not include the token, so you enter it on the phone. A password manager is the easiest way to get it there.
+
+To undo it, run this in an Administrator PowerShell, then restart both apps and replace the token:
+
+```powershell
+Remove-NetFirewallRule -DisplayName "Synth Remote (temp)"
+[Environment]::SetEnvironmentVariable('SYNTH_WARP_REMOTE_CONTROL_URL','ws://127.0.0.1:8787','User')
+```
+
+Installing the app with *Add to Home Screen* needs HTTPS; see [TLS](#tls).
+
 ## Troubleshooting
 
 | Symptom | Check |
@@ -90,3 +122,8 @@ Open `https://rc.example.com`, sign in with the token, and pick a terminal.
 | Web app keeps asking for the token | The cookie is `SameSite=Strict`; open the server's own URL, not through another site |
 | Terminal stopped appearing after a while | A share ends at 100 MB of output (client cap) or when the server restarts; share it again (with `ALL_TERMINALS=1`, a server restart re-shares automatically) |
 | Commands rejected as busy | A command is already running; use the key bar / typing instead |
+| `binding 0.0.0.0:8787` fails with os error 10048 | Another app uses the port; pass `--bind` with a free port |
+| `.exe` shows "can't run on your PC" or `Access is denied` | The file is 0 bytes. In `cmd`, pasting the prompt with the command (`C:\Users\name>D:\...\server.exe`) makes `>` overwrite the file. Rebuild with `cargo clean --release -p remote_control_server`, then `cargo build --release -p remote_control_server` |
+| Token warning says it is under 16 characters | PowerShell variables pasted into `cmd` are saved literally; set the token from PowerShell |
+| QR code or link opens `127.0.0.1` on a phone | The link comes from `SYNTH_WARP_REMOTE_CONTROL_URL`; use a LAN or HTTPS address there |
+| Terminal shows `idle` while a program runs, or mouse movement fills the command bar | Known bug when a terminal is shared after its command started; start the program in an already shared terminal. See the [verification report](../reports/remote-control-verification-2026-11-05.md) |
