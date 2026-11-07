@@ -1,7 +1,7 @@
 //! Synth Warp is local-first: remote control through a user-run server.
 //!
 //! Upstream "Remote control" shares a terminal through Warp's hosted (paid) session-sharing
-//! service. Synth Warp instead points the same sharer code at `crates/remote_control_server`,
+//! service. Synth Warp instead points the same sharer code at the server in `synthet/warp-remote`,
 //! which speaks the public session-sharing protocol, authenticates with one shared token rather
 //! than a Warp account, and serves its own web/mobile app.
 //!

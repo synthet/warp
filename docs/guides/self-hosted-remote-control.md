@@ -17,8 +17,13 @@ Design: [specs/self-hosted-remote-control](../../specs/self-hosted-remote-contro
 
 ## 1. Run the server
 
+The server lives in [synthet/warp-remote](https://github.com/synthet/warp-remote), which also has Windows binaries on its
+releases page, including a tray app.
+
 ```bash
-cargo build --release -p remote_control_server
+git clone https://github.com/synthet/warp-remote.git
+cd warp-remote
+cargo build --release
 export SYNTH_RC_TOKEN="$(openssl rand -hex 32)"   # keep this; terminals and the web app need it
 ./target/release/synth-remote-control-server
 ```

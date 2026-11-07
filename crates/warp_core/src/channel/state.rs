@@ -349,7 +349,7 @@ impl ChannelState {
     }
 
     /// Whether session sharing goes to a user-run remote-control server
-    /// (`crates/remote_control_server`) rather than Warp's hosted service.
+    /// (`synthet/warp-remote`) rather than Warp's hosted service.
     ///
     /// Such a server authenticates with a shared token instead of a Warp account, so callers
     /// use this to skip Warp login gates and ACL dialogs that cannot work there.
