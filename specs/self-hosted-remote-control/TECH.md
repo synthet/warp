@@ -8,7 +8,10 @@ the public, AGPL `session-sharing-protocol` crate (already a workspace dependenc
 sharer/viewer client code is in this repo. So the replacement is a server that implements the
 protocol plus small client gates — not a new sharing stack.
 
-## Server: `crates/remote_control_server`
+## Server: `synthet/warp-remote`
+
+The server moved out of this repository to [synthet/warp-remote](https://github.com/synthet/warp-remote). The paths below are
+relative to that repository.
 
 | File | Role |
 |------|------|

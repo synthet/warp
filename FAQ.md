@@ -18,7 +18,7 @@ The built-in Warp Agent is a different story. Its settings and BYOK/custom-endpo
 
 ## Can I control my terminals from my phone?
 
-Yes, through a server you run instead of Warp's hosted session sharing. Start `synth-remote-control-server`, set `SYNTH_WARP_REMOTE_CONTROL_URL` and `SYNTH_WARP_REMOTE_CONTROL_TOKEN` before launching Synth Warp, and open the server in a browser. No Warp account is needed. See [docs/guides/self-hosted-remote-control.md](docs/guides/self-hosted-remote-control.md).
+Yes, through a server you run instead of Warp's hosted session sharing. Start `synth-remote-control-server` from [synthet/warp-remote](https://github.com/synthet/warp-remote), set `SYNTH_WARP_REMOTE_CONTROL_URL` and `SYNTH_WARP_REMOTE_CONTROL_TOKEN` before launching Synth Warp, and open the server in a browser. No Warp account is needed. See [docs/guides/self-hosted-remote-control.md](docs/guides/self-hosted-remote-control.md).
 
 ## Licensing
 
