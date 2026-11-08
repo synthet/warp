@@ -124,6 +124,18 @@ impl Command {
         }
     }
 
+    /// Spawns the process inside Warp's job object rather than breaking away from
+    /// it, so the process is killed if Warp exits first. Meant for short-lived
+    /// helpers that have no reason to outlive Warp.
+    #[cfg(windows)]
+    pub fn stay_in_parent_job(&mut self) -> &mut Command {
+        use async_process::windows::CommandExt as _;
+
+        self.creation_flags &= !windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0;
+        self.inner.creation_flags(self.creation_flags);
+        self
+    }
+
     /// Adds a single argument to pass to the program.
     ///
     /// # Examples

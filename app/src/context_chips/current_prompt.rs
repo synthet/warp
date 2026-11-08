@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash as _, Hasher as _};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use futures::{FutureExt as _, pin_mut};
 use itertools::Itertools;
@@ -50,6 +51,38 @@ mod tests;
 const PROMPT_DEBOUNCE_PERIOD: Duration = Duration::from_millis(50);
 const PROMPT_DEBOUNCE_PERIOD_KEY: &str = "PromptDebouncePeriod";
 type ChipFingerprint = u64;
+
+/// The kubeconfig files `kubectl` reads for `session`: `$KUBECONFIG` when set, otherwise
+/// `~/.kube/config`.
+///
+/// `None` when Warp cannot read the session's files directly (remote, WSL, and MSYS2 sessions).
+/// `$KUBECONFIG` is read from Warp's environment, which local generator commands inherit.
+fn kubeconfig_paths(session: &Session) -> Option<Vec<PathBuf>> {
+    if !session.is_local() || session.is_wsl() || session.is_msys2() {
+        return None;
+    }
+    match std::env::var_os("KUBECONFIG").filter(|value| !value.is_empty()) {
+        Some(value) => Some(std::env::split_paths(&value).collect()),
+        None => Some(vec![
+            Path::new(session.home_dir()?).join(".kube").join("config"),
+        ]),
+    }
+}
+
+/// Each path paired with its modification time, or `None` when it can't be read.
+fn file_modification_stamps(
+    paths: impl IntoIterator<Item = PathBuf>,
+) -> Vec<(PathBuf, Option<SystemTime>)> {
+    paths
+        .into_iter()
+        .map(|path| {
+            let modified = std::fs::metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .ok();
+            (path, modified)
+        })
+        .collect()
+}
 
 /// The lifecycle state of a chip's value computation within a [`CurrentPrompt`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -537,6 +570,10 @@ impl CurrentPrompt {
                     if let Some(state) = self.states.get(chip_kind) {
                         state.invalidating_command_count.hash(&mut hasher);
                     }
+                }
+                ChipFingerprintInput::KubeconfigFiles => {
+                    let paths = kubeconfig_paths(context.active_session?)?;
+                    file_modification_stamps(paths).hash(&mut hasher);
                 }
             }
         }

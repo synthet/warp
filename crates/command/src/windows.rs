@@ -111,6 +111,74 @@ impl JobObject {
     }
 }
 
+/// A job object that holds one spawned process and the processes it starts, so
+/// the whole tree can be terminated together. `TerminateProcess` on the root
+/// alone leaves its children running.
+///
+/// Dropping this closes the job without terminating its members, the same way a
+/// Unix process group outlives the code that created it. Keeping members from
+/// outliving Warp is left to Warp's own job object (see [`init`]), which a child
+/// stays in when it is spawned without `CREATE_BREAKAWAY_FROM_JOB`.
+#[derive(Debug)]
+pub struct ProcessTreeJob(win32job::Job);
+
+impl ProcessTreeJob {
+    /// Creates a job and assigns the running process `pid` to it. Processes it
+    /// starts from then on join the job too.
+    ///
+    /// The caller must hold an open handle to the process, such as its `Child`,
+    /// so that `pid` cannot be reused before it is opened here.
+    pub fn assign(pid: u32) -> Result<Self, JobObjectError> {
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Threading::{
+            OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
+        };
+
+        let job = win32job::Job::create()?;
+        // SAFETY: `OpenProcess` has no preconditions; the returned handle is
+        // closed below on every path.
+        let process = unsafe { OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid) }
+            .map_err(|error| JobObjectError::AssignFailed(error.into()))?;
+        let assigned = job.assign_process(process.0 as isize);
+        // SAFETY: `process` is a handle this function opened and has not closed.
+        let _ = unsafe { CloseHandle(process) };
+        assigned?;
+        Ok(Self(job))
+    }
+
+    /// Terminates every process in the job.
+    pub fn terminate(&self) -> std::io::Result<()> {
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::System::JobObjects::TerminateJobObject;
+
+        // SAFETY: the job handle stays open for as long as `self` exists.
+        unsafe { TerminateJobObject(HANDLE(self.0.handle() as _), 1) }.map_err(Into::into)
+    }
+
+    /// The number of processes in the job that have not exited.
+    pub fn active_process_count(&self) -> std::io::Result<u32> {
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::System::JobObjects::{
+            JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JobObjectBasicAccountingInformation,
+            QueryInformationJobObject,
+        };
+
+        let mut info = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
+        // SAFETY: `info` is a correctly sized, writable buffer for this
+        // information class, and the job handle stays open for as long as `self`.
+        unsafe {
+            QueryInformationJobObject(
+                Some(HANDLE(self.0.handle() as _)),
+                JobObjectBasicAccountingInformation,
+                (&raw mut info).cast(),
+                std::mem::size_of_val(&info) as u32,
+                None,
+            )
+        }?;
+        Ok(info.ActiveProcesses)
+    }
+}
+
 /// Whether `flags` asks `CreateProcess` to break the new process out of this
 /// process's job object.
 pub(crate) fn has_breakaway(flags: u32) -> bool {
@@ -179,3 +247,7 @@ impl CommandExt for crate::r#async::Command {
         self
     }
 }
+
+#[cfg(test)]
+#[path = "windows_tests.rs"]
+mod tests;
