@@ -19,8 +19,9 @@ use crate::server::server_api::workspace::MockWorkspaceClient;
 use crate::workspaces::team::{Team, TeamVisibility};
 use crate::workspaces::user_workspaces::{TeamlessScopeForTest, UserWorkspaces};
 use crate::workspaces::workspace::{
-    AiOverages, ByoApiKeyPolicy, ByoEndpointPolicy, CustomerType, EnterpriseCreditsAutoReloadPolicy,
-    EnterprisePayAsYouGoPolicy, PurchaseAddOnCreditsPolicy, Workspace, WorkspaceUid,
+    AiOverages, ByoApiKeyPolicy, ByoEndpointPolicy, CustomerType,
+    EnterpriseCreditsAutoReloadPolicy, EnterprisePayAsYouGoPolicy, PurchaseAddOnCreditsPolicy,
+    Workspace, WorkspaceUid,
 };
 
 fn create_test_workspace() -> (WorkspaceUid, Workspace) {
