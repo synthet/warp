@@ -212,3 +212,163 @@ mod unix {
         });
     }
 }
+
+#[cfg(windows)]
+mod win {
+    use std::collections::HashMap;
+    use std::fs;
+    use std::path::Path;
+    use std::time::Duration;
+
+    use ::windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
+    use ::windows::Win32::System::Threading::{
+        OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject,
+    };
+    use async_io::Timer;
+    use futures_util::future::{AbortHandle, Abortable, Aborted};
+    use instant::Instant;
+
+    use super::super::*;
+
+    const TIMEOUT: Duration = Duration::from_secs(30);
+
+    /// Runs through `cmd.exe`, which then waits on a PowerShell descendant.
+    fn executor() -> LocalCommandExecutor {
+        LocalCommandExecutor::new(None, ShellType::PowerShell)
+    }
+
+    fn cmd_exe_options() -> ExecuteCommandOptions {
+        ExecuteCommandOptions {
+            run_command_in_same_shell_as_session: false,
+        }
+    }
+
+    fn descendant_command() -> &'static str {
+        "powershell.exe -NoProfile -NonInteractive -Command \"\
+         Set-Content -NoNewline -LiteralPath $env:READY_FILE -Value $PID; \
+         while (-not (Test-Path -LiteralPath $env:RELEASE_FILE)) { Start-Sleep -Milliseconds 50 }; \
+         Set-Content -NoNewline -LiteralPath $env:SIDE_EFFECT_FILE -Value descendant-ran\""
+    }
+
+    fn command_environment(temp_dir: &Path) -> HashMap<String, String> {
+        ["READY_FILE", "RELEASE_FILE", "SIDE_EFFECT_FILE"]
+            .into_iter()
+            .map(|name| {
+                let path = temp_dir.join(name.to_ascii_lowercase());
+                (name.to_owned(), path.to_string_lossy().into_owned())
+            })
+            .collect()
+    }
+
+    async fn wait_for_descendant_pid(path: &Path) -> u32 {
+        let deadline = Instant::now() + TIMEOUT;
+        loop {
+            if let Ok(contents) = fs::read_to_string(path)
+                && let Ok(pid) = contents.trim().parse()
+            {
+                return pid;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for descendant PID in {}",
+                path.display()
+            );
+            Timer::after(Duration::from_millis(20)).await;
+        }
+    }
+
+    fn has_exited(pid: u32) -> bool {
+        // SAFETY: the handle is closed before returning.
+        unsafe {
+            let Ok(process) = OpenProcess(PROCESS_SYNCHRONIZE, false, pid) else {
+                // The process is gone and its PID no longer resolves.
+                return true;
+            };
+            let exited = WaitForSingleObject(process, 0) == WAIT_OBJECT_0;
+            let _ = CloseHandle(process);
+            exited
+        }
+    }
+
+    async fn wait_for_process_exit(pid: u32) {
+        let deadline = Instant::now() + TIMEOUT;
+        while !has_exited(pid) {
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for descendant {pid} to exit"
+            );
+            Timer::after(Duration::from_millis(20)).await;
+        }
+    }
+
+    /// Releases the descendant and checks that it was already dead.
+    async fn assert_descendant_was_killed(temp_dir: &Path, descendant_pid: u32) {
+        fs::write(temp_dir.join("release_file"), "").expect("release descendant");
+        wait_for_process_exit(descendant_pid).await;
+        Timer::after(Duration::from_millis(300)).await;
+        let side_effect_file = temp_dir.join("side_effect_file");
+        assert!(
+            !side_effect_file.exists(),
+            "canceled descendant unexpectedly created {}",
+            side_effect_file.display()
+        );
+    }
+
+    #[test]
+    fn dropping_command_future_kills_descendant_process() {
+        futures_lite::future::block_on(async {
+            let temp_dir = tempfile::tempdir().expect("create temp dir");
+            let executor = executor();
+            let (abort_handle, abort_registration) = AbortHandle::new_pair();
+            let command = executor.execute_local_command(
+                descendant_command(),
+                None,
+                Some(command_environment(temp_dir.path())),
+                cmd_exe_options(),
+            );
+            let command = Abortable::new(command, abort_registration);
+
+            let task_executor = async_executor::LocalExecutor::new();
+            task_executor
+                .run(async {
+                    let command_task = task_executor.spawn(command);
+                    let descendant_pid =
+                        wait_for_descendant_pid(&temp_dir.path().join("ready_file")).await;
+
+                    abort_handle.abort();
+                    assert!(matches!(command_task.await, Err(Aborted)));
+
+                    assert_descendant_was_killed(temp_dir.path(), descendant_pid).await;
+                })
+                .await;
+        });
+    }
+
+    #[test]
+    fn cancel_active_commands_kills_descendant_process() {
+        futures_lite::future::block_on(async {
+            let temp_dir = tempfile::tempdir().expect("create temp dir");
+            let executor = executor();
+            let command = executor.execute_local_command(
+                descendant_command(),
+                None,
+                Some(command_environment(temp_dir.path())),
+                cmd_exe_options(),
+            );
+
+            let task_executor = async_executor::LocalExecutor::new();
+            task_executor
+                .run(async {
+                    let command_task = task_executor.spawn(command);
+                    let descendant_pid =
+                        wait_for_descendant_pid(&temp_dir.path().join("ready_file")).await;
+
+                    executor.cancel_active_commands();
+                    let _ = command_task.await;
+
+                    assert_descendant_was_killed(temp_dir.path(), descendant_pid).await;
+                })
+                .await;
+        });
+    }
+}

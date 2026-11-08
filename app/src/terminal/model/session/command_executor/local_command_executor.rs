@@ -44,9 +44,6 @@ fn terminate_process_group(process_group_id: u32) {
         }
     }
 }
-#[cfg(not(unix))]
-fn terminate_process_group(_: u32) {}
-
 #[derive(Debug, Default)]
 struct ActiveProcessGroups {
     process_groups: Mutex<HashMap<u32, Arc<ActiveProcessGroup>>>,
@@ -55,13 +52,52 @@ struct ActiveProcessGroups {
 #[derive(Debug)]
 struct ActiveProcessGroup {
     id: u32,
+    /// The job holding the command's process tree, which stands in for a process
+    /// group on Windows. `None` if the job could not be set up, in which case only
+    /// the root process is killed, by `kill_on_drop`.
+    #[cfg(windows)]
+    job: Option<command::windows::ProcessTreeJob>,
+}
+
+impl ActiveProcessGroup {
+    fn new(process_group_id: u32) -> Self {
+        Self {
+            id: process_group_id,
+            #[cfg(windows)]
+            job: command::windows::ProcessTreeJob::assign(process_group_id)
+                .inspect_err(|error| {
+                    log::warn!("Failed to put process {process_group_id} in a job object: {error}");
+                })
+                .ok(),
+        }
+    }
+
+    #[cfg(unix)]
+    fn terminate(&self) {
+        terminate_process_group(self.id);
+    }
+
+    #[cfg(windows)]
+    fn terminate(&self) {
+        let Some(job) = &self.job else {
+            return;
+        };
+        let id = self.id;
+        match job.terminate() {
+            Ok(()) => log::info!("Terminated the job object for process {id}"),
+            Err(error) => {
+                log::warn!("Failed to terminate the job object for process {id}: {error}")
+            }
+        }
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    fn terminate(&self) {}
 }
 
 impl ActiveProcessGroups {
     fn register(&self, process_group_id: u32) -> Arc<ActiveProcessGroup> {
-        let process_group = Arc::new(ActiveProcessGroup {
-            id: process_group_id,
-        });
+        let process_group = Arc::new(ActiveProcessGroup::new(process_group_id));
         self.process_groups
             .lock()
             .insert(process_group_id, process_group.clone());
@@ -86,7 +122,7 @@ impl ActiveProcessGroups {
 
     fn cancel(&self, process_group: &Arc<ActiveProcessGroup>) {
         if self.remove(process_group) {
-            terminate_process_group(process_group.id);
+            process_group.terminate();
         }
     }
 
@@ -311,6 +347,11 @@ impl LocalCommandExecutor {
         if let Some(current_directory_path) = current_directory_path {
             command_process.current_dir(current_directory_path);
         }
+
+        // Generator commands are short-lived probes, so keep them in Warp's job
+        // object: if Warp exits first, they exit with it.
+        #[cfg(windows)]
+        command_process.stay_in_parent_job();
 
         // The purpose of the executor is to produce output. If the child
         // has been dropped, there's no way to get the output anymore,
