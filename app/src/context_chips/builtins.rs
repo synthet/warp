@@ -140,7 +140,11 @@ pub fn shell_git_branch() -> ShellCommandGenerator {
         (ShellType::Fish, SH_COMMAND.to_string()),
     ]);
 
-    ShellCommandGenerator::new(command, Some(vec!["git".to_owned()]))
+    ShellCommandGenerator::new(command, Some(vec!["git".to_owned()])).with_cmd_exe_command(
+        safe_git_cmd_exe(
+            "(git symbolic-ref --short HEAD 2>nul || git rev-parse --short HEAD 2>nul)",
+        ),
+    )
 }
 
 pub fn shell_other_git_branches() -> ShellCommandGenerator {
@@ -160,7 +164,14 @@ pub fn shell_other_git_branches() -> ShellCommandGenerator {
         (ShellType::Fish, SH_COMMAND.to_string()),
     ]);
 
-    ShellCommandGenerator::new(command, Some(vec!["git".to_owned()]))
+    // `echo` prints the record separator (U+001E) on its own line, like `[char]30` above.
+    ShellCommandGenerator::new(command, Some(vec!["git".to_owned()])).with_cmd_exe_command(
+        safe_git_cmd_exe(
+            "git --no-optional-locks branch --no-color --sort=-committerdate & \
+             echo \u{1e}& \
+             git --no-optional-locks worktree list --porcelain",
+        ),
+    )
 }
 
 pub fn shell_git_branch_status() -> ShellCommandGenerator {
@@ -243,14 +254,18 @@ pub fn shell_git_line_changes() -> ShellCommandGenerator {
         ),
     ]);
 
-    ShellCommandGenerator::new(command, Some(vec!["git".to_owned()]))
+    ShellCommandGenerator::new(command, Some(vec!["git".to_owned()])).with_cmd_exe_command(
+        safe_git_cmd_exe("git -c diff.autoRefreshIndex=false diff --shortstat HEAD"),
+    )
 }
 
 pub fn kubernetes_current_context() -> ShellCommandGenerator {
+    const COMMAND: &str = "kubectl config current-context";
     ShellCommandGenerator::new(
-        ShellCommand::portable("kubectl config current-context"),
+        ShellCommand::portable(COMMAND),
         Some(vec!["kubectl".to_owned()]),
     )
+    .with_cmd_exe_command(COMMAND)
 }
 
 /// Generator function that shows the current svn "branch".
@@ -284,6 +299,13 @@ pub fn svn_dirty_items() -> ShellCommandGenerator {
         (ShellType::PowerShell, PWSH_COMMAND.to_string()),
     ]);
     ShellCommandGenerator::new(command, Some(vec!["svn".to_owned()]))
+}
+
+/// Runs `cmd` in `cmd.exe` with `GIT_OPTIONAL_LOCKS=0`. The variable is only set inside that
+/// short-lived `cmd.exe`, so nothing needs restoring. `cmd.exe` exits with the status of the
+/// last command it ran.
+fn safe_git_cmd_exe(cmd: &str) -> String {
+    format!("set \"GIT_OPTIONAL_LOCKS=0\" & {cmd}")
 }
 
 fn safe_git_powershell(cmd: &str) -> String {

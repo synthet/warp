@@ -69,6 +69,25 @@ fn kubeconfig_paths(session: &Session) -> Option<Vec<PathBuf>> {
     }
 }
 
+/// Whether a generator's `cmd.exe` command should replace its shell command for `session`.
+///
+/// Only Windows' [`LocalCommandExecutor`] for a PowerShell session runs commands through
+/// `cmd.exe` when asked to; every other executor would hand `cmd.exe` syntax to PowerShell.
+/// `cmd.exe` also can't use a UNC path (`\\server\share`, `\\wsl$\...`) as its working
+/// directory, so those keep the PowerShell command.
+///
+/// [`LocalCommandExecutor`]: crate::terminal::model::session::LocalCommandExecutor
+fn runs_cmd_exe_locally(session: &Session, current_dir_path: Option<&str>) -> bool {
+    cfg!(windows)
+        && session.shell().shell_type() == crate::terminal::shell::ShellType::PowerShell
+        && session.is_using_local_command_execution()
+        && !current_dir_path.is_some_and(is_unc_path)
+}
+
+fn is_unc_path(path: &str) -> bool {
+    path.starts_with(r"\\") || path.starts_with("//")
+}
+
 /// Each path paired with its modification time, or `None` when it can't be read.
 fn file_modification_stamps(
     paths: impl IntoIterator<Item = PathBuf>,
@@ -238,6 +257,7 @@ struct ShellCommandExecutionContext {
     current_dir_path: Option<String>,
     environment_variables: Option<HashMap<String, String>>,
     shell_type: crate::terminal::shell::ShellType,
+    options: ExecuteCommandOptions,
 }
 
 impl CurrentPrompt {
@@ -647,12 +667,27 @@ impl CurrentPrompt {
 
         let session = session?;
         let shell_type = session.shell().shell_type();
-        let command = cmd.command().for_shell(shell_type).map(str::to_owned)?;
 
         let current_dir_path = latest_context
             .active_block_metadata
             .current_working_directory()
             .map(ToOwned::to_owned);
+
+        let cmd_exe_command = cmd
+            .cmd_exe_command()
+            .filter(|_| runs_cmd_exe_locally(&session, current_dir_path.as_deref()));
+        let (command, options) = match cmd_exe_command {
+            Some(command) => (
+                command.to_owned(),
+                ExecuteCommandOptions {
+                    run_command_in_same_shell_as_session: false,
+                },
+            ),
+            None => (
+                cmd.command().for_shell(shell_type).map(str::to_owned)?,
+                ExecuteCommandOptions::default(),
+            ),
+        };
 
         let path_env_var = session.path().as_deref().map(str::to_owned);
         if let (Some(path_var), Some(env_vars)) = (path_env_var, environment_variables.as_mut()) {
@@ -665,6 +700,7 @@ impl CurrentPrompt {
             current_dir_path,
             environment_variables,
             shell_type,
+            options,
         })
     }
 
@@ -680,6 +716,7 @@ impl CurrentPrompt {
         command: String,
         current_dir_path: Option<String>,
         environment_variables: Option<HashMap<String, String>>,
+        options: ExecuteCommandOptions,
         timeout: Option<Duration>,
     ) -> (Option<warp_completer::completer::CommandOutput>, bool) {
         let command_future = session
@@ -687,7 +724,7 @@ impl CurrentPrompt {
                 &command,
                 current_dir_path.as_deref(),
                 environment_variables,
-                ExecuteCommandOptions::default(),
+                options,
             )
             .fuse();
         let timeout_future = match timeout {
@@ -769,12 +806,14 @@ impl CurrentPrompt {
         if self.maybe_skip_fetch_due_to_matching_fingerprint(
             chip_kind,
             fingerprint,
-            allow_fingerprint_skip,
+            allow_fingerprint_skip && !chip.runtime_policy().refetch_successes(),
         ) {
             return;
         }
 
+        // Only shell commands can fail; contextual generators read values Warp already has.
         if chip.runtime_policy().suppress_on_failure()
+            && matches!(generator, PromptGenerator::ShellCommand(_))
             && let Some(state) = self.states.get(chip_kind)
             && let Some(current_fp) = &fingerprint
             && state.last_failure_fingerprint.as_ref() == Some(current_fp)
@@ -818,6 +857,7 @@ impl CurrentPrompt {
                             exec_ctx.command.clone(),
                             exec_ctx.current_dir_path.clone(),
                             exec_ctx.environment_variables.clone(),
+                            exec_ctx.options,
                             timeout,
                         )
                         .await;
@@ -966,6 +1006,7 @@ impl CurrentPrompt {
                     exec_ctx.command.clone(),
                     exec_ctx.current_dir_path.clone(),
                     exec_ctx.environment_variables.clone(),
+                    exec_ctx.options,
                     timeout,
                 )
                 .await;

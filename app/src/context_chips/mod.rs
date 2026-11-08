@@ -32,7 +32,9 @@ use warpui::fonts::{Properties, Weight};
 pub use self::context_chip::{
     ChipAvailability, ChipDisabledReason, ChipRuntimeCapabilities, ExternalCommandsAvailability,
 };
-use self::context_chip::{ChipFingerprintInput, ChipRuntimePolicy, ContextChip, RefreshConfig};
+use self::context_chip::{
+    ChipFingerprintInput, ChipRuntimePolicy, ContextChip, RefreshConfig, ShellCommandGenerator,
+};
 use self::renderer::RendererStyles;
 use crate::appearance::Appearance;
 use crate::features::FeatureFlag;
@@ -137,6 +139,36 @@ const GIT_REFRESH_CONFIG: RefreshConfig =
     RefreshConfig::Periodically {
         interval: Duration::from_secs(30),
     };
+
+/// A shell-backed Git chip. A failed command, usually "not a git repository", is not retried
+/// until the working directory changes or a `git` command finishes. A successful one still
+/// reruns on every refresh, because the branch can change without either.
+fn git_shell_chip(
+    title: &str,
+    generator: ShellCommandGenerator,
+    on_click_generator: Option<ShellCommandGenerator>,
+) -> ContextChip {
+    let runtime_policy = ChipRuntimePolicy::new(
+        generator.dependencies().to_vec(),
+        false,
+        None,
+        [
+            ChipFingerprintInput::SessionId,
+            ChipFingerprintInput::WorkingDirectory,
+            ChipFingerprintInput::InvalidatingCommandCount,
+        ],
+    )
+    .with_suppress_on_failure()
+    .with_refetch_successes()
+    .with_invalidate_on_commands(["git"]);
+    ContextChip::shell_builtin_with_runtime_policy(
+        title,
+        generator,
+        on_click_generator,
+        GIT_REFRESH_CONFIG,
+        runtime_policy,
+    )
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChipResult {
@@ -304,28 +336,21 @@ impl ContextChipKind {
                 log::warn!("Tried to use custom chip {title}");
                 None
             }
-            Self::ShellGitBranch => Some(ContextChip::shell_builtin(
+            Self::ShellGitBranch => Some(git_shell_chip(
                 "Git Branch",
                 builtins::shell_git_branch(),
                 Some(builtins::shell_other_git_branches()),
-                GIT_REFRESH_CONFIG,
             )),
-            Self::GitBranchStatus => Some(ContextChip::shell_builtin(
+            Self::GitBranchStatus => Some(git_shell_chip(
                 "Git Branch Status",
                 builtins::shell_git_branch_status(),
                 // Same branch list as ShellGitBranch, so clicking the chip
                 // opens the same branch-switcher menu.
                 Some(builtins::shell_other_git_branches()),
-                GIT_REFRESH_CONFIG,
             )),
             Self::GitDiffStats => Some(
-                ContextChip::shell_builtin(
-                    "Git Diff Stats",
-                    builtins::shell_git_line_changes(),
-                    None,
-                    GIT_REFRESH_CONFIG,
-                )
-                .with_allow_empty_value(),
+                git_shell_chip("Git Diff Stats", builtins::shell_git_line_changes(), None)
+                    .with_allow_empty_value(),
             ),
             Self::GithubPullRequest if !FeatureFlag::GithubPrPromptChip.is_enabled() => None,
             Self::GithubPullRequest => Some(ContextChip::builtin(

@@ -1317,3 +1317,153 @@ fn test_failed_kubernetes_chip_is_not_rerun_on_later_prompts() {
         });
     });
 }
+
+/// Renders one prompt per entry in `working_directories` with only `chip` enabled, answering
+/// its commands with `outputs` in order, and returns the commands that ran.
+fn commands_run_for_prompts(
+    chip: ContextChipKind,
+    outputs: Vec<CommandOutput>,
+    working_directories: &'static [&'static str],
+) -> Vec<String> {
+    let commands = Arc::new(Mutex::new(Vec::new()));
+    let commands_for_test = commands.clone();
+    App::test((), move |mut app| async move {
+        let session_id = SessionId::from(321);
+        app.add_singleton_model(move |_| {
+            Prompt::mock_with([chip], false, WarpPromptSeparator::None)
+        });
+        app.add_singleton_model(SessionSettings::new_with_defaults);
+        app.add_singleton_model(|_| History::new(vec![]));
+        app.add_singleton_model(|_ctx| {
+            settings::PublicPreferences::new(
+                Box::<user_preferences::in_memory::InMemoryPreferences>::default(),
+            )
+        });
+        app.add_singleton_model(|_| {
+            settings::PrivatePreferences::new(
+                Box::<user_preferences::in_memory::InMemoryPreferences>::default(),
+            )
+        });
+        app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+        app.add_singleton_model(|_| AuthStateProvider::new_for_test());
+        app.add_singleton_model(AppTelemetryContextProvider::new_context_provider);
+        app.add_singleton_model(AuthManager::new_for_test);
+        app.add_singleton_model(|_| crate::settings::manager::SettingsManager::default());
+        crate::settings::InputSettings::register(&mut app);
+        app.update(crate::settings::AISettings::register_and_subscribe_to_events);
+        app.add_singleton_model(crate::workspaces::user_workspaces::UserWorkspaces::default_mock);
+        #[cfg(windows)]
+        app.add_singleton_model(SystemInfo::new);
+
+        let executor = Arc::new(RecordingCommandExecutor::with_outputs(outputs));
+        let sessions = app.add_model(|ctx| {
+            let mut sessions = Sessions::new_for_test().with_command_executor(executor.clone());
+            sessions.initialize_bootstrapped_session(
+                SessionInfo::new_for_test().with_id(session_id),
+                "test command".to_string(),
+                vec![],
+                None,
+                ctx,
+            );
+            sessions
+        });
+        let current_prompt = app.add_model(move |ctx| CurrentPrompt::new(sessions, ctx));
+        executor.clear();
+
+        for cwd in working_directories {
+            current_prompt
+                .update(&mut app, |current_prompt, ctx| {
+                    current_prompt.latest_context = Some(PromptContext {
+                        active_block_metadata: BlockMetadata::new(
+                            Some(session_id),
+                            Some(cwd.to_string()),
+                        ),
+                        environment: Environment::default(),
+                    });
+                    current_prompt.update_states_with_new_context(ctx);
+                    current_prompt.await_generators(ctx)
+                })
+                .await;
+        }
+
+        *commands_for_test.lock() = executor.commands.lock().clone();
+    });
+    commands.lock().clone()
+}
+
+fn not_a_git_repository() -> CommandOutput {
+    RecordingCommandExecutor::failure_output(
+        "fatal: not a git repository (or any of the parent directories): .git",
+        ExitCode::from(128),
+    )
+}
+
+#[test]
+fn test_failed_git_chip_is_not_rerun_until_the_directory_changes() {
+    let commands = commands_run_for_prompts(
+        ContextChipKind::GitDiffStats,
+        (0..4).map(|_| not_a_git_repository()).collect(),
+        &["/tmp/plain", "/tmp/plain", "/tmp/plain", "/tmp/other"],
+    );
+
+    assert_eq!(
+        commands.len(),
+        2,
+        "expected one run per directory, got {commands:?}"
+    );
+}
+
+#[test]
+fn test_successful_git_chip_reruns_in_the_same_directory() {
+    let commands = commands_run_for_prompts(
+        ContextChipKind::GitDiffStats,
+        (0..2)
+            .map(|_| RecordingCommandExecutor::success_output("1 file changed"))
+            .collect(),
+        &["/tmp/repo", "/tmp/repo"],
+    );
+
+    assert_eq!(
+        commands.len(),
+        2,
+        "expected a run per prompt, got {commands:?}"
+    );
+}
+
+#[test]
+fn test_git_chips_back_off_failures_but_refetch_successes() {
+    for kind in [
+        ContextChipKind::ShellGitBranch,
+        ContextChipKind::GitBranchStatus,
+        ContextChipKind::GitDiffStats,
+    ] {
+        let chip = kind.to_chip().expect("git chip should exist");
+        let policy = chip.runtime_policy();
+        assert!(policy.suppress_on_failure(), "{kind:?}");
+        assert!(policy.refetch_successes(), "{kind:?}");
+        assert_eq!(
+            policy.invalidate_on_commands(),
+            ["git".to_string()],
+            "{kind:?}"
+        );
+        assert_eq!(
+            policy.fingerprint_inputs(),
+            [
+                ChipFingerprintInput::SessionId,
+                ChipFingerprintInput::WorkingDirectory,
+                ChipFingerprintInput::InvalidatingCommandCount,
+            ],
+            "{kind:?}"
+        );
+    }
+}
+
+#[test]
+fn test_is_unc_path() {
+    assert!(super::is_unc_path(r"\\server\share\dir"));
+    assert!(super::is_unc_path(r"\\wsl$\Ubuntu\home"));
+    assert!(!super::is_unc_path(r"\Users\me"));
+    assert!(super::is_unc_path("//server/share"));
+    assert!(!super::is_unc_path(r"C:\Users\me"));
+    assert!(!super::is_unc_path("G:/My Drive"));
+}

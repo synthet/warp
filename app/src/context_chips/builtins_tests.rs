@@ -133,3 +133,112 @@ fn test_node_version() {
         Some("v18.0.0")
     );
 }
+
+/// Runs each generator's `cmd.exe` command the way a local PowerShell session on Windows does.
+#[cfg(windows)]
+mod cmd_exe {
+    use std::path::Path;
+
+    use command::blocking::Command;
+    use warp_completer::completer::CommandOutput;
+
+    use crate::terminal::model::session::{ExecuteCommandOptions, LocalCommandExecutor};
+    use crate::terminal::shell::ShellType;
+
+    fn git(repo: &Path, args: &[&str]) {
+        let status = Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .status()
+            .expect("run git");
+        assert!(status.success(), "git {args:?} failed");
+    }
+
+    fn init_repo(dir: &Path) {
+        git(dir, &["init", "-q", "-b", "main"]);
+        std::fs::write(dir.join("file.txt"), "one\n").expect("write file");
+        git(dir, &["add", "file.txt"]);
+        git(
+            dir,
+            &[
+                "-c",
+                "user.name=test",
+                "-c",
+                "user.email=test@example.com",
+                "commit",
+                "-q",
+                "-m",
+                "init",
+            ],
+        );
+    }
+
+    fn run(generator: super::super::ShellCommandGenerator, dir: &Path) -> CommandOutput {
+        let command = generator
+            .cmd_exe_command()
+            .expect("generator should have a cmd.exe command")
+            .to_owned();
+        futures_lite::future::block_on(
+            LocalCommandExecutor::new(None, ShellType::PowerShell).execute_local_command(
+                &command,
+                dir.to_str(),
+                None,
+                ExecuteCommandOptions {
+                    run_command_in_same_shell_as_session: false,
+                },
+            ),
+        )
+        .expect("execute cmd.exe command")
+    }
+
+    fn stdout(output: &CommandOutput) -> String {
+        output.to_string().expect("utf-8 stdout")
+    }
+
+    #[test]
+    fn git_branch_prints_the_current_branch() {
+        let repo = tempfile::tempdir().expect("create temp dir");
+        init_repo(repo.path());
+
+        let output = run(super::super::shell_git_branch(), repo.path());
+        assert!(output.success(), "{output:?}");
+        assert_eq!(stdout(&output).trim(), "main");
+    }
+
+    #[test]
+    fn git_branch_fails_outside_a_repository() {
+        let dir = tempfile::tempdir().expect("create temp dir");
+
+        let output = run(super::super::shell_git_branch(), dir.path());
+        assert!(!output.success(), "{output:?}");
+        assert!(stdout(&output).trim().is_empty());
+    }
+
+    #[test]
+    fn git_line_changes_reports_the_diff() {
+        let repo = tempfile::tempdir().expect("create temp dir");
+        init_repo(repo.path());
+        std::fs::write(repo.path().join("file.txt"), "one\ntwo\n").expect("modify file");
+
+        let output = run(super::super::shell_git_line_changes(), repo.path());
+        assert!(output.success(), "{output:?}");
+        assert_eq!(stdout(&output).trim(), "1 file changed, 1 insertion(+)");
+    }
+
+    #[test]
+    fn other_git_branches_separates_branches_from_worktrees() {
+        let repo = tempfile::tempdir().expect("create temp dir");
+        init_repo(repo.path());
+
+        let output = run(super::super::shell_other_git_branches(), repo.path());
+        assert!(output.success(), "{output:?}");
+        let stdout = stdout(&output);
+        let lines: Vec<&str> = stdout.lines().map(str::trim).collect();
+        let separator = lines
+            .iter()
+            .position(|line| *line == "\u{1e}")
+            .unwrap_or_else(|| panic!("no record separator line in {stdout:?}"));
+        assert_eq!(lines[..separator], ["* main"]);
+        assert!(lines[separator + 1].starts_with("worktree "), "{stdout:?}");
+    }
+}

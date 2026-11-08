@@ -1164,6 +1164,15 @@ impl Session {
             .is_some()
     }
 
+    /// Returns true if the session runs generators with a [`LocalCommandExecutor`].
+    pub fn is_using_local_command_execution(&self) -> bool {
+        self.command_executor
+            .read()
+            .as_ref()
+            .as_any()
+            .is::<LocalCommandExecutor>()
+    }
+
     /// Returns `true` if already attempted to load external commands for the `Session`.
     pub fn has_attempted_to_load_external_commands(&self) -> bool {
         self.load_external_commands_future.get().is_some()

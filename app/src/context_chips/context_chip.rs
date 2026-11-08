@@ -12,6 +12,10 @@ use crate::terminal::shell::ShellType;
 pub struct ShellCommandGenerator {
     command: ShellCommand,
     dependencies: Vec<String>,
+    /// The same command in `cmd.exe` syntax. Local PowerShell sessions on Windows run this
+    /// instead of the PowerShell command, so they skip PowerShell's startup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cmd_exe_command: Option<String>,
 }
 
 /// Representation of a shell command. The command may or may not be supported on all shells.
@@ -46,7 +50,17 @@ impl ShellCommandGenerator {
         Self {
             command,
             dependencies: dependencies.unwrap_or_default(),
+            cmd_exe_command: None,
         }
+    }
+
+    pub fn cmd_exe_command(&self) -> Option<&str> {
+        self.cmd_exe_command.as_deref()
+    }
+
+    pub fn with_cmd_exe_command(mut self, command: impl Into<String>) -> Self {
+        self.cmd_exe_command = Some(command.into());
+        self
     }
 }
 
@@ -238,6 +252,9 @@ pub struct ChipRuntimePolicy {
     /// Top-level command names (e.g. `["git", "gh", "gt"]`) whose execution should
     /// invalidate this chip's fingerprint. Pair with `ChipFingerprintInput::InvalidatingCommandCount`.
     invalidate_on_commands: Vec<String>,
+    /// When true, the fingerprint is only used by `suppress_on_failure`: a successful result is
+    /// recomputed on every fetch even if the fingerprint hasn't changed.
+    refetch_successes: bool,
 }
 
 impl ChipRuntimePolicy {
@@ -254,6 +271,7 @@ impl ChipRuntimePolicy {
             fingerprint_inputs: fingerprint_inputs.into_iter().collect(),
             suppress_on_failure: false,
             invalidate_on_commands: Vec::new(),
+            refetch_successes: false,
         }
     }
 
@@ -284,6 +302,15 @@ impl ChipRuntimePolicy {
 
     pub fn with_suppress_on_failure(mut self) -> Self {
         self.suppress_on_failure = true;
+        self
+    }
+
+    pub fn refetch_successes(&self) -> bool {
+        self.refetch_successes
+    }
+
+    pub fn with_refetch_successes(mut self) -> Self {
+        self.refetch_successes = true;
         self
     }
 
