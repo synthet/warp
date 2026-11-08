@@ -333,12 +333,28 @@ impl ContextChipKind {
                 |_| None,
                 RefreshConfig::OnDemandOnly,
             )),
-            Self::KubernetesContext => Some(ContextChip::shell_builtin(
-                "Kubernetes Context",
-                builtins::kubernetes_current_context(),
-                None,
-                RefreshConfig::OnDemandOnly,
-            )),
+            Self::KubernetesContext => {
+                let generator = builtins::kubernetes_current_context();
+                // `kubectl config current-context` only reads the kubeconfig, so its result,
+                // including "current-context is not set", holds until that file changes.
+                let runtime_policy = ChipRuntimePolicy::new(
+                    generator.dependencies().to_vec(),
+                    false,
+                    None,
+                    [
+                        ChipFingerprintInput::SessionId,
+                        ChipFingerprintInput::KubeconfigFiles,
+                    ],
+                )
+                .with_suppress_on_failure();
+                Some(ContextChip::shell_builtin_with_runtime_policy(
+                    "Kubernetes Context",
+                    generator,
+                    None,
+                    RefreshConfig::OnDemandOnly,
+                    runtime_policy,
+                ))
+            }
             Self::SvnBranch => Some(ContextChip::shell_builtin(
                 "Svn Branch",
                 builtins::svn_branch_context(),

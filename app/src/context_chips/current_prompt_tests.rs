@@ -24,7 +24,7 @@ use crate::code_review::diff_state::DiffStats;
 use crate::code_review::git_repo_model::{GitRepoStatusModel, GitStatusMetadata};
 #[cfg(feature = "local_fs")]
 use crate::code_review::github_repo_model::GitHubRepoModel;
-use crate::context_chips::context_chip::{Environment, PromptGenerator};
+use crate::context_chips::context_chip::{ChipFingerprintInput, Environment, PromptGenerator};
 #[cfg(feature = "local_fs")]
 use crate::context_chips::display_chip::GitBranchTrackingStatus;
 use crate::context_chips::prompt::Prompt;
@@ -1179,4 +1179,141 @@ impl CommandExecutor for RecordingCommandExecutor {
     fn supports_parallel_command_execution(&self) -> bool {
         false
     }
+}
+
+#[test]
+fn test_kubernetes_chip_runtime_policy_suppresses_failures_until_kubeconfig_changes() {
+    let chip = ContextChipKind::KubernetesContext
+        .to_chip()
+        .expect("kubernetes chip should exist");
+    let policy = chip.runtime_policy();
+    assert!(policy.suppress_on_failure());
+    assert_eq!(
+        policy.fingerprint_inputs(),
+        [
+            ChipFingerprintInput::SessionId,
+            ChipFingerprintInput::KubeconfigFiles,
+        ]
+    );
+    assert_eq!(policy.required_executables(), ["kubectl".to_string()]);
+}
+
+#[test]
+fn test_file_modification_stamps_change_when_file_is_written() {
+    let temp_dir = tempfile::tempdir().expect("create temp dir");
+    let path = temp_dir.path().join("config");
+
+    let missing = super::file_modification_stamps([path.clone()]);
+    assert_eq!(missing, [(path.clone(), None)]);
+
+    std::fs::write(&path, "apiVersion: v1\n").expect("write kubeconfig");
+    let written = super::file_modification_stamps([path.clone()]);
+    assert!(written[0].1.is_some());
+    assert_ne!(missing, written);
+
+    let earlier = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1);
+    std::fs::File::options()
+        .write(true)
+        .open(&path)
+        .and_then(|file| file.set_modified(earlier))
+        .expect("set kubeconfig mtime");
+    let rewritten = super::file_modification_stamps([path.clone()]);
+    assert_eq!(rewritten, [(path, Some(earlier))]);
+    assert_ne!(written, rewritten);
+}
+
+#[test]
+fn test_failed_kubernetes_chip_is_not_rerun_on_later_prompts() {
+    App::test((), |mut app| async move {
+        let session_id = SessionId::from(789);
+        app.add_singleton_model(|_| {
+            Prompt::mock_with(
+                [ContextChipKind::KubernetesContext],
+                false,
+                WarpPromptSeparator::None,
+            )
+        });
+        app.add_singleton_model(SessionSettings::new_with_defaults);
+        app.add_singleton_model(|_| History::new(vec![]));
+        app.add_singleton_model(|_ctx| {
+            settings::PublicPreferences::new(
+                Box::<user_preferences::in_memory::InMemoryPreferences>::default(),
+            )
+        });
+        app.add_singleton_model(|_| {
+            settings::PrivatePreferences::new(
+                Box::<user_preferences::in_memory::InMemoryPreferences>::default(),
+            )
+        });
+        app.add_singleton_model(|_| ServerApiProvider::new_for_test());
+        app.add_singleton_model(|_| AuthStateProvider::new_for_test());
+        app.add_singleton_model(AppTelemetryContextProvider::new_context_provider);
+        app.add_singleton_model(AuthManager::new_for_test);
+        app.add_singleton_model(|_| crate::settings::manager::SettingsManager::default());
+        crate::settings::InputSettings::register(&mut app);
+        app.update(crate::settings::AISettings::register_and_subscribe_to_events);
+        app.add_singleton_model(crate::workspaces::user_workspaces::UserWorkspaces::default_mock);
+        #[cfg(windows)]
+        app.add_singleton_model(SystemInfo::new);
+
+        let not_configured = || {
+            RecordingCommandExecutor::failure_output(
+                "error: current-context is not set",
+                ExitCode::from(1),
+            )
+        };
+        let executor = Arc::new(RecordingCommandExecutor::with_outputs([
+            not_configured(),
+            not_configured(),
+            not_configured(),
+        ]));
+        let sessions = app.add_model(|ctx| {
+            let mut sessions = Sessions::new_for_test().with_command_executor(executor.clone());
+            sessions.initialize_bootstrapped_session(
+                SessionInfo::new_for_test().with_id(session_id),
+                "test command".to_string(),
+                vec![],
+                None,
+                ctx,
+            );
+            sessions
+        });
+        let current_prompt = app.add_model(move |ctx| CurrentPrompt::new(sessions, ctx));
+        executor.clear();
+
+        // Render three prompts in different directories without touching the kubeconfig.
+        for cwd in ["/tmp/one", "/tmp/two", "/tmp/three"] {
+            current_prompt
+                .update(&mut app, |current_prompt, ctx| {
+                    current_prompt.latest_context = Some(PromptContext {
+                        active_block_metadata: BlockMetadata::new(
+                            Some(session_id),
+                            Some(cwd.to_string()),
+                        ),
+                        environment: Environment::default(),
+                    });
+                    current_prompt.update_states_with_new_context(ctx);
+                    current_prompt.await_generators(ctx)
+                })
+                .await;
+        }
+
+        let kubectl_runs = executor
+            .commands
+            .lock()
+            .iter()
+            .filter(|command| command.contains("kubectl config current-context"))
+            .count();
+        assert_eq!(kubectl_runs, 1, "kubectl should run once, then back off");
+
+        app.read(|ctx| {
+            let state = current_prompt
+                .as_ref(ctx)
+                .states
+                .get(&ContextChipKind::KubernetesContext)
+                .expect("expected kubernetes chip state");
+            assert!(state.last_failure_fingerprint.is_some());
+            assert!(state.last_computed_value.is_none());
+        });
+    });
 }

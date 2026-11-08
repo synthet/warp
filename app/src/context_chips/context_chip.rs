@@ -216,6 +216,10 @@ pub enum ChipFingerprintInput {
     /// A per-chip monotonic counter that increments each time a user command matching
     /// the chip's `invalidate_on_commands` list completes, causing the fingerprint to change.
     InvalidatingCommandCount,
+    /// The paths and modification times of the kubeconfig files `kubectl` reads. Only available
+    /// for local sessions whose files Warp can read directly; elsewhere the chip has no
+    /// fingerprint and runs on every fetch.
+    KubeconfigFiles,
 }
 
 /// Configuration that governs how a chip interacts with the runtime environment: which
