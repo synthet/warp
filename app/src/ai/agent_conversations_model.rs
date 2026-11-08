@@ -2119,6 +2119,9 @@ impl AgentConversationsModel {
         if !ChannelState::cloud_agents_enabled() {
             return;
         }
+        if !AppExecutionMode::as_ref(ctx).can_fetch_agent_runs_for_management() {
+            return;
+        }
 
         let ai_client = ServerApiProvider::handle(ctx).as_ref(ctx).get_ai_client();
         let task_filter = self.build_task_list_filter(filters, current_user_uid);

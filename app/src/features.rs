@@ -441,6 +441,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::QueueSlashCommand,
         #[cfg(feature = "queued_prompts_v2")]
         FeatureFlag::QueuedPromptsV2,
+        #[cfg(feature = "agent_prompt_steering")]
+        FeatureFlag::AgentPromptSteering,
         #[cfg(feature = "kitty_keyboard_protocol")]
         FeatureFlag::KittyKeyboardProtocol,
         #[cfg(feature = "inline_menu_headers")]
@@ -535,6 +537,8 @@ fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::StoredScreenshots,
         #[cfg(feature = "cloud_agent_shell_respawn")]
         FeatureFlag::CloudAgentShellRespawn,
+        #[cfg(feature = "acp_harness")]
+        FeatureFlag::AcpHarness,
     ]);
 
     ChannelState::filter_unsupported_features(&mut flags);

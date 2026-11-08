@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use ai::LLMProvider;
-use ai::api_keys::{ApiKeyManager, GrokTokens};
+use ai::api_keys::{
+    ApiKeyManager, CustomEndpoint, CustomEndpointDefinitions, CustomEndpointModel, GrokTokens,
+};
 use chrono::Duration;
 use warp_core::features::FeatureFlag;
 use warp_core::telemetry::testing::MockTelemetryContextProvider;
@@ -17,7 +19,7 @@ use crate::server::server_api::workspace::MockWorkspaceClient;
 use crate::workspaces::team::{Team, TeamVisibility};
 use crate::workspaces::user_workspaces::{TeamlessScopeForTest, UserWorkspaces};
 use crate::workspaces::workspace::{
-    AiOverages, ByoApiKeyPolicy, CustomerType, EnterpriseCreditsAutoReloadPolicy,
+    AiOverages, ByoApiKeyPolicy, ByoEndpointPolicy, CustomerType, EnterpriseCreditsAutoReloadPolicy,
     EnterprisePayAsYouGoPolicy, PurchaseAddOnCreditsPolicy, Workspace, WorkspaceUid,
 };
 
@@ -95,6 +97,40 @@ fn add_request_usage_model_without_auth(app: &mut App) -> ModelHandle<AIRequestU
     app.add_singleton_model(|ctx| {
         AIRequestUsageModel::new_for_test(ServerApiProvider::as_ref(ctx).get_ai_client(), ctx)
     })
+}
+
+/// Current-format endpoint: definition and secret are stored separately, and the secret is written
+/// only through `persist_custom_endpoint_keys`. `add_custom_endpoint` would also fill the legacy
+/// `keys.custom_endpoints` vector, which is the list the credit gate used to read.
+fn install_current_format_custom_endpoint(app: &mut App, secret: Option<&str>) {
+    let legacy = vec![CustomEndpoint {
+        name: "Endpoint".to_string(),
+        url: "https://api.example.com/v1".to_string(),
+        api_key: "endpoint-secret".to_string(),
+        schema: Default::default(),
+        models: vec![CustomEndpointModel {
+            name: "model".to_string(),
+            alias: None,
+            config_key: "config-key".to_string(),
+        }],
+    }];
+    let (definitions, mut keys) = CustomEndpointDefinitions::from_legacy(&legacy)
+        .expect("legacy endpoint should convert to a current-format definition");
+    let id = definitions.id_at(0).expect("one endpoint").clone();
+    match secret {
+        Some(secret) => {
+            keys.insert(id, secret.to_string());
+        }
+        None => {
+            keys.remove(&id);
+        }
+    }
+    ApiKeyManager::handle(app)
+        .update(app, |manager, ctx| {
+            manager.set_custom_endpoint_definitions(definitions, ctx);
+            manager.persist_custom_endpoint_keys(keys, ctx)
+        })
+        .expect("noop secure storage should persist the endpoint secret");
 }
 
 /// Registers the request usage model backed by an explicit AI client so tests
@@ -1333,6 +1369,39 @@ fn test_server_managed_availability_trusted_without_local_keys() {
                 ctx,
             );
             assert!(model.has_any_ai_remaining(&TeamlessScopeForTest, ctx));
+        });
+    });
+}
+
+#[test]
+fn test_out_of_credits_refined_by_current_format_custom_endpoint() {
+    App::test((), |mut app| async move {
+        // The secret is stored only via `persist_custom_endpoint_keys`, so
+        // `keys.custom_endpoints` stays empty while requests already send the resolved endpoint.
+        let (_uid, mut workspace) = create_test_workspace();
+        workspace.billing_metadata.tier.byo_endpoint_policy =
+            Some(ByoEndpointPolicy { enabled: true });
+        add_user_workspaces_with_workspace(&mut app, workspace);
+        let request_usage_model = add_request_usage_model(&mut app);
+        install_current_format_custom_endpoint(&mut app, Some("endpoint-secret"));
+
+        request_usage_model.update(&mut app, |model, ctx| {
+            model.apply_server_availability(
+                Ok(AICreditAvailability::unavailable(
+                    AICreditDenialReason::OutOfCredits,
+                )),
+                ctx,
+            );
+            let manager = ApiKeyManager::as_ref(ctx);
+            assert!(
+                manager.keys().custom_endpoints.is_empty(),
+                "current-format secrets must not land on the legacy endpoint vector",
+            );
+            assert_eq!(manager.custom_endpoints()[0].api_key, "endpoint-secret");
+            assert!(
+                model.has_any_ai_remaining(&TeamlessScopeForTest, ctx),
+                "resolved custom endpoint secrets should refine out-of-credits",
+            );
         });
     });
 }

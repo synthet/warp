@@ -40,6 +40,8 @@ use crate::auth::auth_view_modal::AuthViewVariant;
 use crate::auth::{AuthStateProvider, UserUid};
 use crate::autoupdate::{self, AutoupdateStage, AutoupdateState};
 use crate::server::ids::ServerId;
+#[cfg(not(target_family = "wasm"))]
+use crate::settings::IapRoutingSettings;
 use crate::settings::cloud_preferences::CloudPreferencesSettings;
 use crate::workspace::WorkspaceAction;
 use crate::workspaces::update_manager::TeamUpdateManager;
@@ -125,6 +127,8 @@ pub enum MainPageAction {
     OpenUrl(String),
     #[cfg(not(target_family = "wasm"))]
     RefreshIapCredentials,
+    #[cfg(not(target_family = "wasm"))]
+    ToggleIapRouting,
 }
 
 impl MainPageAction {
@@ -239,6 +243,15 @@ impl TypedActionView for MainSettingsPageView {
             MainPageAction::RefreshIapCredentials => {
                 IapManager::handle(ctx).update(ctx, |manager, ctx| manager.start_refresh(ctx));
                 ctx.notify();
+            }
+            #[cfg(not(target_family = "wasm"))]
+            MainPageAction::ToggleIapRouting => {
+                if IapManager::as_ref(ctx).is_enabled() {
+                    IapRoutingSettings::handle(ctx).update(ctx, |settings, ctx| {
+                        report_if_error!(settings.routing_enabled.toggle_and_save_value(ctx));
+                    });
+                    ctx.notify();
+                }
             }
         }
     }
@@ -1008,6 +1021,50 @@ impl SettingsWidget for IapCredentialsWidget {
                 .finish(),
         )
         .with_margin_top(VERTICAL_MARGIN)
+        .finish()
+    }
+}
+
+// Synth Warp is local-first: IAP routing is never shown; kept so upstream syncs stay small.
+#[allow(dead_code)]
+#[cfg(not(target_family = "wasm"))]
+#[derive(Default)]
+struct IapRoutingWidget {
+    switch_state: SwitchStateHandle,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl SettingsWidget for IapRoutingWidget {
+    type View = MainSettingsPageView;
+
+    fn search_terms(&self) -> &str {
+        "iap staging routing opt in identity proxy"
+    }
+
+    fn render(
+        &self,
+        _view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        Container::new(render_body_item::<MainPageAction>(
+            "Use IAP for staging requests".to_string(),
+            None,
+            LocalOnlyIconState::Hidden,
+            ToggleState::Enabled,
+            appearance,
+            appearance
+                .ui_builder()
+                .switch(self.switch_state.clone())
+                .check(*IapRoutingSettings::as_ref(app).routing_enabled)
+                .build()
+                .on_click(|ctx, _, _| {
+                    ctx.dispatch_typed_action(MainPageAction::ToggleIapRouting);
+                })
+                .finish(),
+            None,
+        ))
+        .with_margin_top(8.)
         .finish()
     }
 }
