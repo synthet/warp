@@ -125,6 +125,49 @@ function New-HooksBlock {
     }
 }
 
+function Test-WarpHook {
+    param($Hook)
+    $command = $Hook.PSObject.Properties['command']
+    return $null -ne $command -and $command.Value -match '[\\/]hooks[\\/]warp[\\/]'
+}
+
+# Keeps every non-Warp hook and replaces any Warp hooks from an earlier install.
+function Merge-HooksBlock {
+    param($Existing, $WarpHooks)
+
+    $merged = [ordered]@{}
+    if ($null -ne $Existing) {
+        foreach ($entry in $Existing.PSObject.Properties) {
+            $groups = @()
+            foreach ($group in @($entry.Value)) {
+                $hooksProp = $group.PSObject.Properties['hooks']
+                if ($null -eq $hooksProp) {
+                    $groups += $group
+                    continue
+                }
+                $kept = @(@($hooksProp.Value) | Where-Object { -not (Test-WarpHook $_) })
+                if ($kept.Count -gt 0) {
+                    $hooksProp.Value = $kept
+                    $groups += $group
+                }
+            }
+            if ($groups.Count -gt 0) {
+                $merged[$entry.Name] = $groups
+            }
+        }
+    }
+
+    foreach ($entry in $WarpHooks.PSObject.Properties) {
+        if ($merged.Contains($entry.Name)) {
+            $merged[$entry.Name] = @($merged[$entry.Name]) + @($entry.Value)
+        } else {
+            $merged[$entry.Name] = @($entry.Value)
+        }
+    }
+
+    return [PSCustomObject]$merged
+}
+
 if (-not (Test-Path -LiteralPath $SourceDir)) {
     Write-Error "Hook source not found: $SourceDir (run from Synth Warp repo root)"
 }
@@ -159,7 +202,12 @@ if (Test-Path -LiteralPath $SettingsPath) {
 }
 
 $hooksObject = New-HooksBlock | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-$settings | Add-Member -NotePropertyName hooks -NotePropertyValue $hooksObject -Force
+$existingHooks = $settings.PSObject.Properties['hooks']
+if ($null -ne $existingHooks) {
+    $existingHooks = $existingHooks.Value
+}
+$mergedHooks = Merge-HooksBlock -Existing $existingHooks -WarpHooks $hooksObject
+$settings | Add-Member -NotePropertyName hooks -NotePropertyValue $mergedHooks -Force
 
 if ($settings.PSObject.Properties.Name -contains 'enabledPlugins' -and $null -ne $settings.enabledPlugins) {
     $warpKey = 'warp@claude-code-warp'
