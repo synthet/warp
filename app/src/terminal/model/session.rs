@@ -1165,12 +1165,19 @@ impl Session {
     }
 
     /// Returns true if the session runs generators with a [`LocalCommandExecutor`].
+    #[cfg(feature = "local_tty")]
     pub fn is_using_local_command_execution(&self) -> bool {
         self.command_executor
             .read()
             .as_ref()
             .as_any()
             .is::<LocalCommandExecutor>()
+    }
+
+    /// Builds without `local_tty` (such as wasm) have no local executor.
+    #[cfg(not(feature = "local_tty"))]
+    pub fn is_using_local_command_execution(&self) -> bool {
+        false
     }
 
     /// Returns `true` if already attempted to load external commands for the `Session`.
