@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use super::{
     cloud_agents_enabled_for, derive_http_origin_from_ws_url,
     enable_self_hosted_remote_control_features_for, filter_unsupported_features_for,
-    is_hosted_warp_cloud_host, self_hosted_remote_control_enabled_for, warp_cloud_enabled_for,
+    is_hosted_warp_cloud_host, oz_enabled_for, self_hosted_remote_control_enabled_for,
+    warp_cloud_enabled_for,
 };
 use crate::channel::{Channel, is_disabled_root_url};
 use crate::features::FeatureFlag;
@@ -136,6 +137,43 @@ fn oss_policy_removes_cloud_agents_but_keeps_local_and_remote_dev_tools() {
     assert!(flags.contains(&FeatureFlag::AgentHarness));
     assert!(flags.contains(&FeatureFlag::RemoteCodebaseIndexing));
     assert!(flags.contains(&FeatureFlag::RemoteCodeReview));
+}
+
+#[test]
+fn oss_policy_removes_oz_platform_entry_points_but_keeps_local_harnesses() {
+    let mut flags = HashSet::from([
+        FeatureFlag::IntegrationCommand,
+        FeatureFlag::ArtifactCommand,
+        FeatureFlag::AcpHarness,
+        FeatureFlag::FactoryMcp,
+        FeatureFlag::OrchestrationLaunchModal,
+        FeatureFlag::PeriodicHandoffCheckpoints,
+        FeatureFlag::AgentCliLaunchModal,
+        // Kept: third-party CLI agents run locally through the PTY harness.
+        FeatureFlag::AgentHarness,
+        FeatureFlag::AgentView,
+    ]);
+
+    filter_unsupported_features_for(&mut flags, Channel::Oss, false);
+
+    assert!(!flags.contains(&FeatureFlag::IntegrationCommand));
+    assert!(!flags.contains(&FeatureFlag::ArtifactCommand));
+    assert!(!flags.contains(&FeatureFlag::AcpHarness));
+    assert!(!flags.contains(&FeatureFlag::FactoryMcp));
+    assert!(!flags.contains(&FeatureFlag::OrchestrationLaunchModal));
+    assert!(!flags.contains(&FeatureFlag::PeriodicHandoffCheckpoints));
+    assert!(!flags.contains(&FeatureFlag::AgentCliLaunchModal));
+    assert!(flags.contains(&FeatureFlag::AgentHarness));
+    assert!(flags.contains(&FeatureFlag::AgentView));
+}
+
+#[test]
+fn oz_is_never_enabled_for_oss_even_with_an_oz_root() {
+    assert!(!oz_enabled_for(Channel::Oss, DISABLED_ROOT));
+    assert!(!oz_enabled_for(Channel::Oss, "https://oz.warp.dev"));
+    assert!(!oz_enabled_for(Channel::Oss, "http://localhost:8080"));
+    assert!(oz_enabled_for(Channel::Stable, "https://oz.warp.dev"));
+    assert!(!oz_enabled_for(Channel::Stable, DISABLED_ROOT));
 }
 
 #[test]

@@ -301,7 +301,7 @@ impl ChannelState {
     /// cannot be repointed at a self-hosted backend.
     pub fn oz_enabled() -> bool {
         let state = CHANNEL_STATE.lock();
-        !is_disabled_root_url(state.config.oz_config.oz_root_url.as_ref())
+        oz_enabled_for(state.channel, state.config.oz_config.oz_root_url.as_ref())
     }
 
     /// Whether this process may start Warp-hosted cloud agents.
@@ -546,6 +546,14 @@ pub fn cloud_agents_enabled_for(
         && !is_disabled_root_url(oz_root_url)
 }
 
+/// Whether Oz is reachable for `channel` with the given Oz root.
+///
+/// Synth Warp is local-first: OSS never offers Oz, even if a future config path
+/// sets a non-blackhole Oz root, because Oz is a paid warp.dev service.
+pub fn oz_enabled_for(channel: Channel, oz_root_url: &str) -> bool {
+    channel != Channel::Oss && !is_disabled_root_url(oz_root_url)
+}
+
 const CLOUD_AGENT_FEATURES: &[FeatureFlag] = &[
     FeatureFlag::AmbientAgentsCommandLine,
     FeatureFlag::AmbientAgentsImageUpload,
@@ -576,6 +584,15 @@ const CLOUD_AGENT_FEATURES: &[FeatureFlag] = &[
     FeatureFlag::CloudModeSetupV2,
     FeatureFlag::CloudModeInputV2,
     FeatureFlag::HandoffCloudCloud,
+    // Synth Warp is local-first: Oz platform entry points (Slack/Linear integrations,
+    // cloud artifacts, the cloud ACP transport, Factory MCP, Oz marketing, cloud
+    // handoff checkpoints). Local CLI agents keep the PTY harness (`AgentHarness`).
+    FeatureFlag::IntegrationCommand,
+    FeatureFlag::ArtifactCommand,
+    FeatureFlag::AcpHarness,
+    FeatureFlag::FactoryMcp,
+    FeatureFlag::OrchestrationLaunchModal,
+    FeatureFlag::PeriodicHandoffCheckpoints,
 ];
 
 /// Warp Inc.'s hosted AI features, stripped from OSS builds. See
@@ -593,6 +610,8 @@ const WARP_HOSTED_AI_FEATURES: &[FeatureFlag] = &[
     FeatureFlag::AgentModeComputerUse,
     FeatureFlag::BackgroundComputerUse,
     FeatureFlag::SharedBlockTitleGeneration,
+    // Marketing modal for the hosted Warp Agent CLI.
+    FeatureFlag::AgentCliLaunchModal,
 ];
 
 const OSS_CONTROL_PLANE_FEATURES: &[FeatureFlag] = &[

@@ -99,6 +99,26 @@ Each is a trap worth remembering:
 | `UsageBasedPricing` | **Inverted logic** — `agent_profiles_page::build_page` only pushes the Warp-credit `UsageWidget` when this flag is *off*. Removing it would *re-enable* the commercial widget |
 | `PredictAMQueries` | Already absent from `enabled_features()` |
 
+## Gated: Oz platform entry points
+
+Oz (Warp-hosted cloud agents, Factory automation, pre-warmed sandboxes) has no self-hosted
+equivalent, so OSS hard-disables it: `oz_enabled_for` and `cloud_agents_enabled_for` both return
+`false` for `Channel::Oss` whatever the configured roots. The 2026-11-08 audit found entry points
+that reached around those predicates; each is now gated:
+
+| Surface | Gate |
+|---|---|
+| `IntegrationCommand` (Slack/Linear), `ArtifactCommand` (incl. the agent's upload-artifact tool), `AcpHarness` (cloud `--harness-transport`), `FactoryMcp`, `OrchestrationLaunchModal`, `PeriodicHandoffCheckpoints` | 3 (`CLOUD_AGENT_FEATURES`) |
+| `AgentCliLaunchModal` (hosted Warp Agent CLI marketing) | 3 (`WARP_HOSTED_AI_FEATURES`) |
+| `warp agent run-cloud-standby` and its `--prewarmed-sandbox-control-url` override | `cloud_agents_enabled()` in `agent_sdk/mod.rs` and `lib.rs` |
+| Deeplinks `action/new_cloud_agent_conversation` (no-window branch skipped the workspace gate), `action/create_environment`, `conversation/<id>` | Early return in `uri/mod.rs` handlers on `cloud_agents_enabled()` / `CloudEnvironments` / `CloudConversations`. Parsing is untouched so upstream URI tests still hold |
+| Bundled skills `oz-platform`, `factory-files` (the latter told agents to `curl app.warp.dev`) | `RequiresFeature(OzPlatformSkills)` in `activation_for_bundled_skill`. `factory-mcp` follows `FactoryMcp`; `factory-deferred-repositories` is already excluded from the global list and only published for cloud task contracts |
+
+Kept: `AgentHarness` and the PTY transport, which run third-party CLI agents locally.
+
+Not yet gated (dormant, end at the sinkhole): the remaining `warp agent list/get/create/...`
+management subcommands still parse and appear in `--help`; they fail at auth.
+
 ## Gated: other pages
 
 - **Knowledge** — "Manage rules" (opens the Warp Drive rule collection, whose page is already

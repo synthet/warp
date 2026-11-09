@@ -575,6 +575,11 @@ pub(crate) fn activation_for_bundled_skill(
         // Factory MCP server, so the skill and the server it documents roll
         // out together.
         "factory-mcp" => BundledSkillActivation::RequiresFeature(FeatureFlag::FactoryMcp),
+        // Synth Warp is local-first: these document the hosted Oz platform and Factory
+        // (factory-files calls app.warp.dev), so they follow the flag OSS strips.
+        "oz-platform" | "factory-files" => {
+            BundledSkillActivation::RequiresFeature(FeatureFlag::OzPlatformSkills)
+        }
         _ => BundledSkillActivation::Always,
     }
 }

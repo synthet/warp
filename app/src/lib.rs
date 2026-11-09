@@ -1611,7 +1611,10 @@ pub(crate) fn initialize_app(
     } = launch_mode
     {
         server_api.set_prewarmed_sandbox_id(args.standby_id.clone());
-        if let Some(url) = &args.prewarmed_sandbox_control_url
+        // Synth Warp is local-first: never repoint Oz sandbox control when cloud agents
+        // are off; the command itself is rejected in `agent_sdk::run`.
+        if ChannelState::cloud_agents_enabled()
+            && let Some(url) = &args.prewarmed_sandbox_control_url
             && let Err(e) = ChannelState::override_prewarmed_sandbox_control_url(url.clone())
         {
             eprintln!("Error: Invalid pre-warmed sandbox control URL: {e:#}");
