@@ -72,9 +72,11 @@ fn factory_files_bundled_skill_is_always_active_and_scoped_to_authoring() {
         "SKILL.md should tell the agent to stop outside a Factory tree"
     );
 
+    // Synth Warp is local-first: Factory is part of the Oz platform, and this skill
+    // tells agents to call app.warp.dev, so it follows the Oz skills flag.
     assert!(matches!(
         activation_for_bundled_skill("factory-files", &skills_dir),
-        BundledSkillActivation::Always
+        BundledSkillActivation::RequiresFeature(FeatureFlag::OzPlatformSkills)
     ));
 
     for reference in [
@@ -204,4 +206,32 @@ fn local_and_remote_catalogs_are_isolated() {
         remote_content(&bundled_skills, &second_host_id),
         Some("second")
     );
+}
+
+#[test]
+fn oz_platform_skills_follow_the_oz_skills_flag_and_local_skills_stay_active() {
+    let resources = Path::new("/resources");
+    for skill_id in ["oz-platform", "factory-files"] {
+        assert!(
+            matches!(
+                activation_for_bundled_skill(skill_id, resources),
+                BundledSkillActivation::RequiresFeature(FeatureFlag::OzPlatformSkills)
+            ),
+            "{skill_id} should be gated on OzPlatformSkills"
+        );
+    }
+    for skill_id in [
+        "add-mcp-server",
+        "create-skill",
+        "pr-comments",
+        "claude-api",
+    ] {
+        assert!(
+            matches!(
+                activation_for_bundled_skill(skill_id, resources),
+                BundledSkillActivation::Always
+            ),
+            "{skill_id} should stay always active"
+        );
+    }
 }

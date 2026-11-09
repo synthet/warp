@@ -403,7 +403,15 @@ fn run_agent(
             ambient::run_ambient_agent(ctx, args)
         }
         #[cfg(not(target_family = "wasm"))]
-        AgentCommand::RunCloudStandby(args) => standby::run(ctx, args),
+        AgentCommand::RunCloudStandby(args) => {
+            // Synth Warp is local-first: pre-warmed sandboxes are Oz infrastructure.
+            if !ChannelState::cloud_agents_enabled() {
+                return Err(anyhow::anyhow!(
+                    "cloud agents are unavailable in this build"
+                ));
+            }
+            standby::run(ctx, args)
+        }
         #[cfg(target_family = "wasm")]
         AgentCommand::RunCloudStandby(_) => {
             Err(anyhow::anyhow!("invalid value 'run-cloud-standby'"))

@@ -284,6 +284,11 @@ impl UriHost {
                 }
             }
             UriHost::Conversation => {
+                // Synth Warp is local-first: these are Warp-hosted cloud conversations.
+                if !FeatureFlag::CloudConversations.is_enabled() {
+                    log::info!("Ignoring cloud conversation link; unavailable in this build");
+                    return;
+                }
                 // We expect the uri to have the conversation ID as the last segment.
                 // e.g. warp://conversation/{conversation_id}
                 let conversation_id: Option<ServerConversationToken> = url
@@ -1094,6 +1099,12 @@ impl Action {
                 }
             }
             Action::NewCloudAgentConversation => {
+                // Synth Warp is local-first: the no-window branch below bypasses the
+                // workspace's own cloud-agent gate, so check before either branch.
+                if !ChannelState::cloud_agents_enabled() {
+                    log::info!("Ignoring cloud agent link; unavailable in this build");
+                    return;
+                }
                 let Some(window_id) = primary_window_id else {
                     open_new_with_workspace_source(NewWorkspaceSource::AmbientAgent, ctx);
                     return;
@@ -1141,6 +1152,12 @@ impl Action {
             }
             Action::CreateEnvironment { repos } => {
                 use crate::root_view::CreateEnvironmentArg;
+
+                // Synth Warp is local-first: cloud environments are Oz infrastructure.
+                if !FeatureFlag::CloudEnvironments.is_enabled() {
+                    log::info!("Ignoring create-environment link; unavailable in this build");
+                    return;
+                }
 
                 let arg = CreateEnvironmentArg {
                     repos: repos.clone(),

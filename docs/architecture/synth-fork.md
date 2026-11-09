@@ -66,8 +66,10 @@ So the fork ungates the UI but does not fabricate a backend:
   `*.warp.dev`, and `true` only for a user-supplied root. With no override, the agent still fails at
   send time — by design, since this fork ships no inference server.
 - `ChannelState::oz_enabled()` is permanently `false`: Warp-hosted cloud agents (Oz) are a paid
-  warp.dev service with no self-hosted equivalent, so `OzConfig::disabled()` is never overridden and
-  Oz session types stay hidden.
+  warp.dev service with no self-hosted equivalent. `oz_enabled_for` returns `false` for
+  `Channel::Oss` regardless of the Oz root, and `cloud_agents_enabled_for` does the same, so Oz
+  session types, CLI commands, deeplinks, and skills stay hidden
+  ([cloud-surface-audit.md § Oz platform](cloud-surface-audit.md#gated-oz-platform-entry-points)).
 
 ## When stripping a cloud surface
 

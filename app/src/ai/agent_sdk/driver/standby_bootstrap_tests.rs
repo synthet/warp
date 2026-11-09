@@ -40,6 +40,35 @@ const CHILD_ENV: &str = "WARP_TEST_STANDBY_BOOTSTRAP";
 const STEP_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[test]
+fn standby_command_is_rejected_when_cloud_agents_are_unavailable() {
+    // Synth Warp is local-first: pre-warmed sandboxes are Oz infrastructure.
+    assert!(!ChannelState::cloud_agents_enabled());
+    let args = Args::try_parse_from([
+        "oz",
+        "agent",
+        "run-cloud-standby",
+        "--standby-id",
+        "bootstrap-test",
+    ])
+    .unwrap();
+    let Some(Command::CommandLine(command)) = args.command() else {
+        panic!("standby arguments must parse as a CLI command");
+    };
+    let command = command.as_ref().clone();
+    let global_options = args.global_options().clone();
+    App::test((), |mut app| async move {
+        let error = app
+            .update(|ctx| dispatch_command(ctx, command, global_options))
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("cloud agents are unavailable"),
+            "{error:#}"
+        );
+    });
+}
+
+#[test]
+#[ignore = "Synth Warp: run-cloud-standby is rejected while cloud agents are unavailable"]
 fn standby_command_bootstrap_subprocess() {
     if std::env::var_os(CHILD_ENV).is_some() {
         verify_standby_bootstrap();
