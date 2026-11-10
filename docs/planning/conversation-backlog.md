@@ -407,7 +407,7 @@ Still open, and the reason this went unnoticed for so long:
 
 ### 16. Copy `docs/zed-warp/` into the Synth Zed checkout — Open
 
-Keep the byte-identical mirror. Sibling path named in docs: `D:\Projects\zed\docs\zed-warp`.
+Keep the byte-identical mirror. Sibling path named in docs: `<projects-root>\zed\docs\zed-warp`.
 
 ### 17. Persist this backlog + optional session memory — Partial
 
