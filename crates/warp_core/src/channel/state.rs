@@ -603,11 +603,11 @@ const CLOUD_AGENT_FEATURES: &[FeatureFlag] = &[
     FeatureFlag::CloudModeInputV2,
     FeatureFlag::HandoffCloudCloud,
     // Synth Warp is local-first: Oz platform entry points (Slack/Linear integrations,
-    // cloud artifacts, the cloud ACP transport, Factory MCP, Oz marketing, cloud
-    // handoff checkpoints). Local CLI agents keep the PTY harness (`AgentHarness`).
+    // cloud artifacts, Factory MCP, Oz marketing, cloud handoff checkpoints). Local CLI
+    // agents keep both harness transports: PTY (`AgentHarness`) and ACP (`AcpHarness`),
+    // which runs the adapter as a local subprocess and needs no Oz task.
     FeatureFlag::IntegrationCommand,
     FeatureFlag::ArtifactCommand,
-    FeatureFlag::AcpHarness,
     FeatureFlag::FactoryMcp,
     FeatureFlag::OrchestrationLaunchModal,
     FeatureFlag::PeriodicHandoffCheckpoints,

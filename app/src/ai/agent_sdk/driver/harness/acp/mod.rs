@@ -111,6 +111,8 @@ use crate::ai::blocklist::{
 use crate::ai::mcp::JSONTransportType;
 use crate::server::server_api::ServerApi;
 use crate::server::server_api::harness_support::HarnessSupportClient;
+// Synth Warp is local-first: no Warp server means a local harness-support stand-in.
+use crate::server::server_api::local_harness_support::harness_support_client_for;
 use crate::terminal::CLIAgent;
 
 /// Format slug sent to the server when creating the conversation: its history is stored as
@@ -416,7 +418,7 @@ impl ThirdPartyHarness for AcpHarness {
             harness_working_dir: harness_working_dir.to_path_buf(),
             model_config: third_party_harness_model_config.cloned(),
             task_id,
-            client: server_api,
+            client: harness_support_client_for(server_api),
             terminal_driver,
             attachments: Arc::new(attachments),
             mcp_servers: resolved_mcp_servers

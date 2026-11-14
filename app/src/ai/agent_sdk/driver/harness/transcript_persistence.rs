@@ -14,6 +14,7 @@ use warpui::duration_with_jitter;
 
 use crate::ai::agent::api::ServerConversationToken;
 use crate::server::server_api::harness_support::{HarnessSupportClient, upload_to_target};
+use crate::server::server_api::local_harness_support::is_local_conversation_token;
 
 const MAX_CAPTURE_ATTEMPTS: usize = 3;
 const JSONL_LIMITS: JsonlLimits = JsonlLimits {
@@ -102,6 +103,11 @@ pub(super) async fn upload_captured_transcript(
     conversation_id: &ServerConversationToken,
     capture: CapturedTranscript,
 ) -> Result<UploadedTranscriptUsage> {
+    // Synth Warp is local-first: a locally issued conversation has no server copy to upload
+    // to, and no server-side usage accounting to feed.
+    if is_local_conversation_token(conversation_id) {
+        return Ok(UploadedTranscriptUsage::empty());
+    }
     let target = client.get_transcript_upload_target(conversation_id).await?;
     upload_to_target(
         client.external_http_client(),

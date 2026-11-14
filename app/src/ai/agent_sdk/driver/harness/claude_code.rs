@@ -46,6 +46,8 @@ use crate::ai::ambient_agents::task::HarnessModelConfig;
 use crate::ai::mcp::JSONTransportType;
 use crate::server::server_api::ServerApi;
 use crate::server::server_api::harness_support::HarnessSupportClient;
+// Synth Warp is local-first: no Warp server means a local harness-support stand-in.
+use crate::server::server_api::local_harness_support::harness_support_client_for;
 use crate::terminal::CLIAgent;
 use crate::terminal::model::block::BlockId;
 use crate::terminal::model::session::ExecuteCommandOptions;
@@ -329,7 +331,7 @@ impl ClaudeHarnessRunner {
             .map(|task_id| MessageBridge::new(task_id.to_string(), session_id))
             .transpose()
             .map_err(AgentDriverError::ConfigBuildFailed)?;
-        let client: Arc<dyn HarnessSupportClient> = server_api.clone();
+        let client: Arc<dyn HarnessSupportClient> = harness_support_client_for(server_api.clone());
 
         Ok(Self {
             command: claude_command(

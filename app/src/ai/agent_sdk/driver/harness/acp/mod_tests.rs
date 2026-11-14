@@ -65,6 +65,9 @@ async fn first_acp_prompt(
 #[test]
 #[serial_test::serial]
 fn initial_files_reach_the_acp_runner_without_changing_the_pty_prompt() {
+    // Synth Warp is local-first: this exercises the warp-server conversation path.
+    let _self_hosted =
+        crate::server::server_api::local_harness_support::SelfHostedServerRootForTest::new();
     App::test((), |mut app| async move {
         initialize_app_for_terminal_view(&mut app);
         let temp = TempDir::new().unwrap();

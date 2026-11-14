@@ -144,13 +144,13 @@ fn oss_policy_removes_oz_platform_entry_points_but_keeps_local_harnesses() {
     let mut flags = HashSet::from([
         FeatureFlag::IntegrationCommand,
         FeatureFlag::ArtifactCommand,
-        FeatureFlag::AcpHarness,
         FeatureFlag::FactoryMcp,
         FeatureFlag::OrchestrationLaunchModal,
         FeatureFlag::PeriodicHandoffCheckpoints,
         FeatureFlag::AgentCliLaunchModal,
-        // Kept: third-party CLI agents run locally through the PTY harness.
+        // Kept: third-party CLI agents run locally through the PTY or ACP harness.
         FeatureFlag::AgentHarness,
+        FeatureFlag::AcpHarness,
         FeatureFlag::AgentView,
     ]);
 
@@ -158,12 +158,12 @@ fn oss_policy_removes_oz_platform_entry_points_but_keeps_local_harnesses() {
 
     assert!(!flags.contains(&FeatureFlag::IntegrationCommand));
     assert!(!flags.contains(&FeatureFlag::ArtifactCommand));
-    assert!(!flags.contains(&FeatureFlag::AcpHarness));
     assert!(!flags.contains(&FeatureFlag::FactoryMcp));
     assert!(!flags.contains(&FeatureFlag::OrchestrationLaunchModal));
     assert!(!flags.contains(&FeatureFlag::PeriodicHandoffCheckpoints));
     assert!(!flags.contains(&FeatureFlag::AgentCliLaunchModal));
     assert!(flags.contains(&FeatureFlag::AgentHarness));
+    assert!(flags.contains(&FeatureFlag::AcpHarness));
     assert!(flags.contains(&FeatureFlag::AgentView));
 }
 

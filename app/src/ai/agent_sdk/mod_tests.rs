@@ -29,7 +29,8 @@ use warpui::{App, SingletonEntity, WindowId};
 use super::driver::agent_setup::configured_skills::selected_execution_skills;
 use super::{
     AgentDriverRunner, CommandAuthentication, command_authentication, command_requires_auth,
-    command_to_telemetry_event, reconcile_task_harness, resolve_agent_driver_team_scope,
+    command_to_telemetry_event, is_local_only_harness_run, reconcile_task_harness,
+    resolve_agent_driver_team_scope,
 };
 use crate::ai::agent_sdk::driver::environment::WorkspaceConfiguration;
 use crate::ai::agent_sdk::driver::harness::HarnessKind;
@@ -1219,6 +1220,27 @@ fn agent_run_scope_falls_back_to_personal_for_an_unparseable_team_uid() {
     };
 
     assert_eq!(HeadlessTeamScope::from_task_scope(&scope).team_uid(), None);
+}
+
+/// Synth Warp is local-first: with no Warp server, a third-party harness run needs no Warp
+/// login, while the built-in agent and task-bound runs still go through auth.
+#[test]
+fn local_only_harness_run_does_not_require_warp_auth() {
+    assert!(!warp_core::channel::ChannelState::warp_cloud_enabled());
+    for harness in ["claude", "codex", "gemini"] {
+        let args = parse_run_agent_args(&["agent", "run", "--harness", harness, "--prompt", "hi"]);
+        assert!(is_local_only_harness_run(&args), "{harness}");
+        assert!(!command_requires_auth(&CliCommand::Agent(AgentCommand::Run(args))));
+    }
+
+    let oz = parse_run_agent_args(&["agent", "run", "--prompt", "hi"]);
+    assert!(!is_local_only_harness_run(&oz));
+    assert!(command_requires_auth(&CliCommand::Agent(AgentCommand::Run(oz))));
+
+    let task_bound = parse_run_agent_args(&[
+        "agent", "run", "--harness", "codex", "--task-id", TASK_ID, "--prompt", "hi",
+    ]);
+    assert!(!is_local_only_harness_run(&task_bound));
 }
 
 #[test]
