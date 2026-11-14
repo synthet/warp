@@ -5,10 +5,10 @@ pub mod block;
 pub(crate) mod download;
 pub mod factory;
 pub mod harness_support;
+pub mod integrations;
 // Synth Warp is local-first: harness support without a Warp server.
 #[cfg_attr(target_family = "wasm", allow(dead_code))]
 pub mod local_harness_support;
-pub mod integrations;
 pub mod managed_mcp;
 pub mod managed_secrets;
 pub mod object;

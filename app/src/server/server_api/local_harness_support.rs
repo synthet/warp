@@ -38,7 +38,9 @@ pub(crate) fn harness_support_client_for(
     if ChannelState::warp_cloud_enabled() {
         server_api
     } else {
-        Arc::new(LocalHarnessSupportClient::new(server_api.owned_http_client()))
+        Arc::new(LocalHarnessSupportClient::new(
+            server_api.owned_http_client(),
+        ))
     }
 }
 

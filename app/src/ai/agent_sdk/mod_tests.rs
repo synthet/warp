@@ -1230,16 +1230,19 @@ fn local_only_harness_run_does_not_require_warp_auth() {
     for harness in ["claude", "codex", "gemini"] {
         let args = parse_run_agent_args(&["agent", "run", "--harness", harness, "--prompt", "hi"]);
         assert!(is_local_only_harness_run(&args), "{harness}");
-        assert!(!command_requires_auth(&CliCommand::Agent(AgentCommand::Run(args))));
+        assert!(!command_requires_auth(&CliCommand::Agent(
+            AgentCommand::Run(args)
+        )));
     }
 
     let oz = parse_run_agent_args(&["agent", "run", "--prompt", "hi"]);
     assert!(!is_local_only_harness_run(&oz));
-    assert!(command_requires_auth(&CliCommand::Agent(AgentCommand::Run(oz))));
+    assert!(command_requires_auth(&CliCommand::Agent(
+        AgentCommand::Run(oz)
+    )));
 
-    let task_bound = parse_run_agent_args(&[
-        "agent", "run", "--harness", "codex", "--task-id", TASK_ID, "--prompt", "hi",
-    ]);
+    let task_bound =
+        parse_run_agent_args(&["agent", "run", "--harness", "codex", "--task-id", TASK_ID]);
     assert!(!is_local_only_harness_run(&task_bound));
 }
 
