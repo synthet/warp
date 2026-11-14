@@ -1433,7 +1433,12 @@ impl AgentDriver {
     ) -> Result<ModelHandle<Self>, AgentDriverError> {
         // If we're not logged in, the root view will go to an auth screen, and all subsequent steps will fail.
         // This should be impossible, since we enforce login before reaching this point.
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
+        // Synth Warp is local-first: a third-party harness with no Warp server and no Oz task
+        // runs without a Warp account (the root view never shows an auth screen in this build).
+        let local_only_harness_run = options.selected_harness != Harness::Oz
+            && options.task_id.is_none()
+            && !warp_core::channel::ChannelState::warp_cloud_enabled();
+        if !local_only_harness_run && !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
             return Err(AgentDriverError::NotLoggedIn);
         }
         let (terminal_inputs, config) = split_run_options(options)?;
@@ -2204,6 +2209,12 @@ impl AgentDriver {
                                 background.clone(),
                             ),
                             EnvironmentSnapshotReporter::new(task_id, ai_client, background),
+                        ),
+                        // Synth Warp is local-first: without a Warp server a run never has an
+                        // Oz task, so there is nothing to report to and nothing to flag.
+                        None if !warp_core::channel::ChannelState::warp_cloud_enabled() => (
+                            SetupClientEventReporter::noop(ai_client.clone(), background.clone()),
+                            EnvironmentSnapshotReporter::noop(ai_client, background),
                         ),
                         None => {
                             report_error!(

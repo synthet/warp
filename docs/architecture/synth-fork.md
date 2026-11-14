@@ -61,7 +61,9 @@ Shipped behavior summary: [features/implemented/local-first.md](../features/impl
 The built-in Warp Agent has no client-side inference path. BYOK provider keys and custom endpoints are
 serialized as *request fields* (`crates/ai/src/api_keys.rs`) and relayed by whatever backend
 `ChannelState::server_root_url()` names — the client never calls Anthropic/OpenAI directly. Only the
-CLI-agent harness (`app/src/ai/agent_sdk/`) talks to providers locally.
+CLI-agent harness (`app/src/ai/agent_sdk/`) talks to providers locally, through the third-party CLI
+(Claude Code, Codex, Gemini CLI) over PTY or ACP; that path needs no Warp server
+([cloud-surface-audit.md § Local third-party harness runs](cloud-surface-audit.md#local-third-party-harness-runs)).
 
 So the fork ungates the UI but does not fabricate a backend:
 
