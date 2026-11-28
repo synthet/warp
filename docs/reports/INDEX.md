@@ -10,6 +10,7 @@ okf_version: 0.1
 
 # Reports
 
+- [fork-feature-candidates.md](fork-feature-candidates.md) — verified survey of Warp and Zed forks (Zap, warp-lite, man-brain, oh-my-warp, Gram, Zedless) with a pick table for the owner; no porting.
 - [remote-control-verification-2026-11-05.md](remote-control-verification-2026-11-05.md) — first end-to-end run of self-hosted remote control: acceptance status, bugs found, setup pitfalls, and the Playwright test plan.
 - [windows-prompt-chip-processes-2026-10-26.md](windows-prompt-chip-processes-2026-10-26.md) — Kubernetes prompt chip runs `kubectl` while hidden; Windows children survive Warp exit
 - [upstream-sync-2026-10-18.md](upstream-sync-2026-10-18.md) — upstream merge preservation decisions and accepted verification failures
