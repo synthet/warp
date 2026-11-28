@@ -81,6 +81,25 @@ sed \
     < "$WORKSPACE_ROOT_DIR/resources/linux/rpm/$ARTIFACT/warp.spec.template" \
     > "$RPMBUILD_DIR/SPEC/warp.spec"
 
+# SYNTH-FORK: the OSS (Synth Warp) package must not install Warp's signing key or add Warp's
+# yum/zypper repository: an update could otherwise replace the fork with official Warp. Drop those
+# blocks from %post; the desktop-database refresh and the trailing `exit 0` stay.
+if [ "$RELEASE_CHANNEL" = "oss" ]; then
+  awk '
+    /^# Install the signing key/ { skip = 1 }
+    skip == 1 && /^WARP_SIGNING_KEY_EOF$/ { skip = 0; next }
+    /^# Helper function to set up a yum repo\./ { skip = 2 }
+    skip == 2 && /^# Ensure an error executing one of the repo install functions/ { skip = 0 }
+    !skip
+  ' "$RPMBUILD_DIR/SPEC/warp.spec" > "$RPMBUILD_DIR/SPEC/warp.spec.oss"
+  mv "$RPMBUILD_DIR/SPEC/warp.spec.oss" "$RPMBUILD_DIR/SPEC/warp.spec"
+  sed -i "s#^Packager: .*#Packager:    Synth Term contributors <synthet@users.noreply.github.com>#" "$RPMBUILD_DIR/SPEC/warp.spec"
+  if grep -q "releases.warp.dev\|RPM-GPG-KEY" "$RPMBUILD_DIR/SPEC/warp.spec"; then
+    echo "::error ::Warp repository setup is still present in the OSS spec"
+    exit 1
+  fi
+fi
+
 # Build the actual package.
 fakeroot rpmbuild -v -bb "$RPMBUILD_DIR/SPEC/warp.spec" --target="$ARCH" --define "_topdir $RPMBUILD_DIR"
 
