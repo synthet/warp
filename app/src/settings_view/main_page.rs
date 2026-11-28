@@ -316,7 +316,7 @@ impl AccountWidget {
     fn render_anonymous_account_info(&self, appearance: &Appearance) -> Box<dyn Element> {
         let user_info = appearance
             .ui_builder()
-            .paragraph("This build runs locally without a Warp account.")
+            .paragraph("Synth Term runs locally. No account or sign-in needed.")
             .with_style(UiComponentStyles {
                 font_size: Some(REGULAR_TEXT_FONT_SIZE),
                 ..Default::default()

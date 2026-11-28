@@ -1,6 +1,11 @@
 ---
+type: Documentation Hub
 title: Zed × Warp Hybrid
 description: Mirrored architecture wiki for Synth Warp and Synth Zed. Use both apps, bridge via Warp local_control, then port session UX into Zed.
+resource: zed-warp/README.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Zed × Warp Hybrid

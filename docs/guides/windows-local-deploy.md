@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: Windows local deploy
-description: Install Synth Warp OSS per user into its own folder, side by side with official Warp.
+description: Install Synth Term OSS per user into its own folder, side by side with official Warp.
 resource: guides/windows-local-deploy.md
 tags: [docs, guides, windows, deploy]
 timestamp: 2026-11-19T23:00:00Z
@@ -12,7 +12,7 @@ okf_version: 0.1
 
 SoT: [`script/windows/deploy.ps1`](../../script/windows/deploy.ps1). Operator notes: [`script/windows/README.md`](../../script/windows/README.md). Compile/resume: [build-and-run.md](build-and-run.md).
 
-Repeatable per-user install into `%LOCALAPPDATA%\Programs\SynthWarp\warp-oss.exe`, side by side with
+Repeatable per-user install into `%LOCALAPPDATA%\Programs\SynthTerm\warp-oss.exe`, side by side with
 any official Warp install. Deploy never writes to `C:\Program Files\Warp`, never stops official
 `warp.exe`, and never edits Warp's registry entries. Do **not** build `CHANNEL=stable`: that binary
 auto-updates from Warp.dev.
@@ -31,9 +31,9 @@ last exe. `script/windows/deploy.cmd` is a double-click wrapper; no UAC prompt i
 Deploy refuses a non-empty `-InstallDir` that has no `warp-oss.exe` unless `-Force` is passed, so it
 cannot be pointed at the official install by accident.
 
-## Deploying from a terminal inside Synth Warp
+## Deploying from a terminal inside Synth Term
 
-Before the copy, deploy force-stops every process started from the Synth Warp folder and waits up to
+Before the copy, deploy force-stops every process started from the Synth Term folder and waits up to
 30s for `warp-oss.exe` to unlock. When the shell running deploy is itself hosted by that install, the
 deploy ends its own session mid-run. Official Warp tabs are not affected.
 
@@ -47,23 +47,23 @@ while ($p) {
 }
 ```
 
-If `%LOCALAPPDATA%\Programs\SynthWarp\warp-oss.exe` is in that chain, split the run in two:
+If `%LOCALAPPDATA%\Programs\SynthTerm\warp-oss.exe` is in that chain, split the run in two:
 
-1. Build from inside Synth Warp, with deploy's feature set:
+1. Build from inside Synth Term, with deploy's feature set:
    `.\script\windows\build.ps1 -Release -Bin warp-oss -Features "release_bundle,gui"`
 2. Install from a shell the install does not host (official Warp, Windows Terminal, conhost, or
    `script\windows\deploy.cmd` double-clicked): `.\script\windows\deploy.ps1 -SkipBuild`
 
 ## Verify what is installed
 
-The exe carries its build commit:
+The exe carries the fork version and its build commit. Without `GIT_RELEASE_TAG` (deploy never sets it), `app/build.rs` builds both the About page version and the exe version resource from the repo-root `VERSION` file plus the short commit hash. `app/Cargo.toml` keeps upstream's `0.1.0` and is only the fallback when `VERSION` is missing:
 
 ```powershell
-(Get-Item "$env:LOCALAPPDATA\Programs\SynthWarp\warp-oss.exe").VersionInfo.FileVersion   # v0.1.0+<short sha>
+(Get-Item "$env:LOCALAPPDATA\Programs\SynthTerm\warp-oss.exe").VersionInfo.FileVersion   # v<VERSION>+<short sha>, e.g. v0.2.0+0e6fd3ac
 ```
 
 ```bash
-sha256sum "$LOCALAPPDATA/Programs/SynthWarp/warp-oss.exe" target/release/warp-oss.exe   # equal => install is that build
+sha256sum "$LOCALAPPDATA/Programs/SynthTerm/warp-oss.exe" target/release/warp-oss.exe   # equal => install is that build
 git log --oneline <short sha>..HEAD                                                    # what the install is missing
 ```
 
@@ -73,11 +73,11 @@ needs a rebuild.
 
 ## Identity
 
-| Piece | Official Warp | Synth Warp (`deploy.ps1`) | Synth Warp (Inno `oss` bundle) |
+| Piece | Official Warp | Synth Term (`deploy.ps1`) | Synth Term (Inno `oss` bundle) |
 |-------|---------------|---------------------------|--------------------------------|
-| Folder / exe | `C:\Program Files\Warp\warp.exe` | `%LOCALAPPDATA%\Programs\SynthWarp\warp-oss.exe` | `{autopf}\WarpOss\warp-oss.exe` |
+| Folder / exe | `C:\Program Files\Warp\warp.exe` | `%LOCALAPPDATA%\Programs\SynthTerm\warp-oss.exe` | `{autopf}\WarpOss\warp-oss.exe` |
 | Channel / scheme | Stable / `warp://` | Oss / `warposs://` | Oss / `warposs://` |
-| Start menu / AUMID | Warp / `dev.warp.Warp` | Synth Warp / `io.github.synthet.Warp` | WarpOss / `dev.warp.WarpOss` |
+| Start menu / AUMID | Warp / `dev.warp.Warp` | Synth Term / `io.github.synthet.Warp` | WarpOss / `dev.warp.WarpOss` |
 | Single-instance mutex | `Local\WarpStable_SingleInstance` | `Local\WarpOss_SingleInstance` | `Local\WarpOss_SingleInstance` |
 | User data | `%APPDATA%\warp\Warp` | `io.github.synthet.Warp` | `io.github.synthet.Warp` |
 | Auto-update | Warp.dev installer | None | None |

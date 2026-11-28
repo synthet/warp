@@ -34,11 +34,22 @@ fn git_short_hash() -> Option<String> {
     }
 }
 
+/// The fork's release version: the repo-root `VERSION` file, which release prep bumps.
+/// `app/Cargo.toml` keeps upstream's `0.1.0`, so its `CARGO_PKG_VERSION` is only the fallback
+/// when `VERSION` is missing or empty.
+fn fork_version() -> String {
+    fs::read_to_string("../VERSION")
+        .ok()
+        .map(|version| version.trim().to_owned())
+        .filter(|version| !version.is_empty())
+        .unwrap_or_else(|| env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_owned()))
+}
+
 fn display_version() -> String {
     match env::var("GIT_RELEASE_TAG") {
         Ok(tag) if !tag.is_empty() => tag,
         _ => {
-            let pkg = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_owned());
+            let pkg = fork_version();
             match git_short_hash() {
                 Some(hash) => format!("v{pkg}+{hash}"),
                 None => format!("v{pkg}"),
@@ -62,6 +73,7 @@ fn file_version_tuple(pkg: &str) -> (u16, u16, u16, u16) {
 
 fn emit_display_version() {
     println!("cargo:rerun-if-env-changed=GIT_RELEASE_TAG");
+    println!("cargo:rerun-if-changed=../VERSION");
     println!("cargo:rerun-if-changed=../.git/HEAD");
     if let Ok(head) = fs::read_to_string("../.git/HEAD")
         && let Some(git_ref) = head.strip_prefix("ref: ")
@@ -526,7 +538,7 @@ fn embed_resource_file(target_dir: &Path) {
     let version = display_version();
     let app_name = env::var("WARP_APP_NAME").unwrap_or_else(|_| "Synth Warp".to_owned());
     let bin_name = env::var("CARGO_BIN_NAME").unwrap_or_else(|_| "warp-oss".to_owned());
-    let pkg_version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_owned());
+    let pkg_version = fork_version();
     let (major, minor, patch, build) = file_version_tuple(&pkg_version);
 
     let icon_path = Path::new("channels")

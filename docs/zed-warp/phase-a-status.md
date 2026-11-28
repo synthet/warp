@@ -1,6 +1,11 @@
 ---
+type: Report
 title: Phase A Terminal Thread status — Zed × Warp Hybrid
 description: Parse OSC 777 warp://cli-agent events, store live status on AgentTerminal, and reuse ThreadItem badges. First Zed implementation slice.
+resource: zed-warp/phase-a-status.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Phase A — Terminal Thread status

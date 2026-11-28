@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Terminal blocks — Zed × Warp Hybrid
 description: Warp command/output grouping. Level 2 v1 should not dump full blocks. Level 3 Phase C ports semantics into Zed.
+resource: zed-warp/surfaces/terminal-blocks.md
+tags: [docs, zed-warp, surfaces]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Terminal blocks

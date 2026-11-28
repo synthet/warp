@@ -1,3 +1,8 @@
+---
+description: On Windows, always run .sh/.py/.rb/.pl scripts through their interpreter, never by bare path.
+alwaysApply: true
+---
+
 # Windows script invocation (always on)
 
 On Windows, **never invoke a `.sh` by bare path.** Always name the interpreter:

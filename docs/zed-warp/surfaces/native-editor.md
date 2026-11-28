@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Native Warp editor — Zed × Warp Hybrid
 description: Warp’s embedded coding surface. Why Level 3 should not transplant Zed’s editor into Warp.
+resource: zed-warp/surfaces/native-editor.md
+tags: [docs, zed-warp, surfaces]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Native Warp editor

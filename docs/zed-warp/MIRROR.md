@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Wiki mirror
 description: This folder is identical in Synth Warp and Synth Zed. Edit one copy, then copy the whole folder to the sibling checkout.
+resource: zed-warp/MIRROR.md
+tags: [docs, zed-warp]
+timestamp: 2026-11-10T19:37:57Z
+okf_version: 0.1
 ---
 
 # Wiki mirror

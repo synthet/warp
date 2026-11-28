@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
 use itertools::Itertools;
+use warp_core::channel::ChannelState;
 use warp_core::ui::builder::UiBuilder;
 use warp_core::ui::theme::color::internal_colors;
 use warp_editor::editor::NavigationKey;
@@ -173,6 +174,18 @@ impl WorkflowViewType {
 
         AccessibilityContent::new_without_help(a11y_content, WarpA11yRole::UserAction)
     }
+}
+
+/// The workflow types listed in the modal's sidebar. Team workflows live in a Warp Drive team
+/// space, so they are listed only when a cloud backend is configured; on the OSS build the
+/// bundled catalog ("All" and the categories), My Workflows and Repository Workflows remain.
+pub(crate) fn sidebar_workflow_types(cloud: bool) -> Vec<WorkflowViewType> {
+    let mut types = vec![WorkflowViewType::All, WorkflowViewType::LocalPersonal];
+    if cloud {
+        types.push(WorkflowViewType::Team);
+    }
+    types.push(WorkflowViewType::Project);
+    types
 }
 
 fn render_workflow(
@@ -914,12 +927,7 @@ impl CategoriesView {
         let workflows_type_sidebar_focused =
             matches!(self.focus_state, WorkflowsFocusState::WorkflowTypesSidebar);
 
-        let workflow_types = vec![
-            WorkflowViewType::All,
-            WorkflowViewType::LocalPersonal,
-            WorkflowViewType::Team,
-            WorkflowViewType::Project,
-        ];
+        let workflow_types = sidebar_workflow_types(ChannelState::warp_cloud_enabled());
 
         let mut workflow_types_list = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
@@ -1116,8 +1124,10 @@ impl CategoriesView {
     fn increment_focused_workflow_type(&mut self, ctx: &mut ViewContext<Self>) {
         let next = match &self.selected_workflow_type {
             WorkflowViewType::All => WorkflowViewType::LocalPersonal,
-            WorkflowViewType::LocalPersonal => WorkflowViewType::Team,
-            WorkflowViewType::Team => WorkflowViewType::Project,
+            WorkflowViewType::LocalPersonal if ChannelState::warp_cloud_enabled() => {
+                WorkflowViewType::Team
+            }
+            WorkflowViewType::LocalPersonal | WorkflowViewType::Team => WorkflowViewType::Project,
             WorkflowViewType::Project if self.category_names.is_empty() => {
                 WorkflowViewType::Project
             }
@@ -1141,7 +1151,10 @@ impl CategoriesView {
                 WorkflowViewType::All => WorkflowViewType::All,
                 WorkflowViewType::LocalPersonal => WorkflowViewType::All,
                 WorkflowViewType::Team => WorkflowViewType::LocalPersonal,
-                WorkflowViewType::Project => WorkflowViewType::Team,
+                WorkflowViewType::Project if ChannelState::warp_cloud_enabled() => {
+                    WorkflowViewType::Team
+                }
+                WorkflowViewType::Project => WorkflowViewType::LocalPersonal,
                 WorkflowViewType::Category { category_index, .. } if *category_index == 0 => {
                     WorkflowViewType::Project
                 }

@@ -313,23 +313,26 @@ impl CustomizeUISlide {
                 })),
             });
 
-            chips.push(ChipSpec {
-                label: "Warp Drive",
-                is_enabled: ui.show_warp_drive,
-                mouse_state: self.chip_warp_drive_mouse.clone(),
-                on_click: Box::new(|ctx, _, _| {
-                    ctx.dispatch_typed_action(CustomizeSlideAction::ToggleToolsSubSetting {
-                        setting: ToolsPanelSubSetting::WarpDrive,
-                    });
-                }),
-                on_hover: Some(Box::new(|is_hovered, ctx, _, _| {
-                    if is_hovered {
-                        ctx.dispatch_typed_action(CustomizeSlideAction::HoverToolsChip {
+            // SYNTH-FORK: no Warp Drive chip without Warp cloud access.
+            if warp_core::channel::ChannelState::warp_cloud_enabled() {
+                chips.push(ChipSpec {
+                    label: "Warp Drive",
+                    is_enabled: ui.show_warp_drive,
+                    mouse_state: self.chip_warp_drive_mouse.clone(),
+                    on_click: Box::new(|ctx, _, _| {
+                        ctx.dispatch_typed_action(CustomizeSlideAction::ToggleToolsSubSetting {
                             setting: ToolsPanelSubSetting::WarpDrive,
                         });
-                    }
-                })),
-            });
+                    }),
+                    on_hover: Some(Box::new(|is_hovered, ctx, _, _| {
+                        if is_hovered {
+                            ctx.dispatch_typed_action(CustomizeSlideAction::HoverToolsChip {
+                                setting: ToolsPanelSubSetting::WarpDrive,
+                            });
+                        }
+                    })),
+                });
+            }
         }
 
         render_toggle_card(

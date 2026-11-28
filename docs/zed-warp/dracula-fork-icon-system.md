@@ -1,3 +1,13 @@
+---
+type: Feature Spec
+title: Dracula Fork Icon System — Zed + Warp
+description: Plan for a sibling app-icon family for the Synth forks of Zed and Warp, distinct from the upstream marks.
+resource: zed-warp/dracula-fork-icon-system.md
+tags: [docs, zed-warp]
+timestamp: 2026-09-13T18:17:15Z
+okf_version: 0.1
+---
+
 # Dracula Fork Icon System — Zed + Warp
 **Status:** design plan / implementation spec  
 **Target platforms:** macOS 26/27-era icon system + Windows 11  

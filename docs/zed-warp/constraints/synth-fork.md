@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Synth forks — Zed × Warp Hybrid
 description: Synth Warp and Synth Zed are commercial-free / local-first. No Drive, no hosted Warp AI. CLI agents only.
+resource: zed-warp/constraints/synth-fork.md
+tags: [docs, zed-warp, constraints]
+timestamp: 2026-08-15T17:45:31Z
+okf_version: 0.1
 ---
 
 # Synth forks

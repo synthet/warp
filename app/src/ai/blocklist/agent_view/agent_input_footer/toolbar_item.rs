@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use warp_core::channel::ChannelState;
 use warpui::SingletonEntity;
 
 use super::editor::AgentToolbarEditorMode;
@@ -199,6 +200,9 @@ impl AgentToolbarItemKind {
             Self::FileExplorer => {
                 cfg!(feature = "local_fs") && *CodeSettings::as_ref(app).show_project_explorer
             }
+            // Drops Voice Input from the editor and from saved layouts on builds that cannot
+            // transcribe; see `voice_input_supported`.
+            Self::VoiceInput => voice_input_supported(),
             _ => true,
         }
     }
@@ -250,7 +254,9 @@ impl AgentToolbarItemKind {
         {
             items.push(Self::HandoffToCloud);
         }
-        items.push(Self::VoiceInput);
+        if voice_input_supported() {
+            items.push(Self::VoiceInput);
+        }
         items.push(Self::FileAttach);
         items
     }
@@ -261,10 +267,11 @@ impl AgentToolbarItemKind {
             .into_iter()
             .map(Self::ContextChip)
             .collect();
+        items.extend([Self::ModelSelector, Self::NLDToggle]);
+        if voice_input_supported() {
+            items.push(Self::VoiceInput);
+        }
         items.extend([
-            Self::ModelSelector,
-            Self::NLDToggle,
-            Self::VoiceInput,
             Self::FileAttach,
             Self::ContextWindowUsage,
             Self::UsageSummary,
@@ -290,11 +297,15 @@ impl AgentToolbarItemKind {
 
     /// Default left-side items for the CLI agent footer.
     pub fn cli_default_left() -> Vec<Self> {
-        let mut items = vec![
-            Self::FileAttach,
-            Self::VoiceInput,
-            Self::ContextChip(ContextChipKind::GitDiffStats),
-        ];
+        Self::cli_default_left_with(voice_input_supported())
+    }
+
+    fn cli_default_left_with(voice_supported: bool) -> Vec<Self> {
+        let mut items = vec![Self::FileAttach];
+        if voice_supported {
+            items.push(Self::VoiceInput);
+        }
+        items.push(Self::ContextChip(ContextChipKind::GitDiffStats));
         if FeatureFlag::CreatingSharedSessions.is_enabled()
             && FeatureFlag::HOARemoteControl.is_enabled()
         {
@@ -318,17 +329,19 @@ impl AgentToolbarItemKind {
 
     /// All items available for the CLI agent footer configurator.
     pub fn all_available_for_cli_input() -> Vec<Self> {
+        Self::all_available_for_cli_input_with(voice_input_supported())
+    }
+
+    fn all_available_for_cli_input_with(voice_supported: bool) -> Vec<Self> {
         let mut items: Vec<Self> = available_chips()
             .into_iter()
             .map(Self::ContextChip)
             .collect();
-        items.extend([
-            Self::FileExplorer,
-            Self::RichInput,
-            Self::FileAttach,
-            Self::VoiceInput,
-            Self::Settings,
-        ]);
+        items.extend([Self::FileExplorer, Self::RichInput, Self::FileAttach]);
+        if voice_supported {
+            items.push(Self::VoiceInput);
+        }
+        items.push(Self::Settings);
         if FeatureFlag::CreatingSharedSessions.is_enabled()
             && FeatureFlag::HOARemoteControl.is_enabled()
         {
@@ -352,6 +365,13 @@ impl AgentToolbarItemKind {
             ),
         }
     }
+}
+
+/// Whether this build can offer voice input at all. Synth Warp is commercial-free: voice is
+/// transcribed by Wispr Flow, a vendor Warp brokers on the user's behalf, so OSS builds never
+/// offer it. Mirrors the build and channel half of `AISettings::is_voice_input_enabled`.
+fn voice_input_supported() -> bool {
+    ChannelState::warp_hosted_ai_enabled() && cfg!(feature = "voice_input")
 }
 
 impl From<ContextChipKind> for AgentToolbarItemKind {

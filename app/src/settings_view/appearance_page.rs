@@ -1429,7 +1429,10 @@ impl AppearanceSettingsPageView {
         if cfg!(feature = "local_fs") && FeatureFlag::GlobalSearch.is_enabled() {
             tools_panel_widgets.push(Box::new(ToolsPanelGlobalSearchWidget::default()));
         }
-        tools_panel_widgets.push(Box::new(ToolsPanelWarpDriveWidget::default()));
+        // SYNTH-FORK: the Drive toggle only exists where Warp Drive can be used.
+        if ChannelState::warp_cloud_enabled() {
+            tools_panel_widgets.push(Box::new(ToolsPanelWarpDriveWidget::default()));
+        }
         if !tools_panel_widgets.is_empty() {
             categories.push(Category::new("Tools panel", tools_panel_widgets));
         }

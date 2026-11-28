@@ -64,10 +64,17 @@ const FONT_SIZE: f32 = 12.;
 
 const SAFE_MODE_TITLE: &str = "Secret redaction";
 static SAFE_MODE_DESCRIPTION: LazyLock<&'static str> = LazyLock::new(|| {
-    "When this setting is enabled, Warp will scan blocks, the contents of \
+    // SYNTH-FORK: the OSS build has no Warp Drive or Oz, so it names only what it scans.
+    if crate::util::links::warp_inc_links_enabled() {
+        "When this setting is enabled, Warp will scan blocks, the contents of \
         Warp Drive objects, and Oz prompts for potential sensitive \
         information and prevent saving or sending this data to any \
         servers. You can customize this list via regexes."
+    } else {
+        "When this setting is enabled, Synth Term scans blocks and agent prompts \
+        for potential sensitive information and keeps it from being saved or \
+        sent to any server. You can customize this list via regexes."
+    }
 });
 const USER_SECRET_REGEX_TITLE: &str = "Custom secret redaction";
 const USER_SECRET_REGEX_DESCRIPTION: &str = "Use regex to define additional secrets or data you'd like to redact. This will take effect \
@@ -102,7 +109,19 @@ fn privacy_policy_link_text() -> &'static str {
     if crate::util::links::warp_inc_links_enabled() {
         "Read Warp's privacy policy"
     } else {
-        "Read how Synth Warp handles your data"
+        "Read how Synth Term handles your data"
+    }
+}
+
+fn network_log_console_description() -> &'static str {
+    // SYNTH-FORK: name the fork, not Warp, as the app whose traffic the console shows.
+    if crate::util::links::warp_inc_links_enabled() {
+        "We've built a native console that allows you to view all communications \
+        from Warp to external servers to ensure you feel comfortable that your \
+        work is always kept safe."
+    } else {
+        "A built-in console shows every request Synth Term makes to external \
+        servers, so you can check that your work stays private."
     }
 }
 
@@ -1818,12 +1837,7 @@ impl SettingsWidget for NetworkLogWidget {
             ))
             .with_child(
                 ui_builder
-                    .paragraph(
-                        "We've built a native console that allows you to view all communications \
-                        from Warp to external servers to ensure you feel comfortable that your \
-                        work is always kept safe."
-                            .to_owned(),
-                    )
+                    .paragraph(network_log_console_description().to_owned())
                     .with_style(UiComponentStyles {
                         font_color: Some(
                             appearance

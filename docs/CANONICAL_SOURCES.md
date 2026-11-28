@@ -23,6 +23,7 @@ question.
 | Domain vocabulary | [`AGENTS.md`](../AGENTS.md) architecture overview; wiki: [`architecture/system-overview.md`](architecture/system-overview.md) |
 | Build / test / lint commands | [`../AGENTS.md`](../AGENTS.md) |
 | Windows GUI compile / resume | [`../script/windows/build.ps1`](../script/windows/build.ps1); wiki: [`guides/build-and-run.md`](guides/build-and-run.md) |
+| App version (About page, exe version resource) | [`../VERSION`](../VERSION) via `fork_version()` in [`../app/build.rs`](../app/build.rs); `GIT_RELEASE_TAG` overrides it when set. `app/Cargo.toml`'s `0.1.0` is upstream's and only the fallback. |
 | Windows local per-user install | [`../script/windows/deploy.ps1`](../script/windows/deploy.ps1); wiki: [`guides/windows-local-deploy.md`](guides/windows-local-deploy.md) |
 | Cloud/commercial surface gating | [`../crates/warp_core/src/channel/mod.rs`](../crates/warp_core/src/channel/mod.rs) (`offers_warp_hosted_ai`, `shows_warp_inc_links`) and [`../crates/warp_core/src/channel/state.rs`](../crates/warp_core/src/channel/state.rs) (`warp_cloud_enabled`, `filter_unsupported_features_for`); wiki: [`architecture/cloud-surface-audit.md`](architecture/cloud-surface-audit.md) |
 | OSS disabled cloud URLs | [`../crates/warp_core/src/channel/config.rs`](../crates/warp_core/src/channel/config.rs) (`WarpServerConfig::disabled()`, `192.0.2.0:9`); wiki: [`guides/oss-windows-runtime-warnings.md`](guides/oss-windows-runtime-warnings.md) |

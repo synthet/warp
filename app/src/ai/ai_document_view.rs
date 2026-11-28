@@ -642,6 +642,13 @@ impl AIDocumentView {
 
         let is_streaming = self.is_conversation_streaming(app);
 
+        // SYNTH-FORK: plans can't sync to Warp Drive without it, so show no sync control.
+        if !crate::drive::settings::WarpDriveSettings::is_warp_drive_enabled(app) {
+            let update_plan_button = self.update_plan_button.clone();
+            return (is_streaming && user_edit_status.is_dirty())
+                .then(|| ChildView::new(&update_plan_button).finish());
+        }
+
         let sync_element = self.render_sync_element(save_status, app);
 
         if is_streaming && user_edit_status.is_dirty() {

@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::workflows::WorkflowType;
-use crate::workflows::categories::{CategoriesView, WorkflowMatchType};
+use crate::workflows::categories::{
+    CategoriesView, WorkflowMatchType, WorkflowViewType, sidebar_workflow_types,
+};
 use crate::workflows::workflow::Workflow;
 
 #[test]
@@ -53,5 +55,33 @@ fn test_workflow_matches() {
     assert_eq!(
         CategoriesView::matches_workflow(&workflow, "gibberish"),
         WorkflowMatchType::Unmatched
+    );
+}
+
+/// Without a cloud backend (the OSS build) the sidebar lists no Team Workflows entry, while the
+/// bundled catalog ("All"), My Workflows and Repository Workflows remain.
+#[test]
+fn sidebar_omits_team_workflows_without_cloud() {
+    assert_eq!(
+        sidebar_workflow_types(false),
+        vec![
+            WorkflowViewType::All,
+            WorkflowViewType::LocalPersonal,
+            WorkflowViewType::Project,
+        ]
+    );
+}
+
+/// With a cloud backend configured, Team Workflows sits between My and Repository Workflows.
+#[test]
+fn sidebar_lists_team_workflows_with_cloud() {
+    assert_eq!(
+        sidebar_workflow_types(true),
+        vec![
+            WorkflowViewType::All,
+            WorkflowViewType::LocalPersonal,
+            WorkflowViewType::Team,
+            WorkflowViewType::Project,
+        ]
     );
 }

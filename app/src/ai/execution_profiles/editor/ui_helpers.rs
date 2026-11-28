@@ -618,11 +618,14 @@ pub fn render_permissions_section(
         );
     }
 
-    column.add_child(
-        Container::new(render_plan_auto_sync_toggle(appearance, view, profile_data))
-            .with_margin_top(16.)
-            .finish(),
-    );
+    // SYNTH-FORK: plan auto-sync targets Warp Drive; hide it while Drive is unavailable.
+    if crate::drive::settings::WarpDriveSettings::is_warp_drive_enabled(app) {
+        column.add_child(
+            Container::new(render_plan_auto_sync_toggle(appearance, view, profile_data))
+                .with_margin_top(16.)
+                .finish(),
+        );
+    }
 
     Container::new(column.finish())
         .with_margin_bottom(24.)

@@ -1,6 +1,11 @@
 ---
+type: Feature Spec
 title: Level 3 Port Warp behavior into Zed — Zed × Warp Hybrid
-description: Core/fork work in Synth Zed. Order by leverage: status, launcher, blocks, rich input. Reimplement; do not copy AGPL crates.
+description: "Core/fork work in Synth Zed. Order by leverage: status, launcher, blocks, rich input. Reimplement; do not copy AGPL crates."
+resource: zed-warp/level-3.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Level 3 — Port Warp behavior into Zed

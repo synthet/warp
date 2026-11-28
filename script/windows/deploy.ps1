@@ -1,11 +1,11 @@
 #!/usr/bin/env powershell
 <#
 .SYNOPSIS
-    Build Synth Warp (OSS) and install it into its own per-user folder.
+    Build Synth Term (OSS) and install it into its own per-user folder.
 
 .DESCRIPTION
     Builds warp-oss (unless -SkipBuild), stages it with the Windows payload DLLs and resources,
-    then copies it into %LOCALAPPDATA%\Programs\SynthWarp. Synth Warp runs side by side with any
+    then copies it into %LOCALAPPDATA%\Programs\SynthTerm. Synth Term runs side by side with any
     official Warp install: the official folder, its processes, shortcuts and registry entries are
     never touched. Re-run after each build to update the install.
 
@@ -38,21 +38,22 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
     $PSNativeCommandUseErrorActionPreference = $false
 }
 
-$ProductName = 'Synth Warp'
+$ProductName = 'Synth Term'
 # Must match ChannelState::app_id() for the OSS build so the taskbar and notifications attribute
 # windows to this shortcut.
 $AppUserModelId = 'io.github.synthet.Warp'
 $UrlScheme = 'warposs'
-$RegistryKeyName = 'SynthWarp'
+$RegistryKeyName = 'SynthTerm'
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $TargetDir = Join-Path $RepoRoot 'target'
 $StagingDir = Join-Path $TargetDir 'warp-deploy-staging'
 $BuildScript = Join-Path $PSScriptRoot 'build.ps1'
 $PrepareResourcesScript = Join-Path $PSScriptRoot 'prepare_bundled_resources.ps1'
+. (Join-Path $PSScriptRoot 'deploy_compliance.ps1')
 
 if (-not $InstallDir) {
-    $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\SynthWarp'
+    $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\SynthTerm'
 }
 $InstallDir = [System.IO.Path]::GetFullPath($InstallDir)
 $ExeName = "$Bin.exe"
@@ -67,7 +68,7 @@ function Show-Usage {
     Write-Output @'
 Usage: .\script\windows\deploy.ps1 [options]
 
-Build Synth Warp (OSS) and install it into %LOCALAPPDATA%\Programs\SynthWarp, side by side
+Build Synth Term (OSS) and install it into %LOCALAPPDATA%\Programs\SynthTerm, side by side
 with any official Warp install, which is never touched.
 
 Options:
@@ -75,13 +76,13 @@ Options:
   -SkipBuild         Do not compile; install the last warp-oss.exe.
   -Release           Build with --release (default unless -Debug).
   -Debug             Faster non-release build.
-  -Restart           Launch Synth Warp after the copy (default).
+  -Restart           Launch Synth Term after the copy (default).
   -NoRestart         Do not launch after the copy.
-  -NoShortcut        Do not create the "Synth Warp" Start menu shortcut.
-  -NoContextMenu     Do not add the "Open Synth Warp" Explorer folder entries.
+  -NoShortcut        Do not create the "Synth Term" Start menu shortcut.
+  -NoContextMenu     Do not add the "Open Synth Term" Explorer folder entries.
   -Force             Install into a non-empty folder that has no warp-oss.exe.
   -WhatIf            Print the plan without stopping processes or writing files.
-  -InstallDir PATH   Install directory (default: %LOCALAPPDATA%\Programs\SynthWarp).
+  -InstallDir PATH   Install directory (default: %LOCALAPPDATA%\Programs\SynthTerm).
   -Features LIST     Cargo features (default: release_bundle,gui).
   -Bin NAME          Cargo binary (default: warp-oss).
   -Package NAME      Cargo package (default: warp).
@@ -154,7 +155,7 @@ function Write-CliShim {
 }
 
 function Invoke-PrepareResource {
-    param([string]$DestinationDir, [string]$CargoProfile)
+    param([string]$DestinationDir, [string]$SchemaExecutable)
     $bundledSource = Join-Path $RepoRoot 'resources\bundled'
     $bundledDest = Join-Path $DestinationDir 'bundled'
     if (-not (Test-Path -LiteralPath $bundledSource -PathType Container)) {
@@ -165,7 +166,14 @@ function Invoke-PrepareResource {
     }
 
     try {
-        & $PrepareResourcesScript -DestinationDir $DestinationDir -Channel oss -CargoProfile $CargoProfile
+        # prepare_bundled_resources.ps1 runs the built app to dump the settings schema, as bundle.ps1 does.
+        $previousSchemaExe = $env:SETTINGS_SCHEMA_EXECUTABLE
+        $env:SETTINGS_SCHEMA_EXECUTABLE = $SchemaExecutable
+        try {
+            & $PrepareResourcesScript -DestinationDir $DestinationDir -Channel oss
+        } finally {
+            $env:SETTINGS_SCHEMA_EXECUTABLE = $previousSchemaExe
+        }
         if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
             throw "prepare_bundled_resources.ps1 exited $LASTEXITCODE"
         }
@@ -238,9 +246,10 @@ function Initialize-DeployStaging {
         Copy-PayloadFile -Source (Join-Path $RepoRoot $notice) -Destination (Join-Path $StagingDir (Split-Path -Leaf $notice))
     }
 
-    $cargoProfile = if ($UseRelease) { 'release' } else { 'debug' }
     Write-Output 'Preparing bundled resources...'
-    Invoke-PrepareResource -DestinationDir (Join-Path $StagingDir 'resources') -CargoProfile $cargoProfile
+    Invoke-PrepareResource -DestinationDir (Join-Path $StagingDir 'resources') -SchemaExecutable $exeSource
+    Write-SourceRecord -StagingDir $StagingDir -RepoRoot $RepoRoot
+    Assert-StagedCompliance -StagingDir $StagingDir
 
     Write-CliShim -Path (Join-Path $StagingDir "bin\$Bin.cmd") -ExePath $InstalledExe
 }
@@ -427,6 +436,7 @@ if (-not $SkipBuild) {
 
 if ($WhatIf) {
     Write-Plan "stage $Bin.exe, payload DLLs, icon, notices and resources in $StagingDir"
+    Write-Plan "record the source commit in SOURCE.txt; fail if any of $($RequiredStagedNotices -join ', ') is missing"
 } else {
     Initialize-DeployStaging
 }

@@ -5064,7 +5064,12 @@ impl ApiKeysWidget {
                 });
                 update_editor_interaction_state(
                     editor.clone(),
-                    is_any_ai_enabled && is_byo_enabled && member_byo_keys_allowed,
+                    provider_keys_editable(
+                        is_any_ai_enabled,
+                        is_byo_enabled,
+                        member_byo_keys_allowed,
+                        byok_backend_available(),
+                    ),
                     ctx,
                 );
                 ctx.subscribe_to_view(&editor, move |_, editor, event, ctx| {
@@ -5083,7 +5088,6 @@ impl ApiKeysWidget {
                             AISettings::handle(ctx).as_ref(ctx).is_any_ai_enabled(ctx);
                         let is_byo_enabled = workspace.as_ref(ctx).is_byo_api_key_enabled(ctx);
                         let member_byo_keys_allowed = member_byo_keys_allowed_for_view(ctx);
-                        let is_enabled = is_any_ai_enabled && is_byo_enabled;
                         let has_key = !editor_clone.as_ref(ctx).is_empty(ctx);
                         if !is_byo_enabled && has_key {
                             editor_clone.update(ctx, |editor, ctx| {
@@ -5095,7 +5099,12 @@ impl ApiKeysWidget {
                         }
                         update_editor_interaction_state(
                             editor_clone.clone(),
-                            is_enabled && member_byo_keys_allowed,
+                            provider_keys_editable(
+                                is_any_ai_enabled,
+                                is_byo_enabled,
+                                member_byo_keys_allowed,
+                                byok_backend_available(),
+                            ),
                             ctx,
                         );
                         ctx.notify();
@@ -5444,22 +5453,19 @@ impl ApiKeysWidget {
             lines.push(FormattedTextLine::Line(fragments));
         };
 
-        if show_provider_keys {
-            add_paragraph(vec![FormattedTextFragment::plain_text(
-                "Use your own API keys from model providers for Warp Agent. API keys are used to make requests to your chosen model provider. Using auto models or models you do not have available API keys for will consume Warp credits.",
-            )]);
+        for paragraph in custom_inference_description_paragraphs(
+            show_provider_keys,
+            show_custom_endpoints,
+            ChannelState::warp_hosted_ai_enabled(),
+            byok_backend_available(),
+        ) {
+            add_paragraph(vec![FormattedTextFragment::plain_text(paragraph)]);
         }
 
-        if show_custom_endpoints {
-            add_paragraph(vec![FormattedTextFragment::plain_text(
-                "Add custom endpoints to use third-party models. Custom endpoints must support OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages.",
-            )]);
-        }
-
-        if show_provider_keys || show_custom_endpoints {
-            add_paragraph(vec![FormattedTextFragment::plain_text(
-                "API keys added here are stored only on this device, not on Warp's servers.",
-            )]);
+        // Synth Warp is local-first: the upstream page describes Warp credits.
+        if (show_provider_keys || show_custom_endpoints)
+            && crate::util::links::warp_inc_links_enabled()
+        {
             add_paragraph(vec![FormattedTextFragment::hyperlink(
                 "Learn more",
                 CUSTOM_INFERENCE_LEARN_MORE_URL,
@@ -5855,6 +5861,65 @@ struct CustomInferenceVisibility {
     managed_byok_byoe_enabled: bool,
 }
 
+/// Synth Warp is local-first: BYOK keys are request fields relayed by whatever
+/// backend `server_root_url` names (docs/architecture/synth-fork.md § BYOK), so
+/// they do nothing until a self-hosted backend is configured.
+fn byok_backend_available() -> bool {
+    ChannelState::warp_cloud_enabled()
+}
+
+/// Whether the provider key fields accept input.
+fn provider_keys_editable(
+    is_any_ai_enabled: bool,
+    is_byo_enabled: bool,
+    member_byo_keys_allowed: bool,
+    backend_available: bool,
+) -> bool {
+    is_any_ai_enabled && is_byo_enabled && member_byo_keys_allowed && backend_available
+}
+
+const PROVIDER_KEYS_DESCRIPTION_WARP_HOSTED: &str = "Use your own API keys from model providers for Warp Agent. API keys are used to make requests to your chosen model provider. Using auto models or models you do not have available API keys for will consume Warp credits.";
+const PROVIDER_KEYS_DESCRIPTION_SELF_HOSTED: &str = "Use your own API keys from model providers for the built-in agent. The keys are sent with each request to the self-hosted backend set in SYNTH_WARP_SERVER_ROOT_URL, which calls your chosen model provider.";
+const CUSTOM_ENDPOINTS_DESCRIPTION: &str = "Add custom endpoints to use third-party models. Custom endpoints must support OpenAI Chat Completions, OpenAI Responses, or Anthropic Messages.";
+const KEY_STORAGE_DESCRIPTION_WARP_HOSTED: &str =
+    "API keys added here are stored only on this device, not on Warp's servers.";
+const KEY_STORAGE_DESCRIPTION_SELF_HOSTED: &str =
+    "API keys added here are stored only on this device.";
+const NO_BACKEND_PREREQUISITE: &str = "No backend is configured, so these keys are not used and the fields are disabled. Set SYNTH_WARP_SERVER_ROOT_URL to a self-hosted backend to enable them.";
+
+/// The Custom Inference description paragraphs. Warp-hosted channels keep the
+/// upstream copy; every other channel gets copy that matches its inference path.
+fn custom_inference_description_paragraphs(
+    show_provider_keys: bool,
+    show_custom_endpoints: bool,
+    warp_hosted_ai: bool,
+    backend_available: bool,
+) -> Vec<&'static str> {
+    let mut paragraphs = Vec::new();
+    if show_provider_keys {
+        paragraphs.push(if warp_hosted_ai {
+            PROVIDER_KEYS_DESCRIPTION_WARP_HOSTED
+        } else {
+            PROVIDER_KEYS_DESCRIPTION_SELF_HOSTED
+        });
+    }
+    if show_custom_endpoints {
+        paragraphs.push(CUSTOM_ENDPOINTS_DESCRIPTION);
+    }
+    if show_provider_keys || show_custom_endpoints {
+        paragraphs.push(if warp_hosted_ai {
+            KEY_STORAGE_DESCRIPTION_WARP_HOSTED
+        } else {
+            KEY_STORAGE_DESCRIPTION_SELF_HOSTED
+        });
+        // The prerequisite names the provider key fields, so it only applies when they show.
+        if show_provider_keys && !warp_hosted_ai && !backend_available {
+            paragraphs.push(NO_BACKEND_PREREQUISITE);
+        }
+    }
+    paragraphs
+}
+
 impl CustomInferenceVisibility {
     /// Resolves the section's visibility for `team_scope`'s team.
     fn compute(team_scope: &TeamContext<'_>, app: &AppContext) -> Self {
@@ -5867,7 +5932,10 @@ impl CustomInferenceVisibility {
 
         // BYOK: shown even when BYO is off so the upgrade CTA can render.
         let show_provider_keys = member_byo_keys_allowed;
-        let provider_keys_enabled = show_provider_keys && is_any_ai_enabled && is_byo_enabled;
+        let upstream_provider_keys_enabled =
+            show_provider_keys && is_any_ai_enabled && is_byo_enabled;
+        // Synth Warp is local-first: keys are inert without a backend to relay them.
+        let provider_keys_enabled = upstream_provider_keys_enabled && byok_backend_available();
 
         // BYOE (custom endpoints).
         let show_custom_inference = is_custom_inference_enabled && member_byo_endpoints_allowed;

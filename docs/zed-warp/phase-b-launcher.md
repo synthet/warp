@@ -1,6 +1,11 @@
 ---
+type: Feature Spec
 title: Phase B Session launcher — Zed × Warp Hybrid
 description: A Zed-native analogue of Warp Tab Configs — worktree, agent command, cwd, env — spawned from the New Thread menu.
+resource: zed-warp/phase-b-launcher.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Phase B — Session launcher / workspace configs

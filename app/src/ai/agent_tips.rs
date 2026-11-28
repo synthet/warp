@@ -421,6 +421,10 @@ impl AITip for AgentTip {
                 .get_codebase_index_status_for_path(root, app)
                 .is_none();
         }
+        // SYNTH-FORK: no Warp Drive tips while Drive is unavailable (always, without Warp cloud).
+        if matches!(self.kind, AgentTipKind::WarpDrive) {
+            return crate::drive::settings::WarpDriveSettings::is_warp_drive_enabled(app);
+        }
         // Handoff tips only apply when the feature is available and enabled.
         if matches!(self.kind, AgentTipKind::Handoff) {
             return AISettings::as_ref(app).is_cloud_handoff_enabled(app);

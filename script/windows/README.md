@@ -2,7 +2,7 @@
 
 ## Local deploy into its own folder
 
-Builds Synth Warp (OSS) and installs it per user into `%LOCALAPPDATA%\Programs\SynthWarp`,
+Builds Synth Term (OSS) and installs it per user into `%LOCALAPPDATA%\Programs\SynthTerm`,
 side by side with any official Warp install. Official Warp's folder, processes, shortcuts and
 registry entries are never touched. Re-run after each build; no elevation is needed.
 
@@ -14,8 +14,8 @@ registry entries are never touched. Re-run after each build; no elevation is nee
 
 `deploy.cmd` in this folder is a double-clickable wrapper for the same script.
 
-Deploy creates a "Synth Warp" Start menu shortcut (AppUserModelID `io.github.synthet.Warp`, so
-the taskbar and notifications attribute to it), "Open Synth Warp in new tab/window" Explorer
+Deploy creates a "Synth Term" Start menu shortcut (AppUserModelID `io.github.synthet.Warp`, so
+the taskbar and notifications attribute to it), "Open Synth Term in new tab/window" Explorer
 folder entries on `warposs://`, and an App Paths entry for `warp-oss.exe`. Settings live under
 `io.github.synthet.Warp` wherever the binary is installed. If `cargo about` is not installed,
 deploy still copies `resources\bundled` and skips license/schema generation.

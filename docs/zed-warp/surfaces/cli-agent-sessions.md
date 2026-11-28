@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: CLI agent sessions — Zed × Warp Hybrid
 description: Warp in-process model for Claude/Codex/Gemini/OpenCode. Live source of truth for AgentSession when Warp hosts agents.
+resource: zed-warp/surfaces/cli-agent-sessions.md
+tags: [docs, zed-warp, surfaces]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # CLI agent sessions

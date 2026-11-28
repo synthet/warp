@@ -47,6 +47,11 @@ impl WarpDriveSettings {
     /// feature remains unavailable until then.
     pub fn is_warp_drive_available(app: &warpui::AppContext) -> bool {
         use warpui::SingletonEntity as _;
+        // SYNTH-FORK: Warp Drive is a Warp-hosted cloud service. Without Warp cloud access
+        // (the OSS build) it is unavailable, which hides every Drive surface gated on this.
+        if !crate::channel::ChannelState::warp_cloud_enabled() {
+            return false;
+        }
         !FeatureFlag::SkipFirebaseAnonymousUser.is_enabled()
             || !crate::auth::AuthStateProvider::as_ref(app)
                 .get()

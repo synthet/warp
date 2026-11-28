@@ -7522,7 +7522,8 @@ impl SettingsWidget for WorkflowsInCommandSearch {
         let workflow_settings = CommandSearchSettings::as_ref(app);
         render_body_item::<FeaturesPageAction>(
             "Show Global Workflows in Command Search (ctrl-r)".into(),
-            Some(AdditionalInfo {
+            // The docs link points at Warp Inc.'s site, which OSS builds do not link to.
+            crate::util::links::warp_inc_links_enabled().then(|| AdditionalInfo {
                 mouse_state: self.additional_info_link.clone(),
                 on_click_action: Some(FeaturesPageAction::OpenUrl(
                     "https://docs.warp.dev/terminal/entry/yaml-workflows".into(),

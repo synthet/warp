@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: AgentSession — Zed × Warp Hybrid
 description: Shared session model across Zed native, ACP, Terminal Threads, and Warp CLI agents.
+resource: zed-warp/agent-session.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # AgentSession

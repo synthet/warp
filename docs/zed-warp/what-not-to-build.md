@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: What not to build — Zed × Warp Hybrid
 description: Embeddings, editor transplants, extension dashboards, AGPL vendoring, third brokers, and PTY/buffer sync are out of scope.
+resource: zed-warp/what-not-to-build.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # What not to build

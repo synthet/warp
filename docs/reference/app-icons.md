@@ -21,8 +21,8 @@ There are **three independent icon systems** — changing one does not change th
 | [Dock icon variants](#3-macos-dock-icon-variants) | `DockTilePlugin/Resources/*.png` | macOS only | User setting (runtime) |
 
 > **Source of truth.** The `local`, `oss`, and `warp-oss` rasters are generated — do not hand-edit
-> them. Vector masters are mirrored at [`assets/icons/synth-family/`](../../assets/icons/synth-family/README.md)
-> and rendered by `script/apply_branding_icons.py` in the sibling Zed checkout:
+> them. The Synth Term vector masters live in [`assets/branding/synth-term/`](../../assets/branding/synth-term/README.md)
+> and are rendered by this repo's `script/apply_branding_icons.py`:
 > `uv run --with pillow python script/apply_branding_icons.py` (add `--check` to validate only).
 >
 > **Glyph note.** `local`, `oss`, and `warp-oss` carry the Synth fork glyph; the rest are inherited
@@ -179,11 +179,9 @@ logic in `WarpDockTilePlugin.m`.
 ### Windows (this fork's usual target)
 
 For `local` / `oss` / `warp-oss`, don't hand-author rasters — edit the vector master in
-[`assets/icons/synth-family/`](../../assets/icons/synth-family/README.md), mirror it to the
-canonical copy in the sibling Zed checkout, and regenerate:
+[`assets/branding/synth-term/`](../../assets/branding/synth-term/README.md) and regenerate:
 
 ```shell
-cd ../zed
 uv run --with pillow python script/apply_branding_icons.py
 uv run --with pillow python script/apply_branding_icons.py --check
 ```

@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Windows constraints — Zed × Warp Hybrid
 description: Warp→Zed editor missing on Windows. local_control publication off. warposs scheme registration.
+resource: zed-warp/constraints/windows.md
+tags: [docs, zed-warp, constraints]
+timestamp: 2026-08-15T17:45:31Z
+okf_version: 0.1
 ---
 
 # Windows constraints

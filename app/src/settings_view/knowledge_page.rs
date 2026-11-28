@@ -196,7 +196,10 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
                 flags::WARP_DRIVE_CONTEXT_FLAG,
             )
             .with_group(bindings::BindingGroup::WarpAi)
-            .with_enabled(|| FeatureFlag::AIRules.is_enabled()),
+            // SYNTH-FORK: Drive-as-context needs Warp Drive, which needs Warp cloud access.
+            .with_enabled(|| {
+                FeatureFlag::AIRules.is_enabled() && ChannelState::warp_cloud_enabled()
+            }),
         ],
         app,
     );
