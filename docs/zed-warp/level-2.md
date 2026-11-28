@@ -1,6 +1,11 @@
 ---
+type: Feature Spec
 title: Level 2 Bridge — Zed × Warp Hybrid
 description: Warp exports AgentSession over local_control. Zed consumes via poll or MCP. No third daemon as source of truth.
+resource: zed-warp/level-2.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Level 2 — Bridge (Warp export, Zed consume)

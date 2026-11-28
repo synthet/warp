@@ -1,5 +1,11 @@
 ---
+type: Documentation Hub
 title: Warp surfaces index — Zed × Warp Hybrid
+description: ← Zed × Warp
+resource: zed-warp/surfaces/README.md
+tags: [docs, zed-warp, surfaces]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Warp surfaces

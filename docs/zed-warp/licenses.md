@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Licenses — Zed × Warp Hybrid
 description: GPL Zed, AGPL Warp, MIT/Apache UI frameworks. Reimplement protocols. Do not vendor Warp crates into Zed or GPUI into Warp.
+resource: zed-warp/licenses.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Licenses

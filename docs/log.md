@@ -6,6 +6,7 @@ Format: `- YYYY-MM-DD: <verb> — <details and paths>` (verbs: `created`, `updat
 
 ## 2026-11
 
+- 2026-11-20: lint-fixed — added the OKF frontmatter fields `okf_lint.py --profile project` requires (type, resource, tags, timestamp, okf_version; title/description where missing) to [planning/graphql-call-site-inventory.md](planning/graphql-call-site-inventory.md) and 34 pages in [zed-warp/](zed-warp/README.md); redirect stubs typed `Archive`; quoted the unparseable description in zed-warp/level-3.md. Frontmatter only, page text unchanged. The zed-warp mirror already differed from the Synth Zed copy in 8 pages before this change; it needs a two-way reconcile (see zed-warp/MIRROR.md).
 - 2026-11-05: created — self-hosted remote control verification: [reports/remote-control-verification-2026-11-05.md](reports/remote-control-verification-2026-11-05.md). Updated the guide's troubleshooting table and the spec's known limits with what the run found.
 
 ## 2026-10

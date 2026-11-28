@@ -1,6 +1,11 @@
 ---
+type: Report
 title: Feasibility / roadmap — Zed × Warp Hybrid
 description: Verdict for 5–15 simultaneous Claude/Codex sessions. Dual-app vs Zed-only sequences. Shared todos.
+resource: zed-warp/feasibility.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Feasibility and roadmap

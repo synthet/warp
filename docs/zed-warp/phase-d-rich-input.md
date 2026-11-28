@@ -1,6 +1,11 @@
 ---
+type: Feature Spec
 title: Phase D Rich agent input — Zed × Warp Hybrid
 description: Warp Ctrl-G injects a host editor into CLI stdin. Zed already has MessageEditor for ACP. Treat TTY overlays as a per-agent enhancement after status and launcher.
+resource: zed-warp/phase-d-rich-input.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Phase D — Rich agent input overlay

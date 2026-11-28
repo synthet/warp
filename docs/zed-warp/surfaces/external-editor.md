@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: External editor — Zed × Warp Hybrid
 description: How Synth Warp opens a file in Zed or another editor. Warp → Zed half of Level 1.
+resource: zed-warp/surfaces/external-editor.md
+tags: [docs, zed-warp, surfaces]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # External editor (Warp → Zed)

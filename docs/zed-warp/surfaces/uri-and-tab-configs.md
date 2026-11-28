@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: URI scheme and tab configs — Zed × Warp Hybrid
 description: warposs:// and warp:// actions, TabConfig TOML, Zed tasks. Zed → Warp half of Level 1.
+resource: zed-warp/surfaces/uri-and-tab-configs.md
+tags: [docs, zed-warp, surfaces]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # URI scheme and tab configs

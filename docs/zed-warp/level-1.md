@@ -1,6 +1,11 @@
 ---
+type: Feature Spec
 title: Level 1 Dual-app workflow — Zed × Warp Hybrid
 description: Use Warp for agent/terminal sessions and Zed as the editor. File-link support plus warposs:// / warp:// tasks.
+resource: zed-warp/level-1.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Level 1 — Dual-app workflow

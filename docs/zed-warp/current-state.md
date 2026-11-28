@@ -1,6 +1,11 @@
 ---
+type: Report
 title: Current state — Zed × Warp Hybrid
 description: What Zed and Warp already provide, and the exact gaps a hybrid would close.
+resource: zed-warp/current-state.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Current state

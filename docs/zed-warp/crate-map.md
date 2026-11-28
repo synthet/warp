@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Crate map — Zed × Warp Hybrid
 description: Where a hybrid change would land in Synth Zed and Synth Warp. Paths are labeled by checkout.
+resource: zed-warp/crate-map.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Crate map

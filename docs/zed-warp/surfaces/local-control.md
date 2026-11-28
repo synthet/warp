@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Local control — Zed × Warp Hybrid
 description: warpctrl IPC. Extend this catalog for Level 2. Do not add a competing ~/.devsessions daemon.
+resource: zed-warp/surfaces/local-control.md
+tags: [docs, zed-warp, surfaces]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Local control (`warpctrl`)

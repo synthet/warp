@@ -1,3 +1,13 @@
+---
+type: Report
+title: "`send_graphql_request` call-site inventory (backlog item #10)"
+description: "Inventory of send_graphql_request call sites behind backlog item #10: quieting leftover GraphQL requests to the disabled 192.0.2.0:9 server root."
+resource: planning/graphql-call-site-inventory.md
+tags: [docs, planning]
+timestamp: 2026-09-12T20:40:55Z
+okf_version: 0.1
+---
+
 # `send_graphql_request` call-site inventory (backlog item #10)
 
 Follow-up inventory for [conversation-backlog.md](conversation-backlog.md) item **#10 — Quiet

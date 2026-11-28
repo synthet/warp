@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Overview — Zed × Warp Hybrid
 description: Three realistic integration levels. Do not embed the apps. Warp local_control for dual-app sync. Zed as the end-state base.
+resource: zed-warp/overview.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Overview

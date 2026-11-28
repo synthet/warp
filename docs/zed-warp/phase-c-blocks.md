@@ -1,6 +1,11 @@
 ---
+type: Feature Spec
 title: Phase C Terminal blocks — Zed × Warp Hybrid
 description: Warp blocks are a shell-integration model, not a widget. Defer until Phase A. Prefer cheap ACP tool headers unless you need interactive-shell blocks.
+resource: zed-warp/phase-c-blocks.md
+tags: [docs, zed-warp]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Phase C — Terminal blocks

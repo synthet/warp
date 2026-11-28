@@ -1,6 +1,11 @@
 ---
+type: Technical Reference
 title: Zed extension limits — Zed × Warp Hybrid
 description: MCP, ACP, and tasks work. Custom terminal UI, session dashboard, and agent sidebar chrome require Zed core or a fork.
+resource: zed-warp/constraints/zed-extensions.md
+tags: [docs, zed-warp, constraints]
+timestamp: 2026-08-15T03:14:33Z
+okf_version: 0.1
 ---
 
 # Zed extension limits
