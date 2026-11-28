@@ -895,6 +895,13 @@ impl warpui::Entity for AgentDriverRunner {
 
 impl warpui::SingletonEntity for AgentDriverRunner {}
 
+/// Synth Warp is local-first: a third-party harness started from this machine with no Warp
+/// server configured runs without a Warp account, team, Drive or Oz task. The harness CLI
+/// authenticates with its own login or API key.
+fn is_local_only_harness_run(args: &RunAgentArgs) -> bool {
+    args.harness != Harness::Oz && args.task_id.is_none() && !ChannelState::warp_cloud_enabled()
+}
+
 fn resolve_agent_driver_team_scope(
     args: &RunAgentArgs,
     ctx: &AppContext,
@@ -949,14 +956,22 @@ impl AgentDriverRunner {
             let execution_config = execution_data.as_ref().map(|data| &data.config);
             let has_execution_config = execution_config.is_some();
 
+            // Synth Warp is local-first: a local-only harness run has no team, team scope or
+            // Drive to sync. The guarded upstream bodies keep their indentation so upstream
+            // merges stay byte-identical.
+            let local_only_run = is_local_only_harness_run(&args);
             // Ensure we've synced team state before starting the driver.
+            if !local_only_run {
             setup_events
                 .record_result(
                     SetupStep::TeamMetadataRefresh,
                     Self::refresh_team_metadata(&foreground, args.task_id.is_some()),
                 )
                 .await?;
-            let agent_driver_team_scope = if let Some(config) = execution_config {
+            }
+            let agent_driver_team_scope = if local_only_run {
+                None
+            } else if let Some(config) = execution_config {
                 Some(execution_config::team_scope(config.team_id.as_ref())
                     .map_err(AgentDriverError::ConfigBuildFailed)?)
             } else {
@@ -970,6 +985,7 @@ impl AgentDriverRunner {
             // Wait for Warp Drive to sync before building the task config, since
             // prompt resolution (SavedPrompt -> workflow lookup) and environment
             // resolution (CloudAmbientAgentEnvironment lookup) depend on it.
+            if !local_only_run {
             setup_events
                 .record_result(SetupStep::WarpDriveSync, async {
                     if foreground
@@ -983,6 +999,7 @@ impl AgentDriverRunner {
                     Ok(())
                 })
                 .await?;
+            }
 
             // Pull relevant variables out of args before moving it into the closure.
             let share_requests = match execution_config {
@@ -1454,6 +1471,7 @@ impl AgentDriverRunner {
         setup_events: &SetupClientEventReporter,
         execution_data: Option<ExecutionTaskData>,
     ) -> Result<(AgentDriverOptions, Task, Option<String>), AgentDriverError> {
+        let local_only_run = is_local_only_harness_run(&args);
         // Get the working directory
         let working_dir = match args.cwd.as_ref() {
             Some(dir) => dunce::canonicalize(dir)
@@ -1652,6 +1670,9 @@ impl AgentDriverRunner {
                     ),
                 )
                 .await?
+        } else if local_only_run {
+            // Synth Warp is local-first: there is no Oz task to create; the run stays local.
+            (None, Vec::new())
         } else {
             // Extract the prompt text that we'll pass up to the server when we create the task.
             let prompt_for_task_creation = match &prompt {
@@ -2229,7 +2250,7 @@ fn command_authentication(
 fn command_requires_auth(command: &CliCommand) -> bool {
     match command {
         CliCommand::Agent(agent_cmd) => match agent_cmd {
-            AgentCommand::Run { .. } => true,
+            AgentCommand::Run(args) => !is_local_only_harness_run(args),
             AgentCommand::RunCloud { .. } => true,
             AgentCommand::RunCloudStandby { .. } => true,
             AgentCommand::Profile(sub) => match sub {

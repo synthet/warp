@@ -35,6 +35,7 @@ use crate::ai::attachment_utils::DownloadedAttachment;
 use crate::ai::mcp::JSONMCPServer;
 use crate::server::server_api::ServerApi;
 use crate::server::server_api::harness_support::{HarnessSupportClient, upload_to_target};
+use crate::server::server_api::local_harness_support::is_local_conversation_token;
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::{CLIAgentSessionStatus, CLIAgentSessionsModel};
 use crate::terminal::model::block::{BlockId, SerializedBlock};
@@ -958,6 +959,10 @@ pub(crate) async fn upload_block_snapshot(
     conversation_id: &ServerConversationToken,
     block: SerializedBlock,
 ) -> Result<()> {
+    // Synth Warp is local-first: a locally issued conversation has no server copy.
+    if is_local_conversation_token(conversation_id) {
+        return Ok(());
+    }
     log::info!("Uploading block snapshot for CLI agent to conversation {conversation_id}");
     let target = client
         .get_block_snapshot_upload_target(conversation_id)

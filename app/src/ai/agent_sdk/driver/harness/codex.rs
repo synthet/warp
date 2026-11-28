@@ -48,6 +48,8 @@ use crate::ai::ambient_agents::task::HarnessModelConfig;
 use crate::ai::mcp::JSONTransportType;
 use crate::server::server_api::ServerApi;
 use crate::server::server_api::harness_support::HarnessSupportClient;
+// Synth Warp is local-first: no Warp server means a local harness-support stand-in.
+use crate::server::server_api::local_harness_support::harness_support_client_for;
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::model::block::BlockId;
@@ -190,7 +192,7 @@ impl ThirdPartyHarness for CodexHarness {
         }
         parts.push(prompt);
         let owned_prompt = parts.join("\n\n");
-        let client: Arc<dyn HarnessSupportClient> = server_api;
+        let client: Arc<dyn HarnessSupportClient> = harness_support_client_for(server_api);
         Ok(Box::new(CodexHarnessRunner::new(
             self.cli_agent().command_prefix(),
             &owned_prompt,

@@ -6,6 +6,9 @@ pub(crate) mod download;
 pub mod factory;
 pub mod harness_support;
 pub mod integrations;
+// Synth Warp is local-first: harness support without a Warp server.
+#[cfg_attr(target_family = "wasm", allow(dead_code))]
+pub mod local_harness_support;
 pub mod managed_mcp;
 pub mod managed_secrets;
 pub mod object;
@@ -1629,7 +1632,8 @@ impl ServerApiProvider {
 
     #[cfg_attr(target_family = "wasm", expect(dead_code))]
     pub fn get_harness_support_client(&self) -> Arc<dyn harness_support::HarnessSupportClient> {
-        self.server_api.clone()
+        // Synth Warp is local-first: without a Warp server, harness runs use a local stand-in.
+        local_harness_support::harness_support_client_for(self.server_api.clone())
     }
 
     /// Returns the standby API client with the app's shared authentication state.

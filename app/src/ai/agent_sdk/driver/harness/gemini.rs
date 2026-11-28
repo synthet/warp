@@ -30,6 +30,8 @@ use crate::ai::ambient_agents::AmbientAgentTaskId;
 use crate::ai::ambient_agents::task::HarnessModelConfig;
 use crate::server::server_api::ServerApi;
 use crate::server::server_api::harness_support::HarnessSupportClient;
+// Synth Warp is local-first: no Warp server means a local harness-support stand-in.
+use crate::server::server_api::local_harness_support::harness_support_client_for;
 use crate::terminal::CLIAgent;
 use crate::terminal::model::block::BlockId;
 
@@ -102,7 +104,7 @@ impl ThirdPartyHarness for GeminiHarness {
             Some(ctx) if !ctx.is_empty() => format!("{ctx}\n\n{prompt}"),
             _ => prompt.to_string(),
         };
-        let client: Arc<dyn HarnessSupportClient> = server_api;
+        let client: Arc<dyn HarnessSupportClient> = harness_support_client_for(server_api);
         Ok(Box::new(GeminiHarnessRunner::new(
             self.cli_agent().command_prefix(),
             &effective_prompt,

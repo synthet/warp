@@ -1949,6 +1949,12 @@ impl RootView {
                     let should_show_pre_login_onboarding = pre_login_onboarding_enabled
                         && FeatureFlag::AgentOnboarding.is_enabled()
                         && !has_completed_local_onboarding;
+                    // Synth Warp is local-first: logged-out headless runs (`agent run --harness
+                    // ...` with no Warp server) reach this branch, and need a terminal, not
+                    // first-launch onboarding.
+                    let should_show_pre_login_onboarding = should_show_pre_login_onboarding
+                        && warp_core::execution_mode::AppExecutionMode::as_ref(ctx)
+                            .can_show_onboarding();
                     if should_show_pre_login_onboarding {
                         let workspace_args_box: Box<WorkspaceArgs> = workspace_args.into();
                         let onboarding_view = Self::create_agent_onboarding_view(ctx);

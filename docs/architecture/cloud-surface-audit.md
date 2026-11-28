@@ -108,16 +108,54 @@ that reached around those predicates; each is now gated:
 
 | Surface | Gate |
 |---|---|
-| `IntegrationCommand` (Slack/Linear), `ArtifactCommand` (incl. the agent's upload-artifact tool), `AcpHarness` (cloud `--harness-transport`), `FactoryMcp`, `OrchestrationLaunchModal`, `PeriodicHandoffCheckpoints` | 3 (`CLOUD_AGENT_FEATURES`) |
+| `IntegrationCommand` (Slack/Linear), `ArtifactCommand` (incl. the agent's upload-artifact tool), `FactoryMcp`, `OrchestrationLaunchModal`, `PeriodicHandoffCheckpoints` | 3 (`CLOUD_AGENT_FEATURES`) |
 | `AgentCliLaunchModal` (hosted Warp Agent CLI marketing) | 3 (`WARP_HOSTED_AI_FEATURES`) |
 | `warp agent run-cloud-standby` and its `--prewarmed-sandbox-control-url` override | `cloud_agents_enabled()` in `agent_sdk/mod.rs` and `lib.rs` |
 | Deeplinks `action/new_cloud_agent_conversation` (no-window branch skipped the workspace gate), `action/create_environment`, `conversation/<id>` | Early return in `uri/mod.rs` handlers on `cloud_agents_enabled()` / `CloudEnvironments` / `CloudConversations`. Parsing is untouched so upstream URI tests still hold |
 | Bundled skills `oz-platform`, `factory-files` (the latter told agents to `curl app.warp.dev`) | `RequiresFeature(OzPlatformSkills)` in `activation_for_bundled_skill`. `factory-mcp` follows `FactoryMcp`; `factory-deferred-repositories` is already excluded from the global list and only published for cloud task contracts |
 
-Kept: `AgentHarness` and the PTY transport, which run third-party CLI agents locally.
+Kept: `AgentHarness` and both harness transports, PTY and ACP (`AcpHarness`), which run third-party
+CLI agents locally. `AcpHarness` was stripped until 2026-11-14 on the assumption that the ACP
+transport was cloud-only; it is not — the adapter runs as a local subprocess over a socket bridge.
+
+### Local third-party harness runs
+
+`warp agent run --harness claude|codex|gemini [--harness-transport acp]` runs with no Warp server and
+no Warp login. When `ChannelState::warp_cloud_enabled()` is false and the run has no `--task-id`
+(`is_local_only_harness_run` in `agent_sdk/mod.rs`):
+
+- the command skips the Warp login requirement, team-metadata refresh, Drive sync and Oz task
+  creation, and `AgentDriver::create` skips its login check;
+- the root view skips first-launch onboarding for non-app execution modes
+  (`AppExecutionMode::can_show_onboarding`), so the headless driver gets a terminal;
+- `LocalHarnessSupportClient` (`server/server_api/local_harness_support.rs`) replaces warp-server's
+  harness-support API: it issues `local-…` conversation tokens, and the transcript and
+  block-snapshot upload helpers skip those tokens. Oz-task operations fail explicitly.
+
+The harness authenticates with its own login or API key (`codex login`, `ANTHROPIC_API_KEY`, …).
+Codex over PTY additionally installs Warp's Codex plugin from GitHub (`warpdotdev/codex-warp`).
 
 Not yet gated (dormant, end at the sinkhole): the remaining `warp agent list/get/create/...`
 management subcommands still parse and appear in `--help`; they fail at auth.
+
+## Gated: Tools panel and header toolbar
+
+2026-11-14 audit of the left Tools panel (`workspace/view/left_panel.rs`) and the header toolbar
+items that sit next to it (`workspace/header_toolbar_item.rs`):
+
+| Surface | Backing | Status |
+|---|---|---|
+| Project explorer, Global search | Local filesystem | Kept |
+| **Warp Drive** tab | Hosted Drive sync | Gate 1 in `Workspace::compute_left_panel_views`, with its Appearance → Tools panel toggle (see `WarpDriveSettings::is_warp_drive_available`) |
+| Agent conversations tab | Local SQLite history | Kept. Ambient (Oz) runs are already never fetched (`AgentConversationsModel` checks `cloud_agents_enabled()`); the zero-state copy no longer mentions ambient agents |
+| Agent Management ("Runs") | Local runs + Oz runs | Setup guide, environment filter, cloud loading icon and cloud agent type were already gated. The **Source** filter is now gated too: every source but `Interactive` is an Oz run source, so locally it could only narrow to nothing |
+| Code Review | Local git | Kept |
+| Notifications | Local agent completion alerts | Kept (the `Oz` variant is the built-in agent's icon, not a cloud run) |
+
+Known residue: the conversations tab still reports `RequiresAccount` whenever the user is logged
+out (`ToolPanelView::availability`), which without a self-hosted login is always — so the tab stays
+locked even with AI enabled. That is an account gate on a local feature, not a cloud surface; left
+for a separate change.
 
 ## Gated: other pages
 
