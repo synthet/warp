@@ -37,6 +37,18 @@ fn can_auto_install_is_true_off_windows() {
     assert!(ClaudeCodePluginManager::new(None, None, None).can_auto_install());
 }
 
+#[cfg(windows)]
+#[test]
+fn supports_update_is_false_on_windows() {
+    assert!(!ClaudeCodePluginManager::new(None, None, None).supports_update());
+}
+
+#[cfg(not(windows))]
+#[test]
+fn supports_update_is_true_off_windows() {
+    assert!(ClaudeCodePluginManager::new(None, None, None).supports_update());
+}
+
 #[test]
 fn installed_when_plugin_present() {
     let dir = tempfile::tempdir().unwrap();

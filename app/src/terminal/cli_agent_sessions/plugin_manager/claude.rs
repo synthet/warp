@@ -206,6 +206,13 @@ impl CliAgentPluginManager for ClaudeCodePluginManager {
         }
     }
 
+    /// On Windows the fork installs its own PowerShell hooks rather than the versioned upstream
+    /// plugin, so the version they report can't be compared with MINIMUM_PLUGIN_VERSION, and
+    /// re-running the installer can't raise it.
+    fn supports_update(&self) -> bool {
+        cfg!(not(windows))
+    }
+
     async fn install_platform_plugin(&self) -> Result<(), PluginInstallError> {
         let mut log = String::new();
         self.run_logged(
