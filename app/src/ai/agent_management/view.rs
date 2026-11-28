@@ -2017,10 +2017,15 @@ impl AgentManagementView {
             let mut filters_wrap = Wrap::row()
                 .with_spacing(4.)
                 .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(ChildView::new(&self.status_dropdown).finish())
-                .with_child(ChildView::new(&self.source_dropdown).finish())
-                .with_child(ChildView::new(&self.created_on_dropdown).finish())
-                .with_child(ChildView::new(&self.artifact_dropdown).finish());
+                .with_child(ChildView::new(&self.status_dropdown).finish());
+            // Synth Warp is local-first: every source but `Interactive` is a cloud
+            // (Oz) run source, and local runs are all `Interactive`, so without
+            // cloud agents the source filter can only ever narrow to nothing.
+            if cloud_agents_enabled {
+                filters_wrap.add_child(ChildView::new(&self.source_dropdown).finish());
+            }
+            filters_wrap.add_child(ChildView::new(&self.created_on_dropdown).finish());
+            filters_wrap.add_child(ChildView::new(&self.artifact_dropdown).finish());
 
             if HarnessAvailabilityModel::as_ref(app).should_show_harness_selector() {
                 filters_wrap.add_child(ChildView::new(&self.harness_dropdown).finish());

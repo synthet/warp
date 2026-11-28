@@ -3,6 +3,7 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use pathfinder_geometry::vector::Vector2F;
+use warp_core::channel::ChannelState;
 use warp_core::features::FeatureFlag;
 use warp_core::send_telemetry_from_ctx;
 use warp_core::ui::Icon;
@@ -805,7 +806,13 @@ fn render_zero_state(
         .with_child(
             ConstrainedBox::new(
                 FormattedTextElement::from_str(
-                    "Your active and past conversations with local and ambient agents will appear here.",
+                    // Synth Warp is local-first: ambient (cloud) agents are never
+                    // listed without cloud agents, so don't advertise them.
+                    if ChannelState::cloud_agents_enabled() {
+                        "Your active and past conversations with local and ambient agents will appear here."
+                    } else {
+                        "Your active and past agent conversations will appear here."
+                    },
                     appearance.ui_font_family(),
                     14.,
                 )

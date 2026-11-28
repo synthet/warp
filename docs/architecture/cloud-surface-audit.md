@@ -138,6 +138,25 @@ Codex over PTY additionally installs Warp's Codex plugin from GitHub (`warpdotde
 Not yet gated (dormant, end at the sinkhole): the remaining `warp agent list/get/create/...`
 management subcommands still parse and appear in `--help`; they fail at auth.
 
+## Gated: Tools panel and header toolbar
+
+2026-11-14 audit of the left Tools panel (`workspace/view/left_panel.rs`) and the header toolbar
+items that sit next to it (`workspace/header_toolbar_item.rs`):
+
+| Surface | Backing | Status |
+|---|---|---|
+| Project explorer, Global search | Local filesystem | Kept |
+| **Warp Drive** tab | Hosted Drive sync | Gate 1 in `Workspace::compute_left_panel_views`, with its Appearance → Tools panel toggle (see `WarpDriveSettings::is_warp_drive_available`) |
+| Agent conversations tab | Local SQLite history | Kept. Ambient (Oz) runs are already never fetched (`AgentConversationsModel` checks `cloud_agents_enabled()`); the zero-state copy no longer mentions ambient agents |
+| Agent Management ("Runs") | Local runs + Oz runs | Setup guide, environment filter, cloud loading icon and cloud agent type were already gated. The **Source** filter is now gated too: every source but `Interactive` is an Oz run source, so locally it could only narrow to nothing |
+| Code Review | Local git | Kept |
+| Notifications | Local agent completion alerts | Kept (the `Oz` variant is the built-in agent's icon, not a cloud run) |
+
+Known residue: the conversations tab still reports `RequiresAccount` whenever the user is logged
+out (`ToolPanelView::availability`), which without a self-hosted login is always — so the tab stays
+locked even with AI enabled. That is an account gate on a local feature, not a cloud surface; left
+for a separate change.
+
 ## Gated: other pages
 
 - **Knowledge** — "Manage rules" (opens the Warp Drive rule collection, whose page is already
